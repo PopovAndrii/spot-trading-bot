@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+  <%- include('../views/head'); %>
+  <body>
+    <%- include('../views/navbar'); %>
+    <div class="container">
+      <form>
+        <div class="row">
+          <div class="col">
+            <%= currency %>
+          </div>
+          <div class="col">
+            <div id="settings-strategy" class="btn-group" role="group" aria-label="Basic radio toggle button group">
+              <input id="short" type="radio" class="btn-check" name="btnradio" autocomplete="off" >
+              <label class="btn btn-outline-primary" for="short">short</label>
+              <input id="long" type="radio" class="btn-check" name="btnradio" autocomplete="off">
+              <label class="btn btn-outline-primary" for="long">long</label>
+            </div>
+          </div>
+          <!-- <div class="col">
+            <span id="settings-balance" class="badge p-2 text-bg-success"></span>(you balance)
+          </div> -->
+        </div>
+
+        <div class="row pt-3">
+          <div class="col">
+            <div class="mb-1">
+              <label class="form-label">Currency</label>
+              <input type="" class="form-control" id="field-currency" placeholder="0" disabled readonly>
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-strategy" class="form-label">Strategy</label>
+              <input type="" class="form-control" id="field-strategy" placeholder="" disabled readonly>
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-tickSize" class="form-label">tickSize price</label>
+              <input type="" class="form-control" id="field-tickSize" placeholder="" disabled readonly>
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-stepSize" class="form-label">stepSize quantity</label>
+              <input type="" class="form-control" id="field-stepSize" placeholder="" disabled readonly>
+            </div>
+          </div>
+        </div>
+        <div class="row pt-3">
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-deposit" class="form-label">Deposite</label>
+              <input type="" class="form-control" id="field-deposit" placeholder="0">
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-orderSize" class="form-label">Order Size <i class="small" id="info-quoteAsset1"></i></label>
+              <input type="" class="form-control" id="field-orderSize" placeholder="0">
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-profit" class="form-label">Profit 0.1 - 0.4</label>
+              <input type="" class="form-control" id="field-profit" placeholder="0">
+            </div>
+          </div>
+        </div>
+          
+        <div class="row pt-3">
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-fibonachiStep" class="form-label">Fibonachi step</label>
+              <input type="" class="form-control" id="field-fibonachiStep" placeholder="0">
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-martingail" class="form-label">Martingail</label>
+              <input type="" class="form-control" id="field-martingail" placeholder="0">
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-indent" class="form-label">Indent from the price</label>
+              <input type="" class="form-control" id="field-indent" placeholder="0">
+            </div>
+          </div>
+        </div>
+          
+        <div class="row pt-3">
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-trackPrice" class="form-label">Track price</label>
+              <input type="" class="form-control" id="field-trackPrice" placeholder="0">
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-staticStep" class="form-label">Static Step</label>
+              <input type="" class="form-control" id="field-staticStep" placeholder="0">
+            </div>
+          </div>
+          <div class="col">
+            <div class="mb-1">
+              <label for="field-requestFrequency" class="form-label">Request frequency</label>
+              <input type="" class="form-control" id="field-requestFrequency" placeholder="0">
+            </div>
+          </div>
+        </div>
+
+        <div class="row pt-3">
+          <div class="col">
+            <div class="mb-1">
+              <div class="btn-group btn-group-sm" role="group" aria-label="Basic mixed styles example">
+                <button id="settings-calculate" value="long" type="button" class="btn btn-info">Calculate</button>
+                <button id="settings-calculate-save" type="button" class="btn btn-outline-info">save</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="row">
+              <div class="col">
+               <button id="toggleBtn" type="button" class="btn btn-sm btn-info">Start <i class="bi bi-caret-right-fill"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+          
+      </form>
+
+      <table id="settings-table" class="table table-secondary table-bordered table-striped table-hover table-striped table-striped">
+        <thead>
+          <tr class="table-primary">
+            <th scope="col">#</th>
+            <th scope="col">%</th>
+            <th scope="col">Buy currency</th>
+            <th scope="col">BUY</th>
+            <th scope="col">SELL</th>
+            <th scope="col">Sell currency</th>
+            <th scope="col">Spent. did buy</th>
+            <th scope="col">Balance</th>
+            <th scope="col">stat</th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+            
+      <div class="row">
+        <div class="col">
+          <div class="mb-1">
+            <button id="cancel-all-orders" type="button" class="btn btn-danger btn-sm">Cancel all order</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <br>
+    <br>
+    <%- include('../views/footer'); %>
+  </body>
+  <script>
+    
+    const currency = '<%= currency %>';
+    var orders = [
+      //  symbol: 'BTCUSDT',     // пара
+      //  side: 'BUY',           // или 'SELL'
+      //  type: 'LIMIT',         // лимитный ордер
+      //  quantity: 0.001,       // количество BTC
+      //  price: 50000,          // цена в USDT
+      //  timeInForce: 'GTC',    // "Good Til Cancelled" — ордер висит, пока не исполнится
+    ];
+    
+  </script>
+  <!-- <script src="/lib/job.js"></script> -->
+  <script type="module" src="/javascripts/spotMain.js"></script>
+</html>

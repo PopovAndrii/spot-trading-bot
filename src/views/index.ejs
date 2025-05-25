@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <%- include('../views/head'); %>
+  <body>
+    <%- include('../views/navbar'); %>
+
+    <div class="container text-center">
+      <div class="row">
+        <div class="col">
+          <div class="form-floating">
+            <select class="form-select" id="selectCurrency" aria-label="Floating label select example">
+              <option selected><%= info.symbols.length %> elements</option>
+              <% info.symbols.forEach((name, index) => { %>
+                <option value='<%= name.symbol %>?base=<%= name.baseAsset %>&quote=<%= name.quoteAsset %>'><%= name.symbol %></option>
+              <% }); %>
+            </select>
+            <label for="selectCurrency">Select currency</label>
+          </div>
+        </div>
+        <div class="col">
+          <a href="#" id="sendCurrency" class="btn btn-success btn-lg" role="button" aria-disabled="true">Select currency!</a>
+        </div>
+      </div> 
+      <%- include('../views/footer'); %>  
+  </body>
+  <script>
+    document.getElementById('selectCurrency').addEventListener('change', function () {
+      const btn = document.getElementById('sendCurrency');
+      btn.innerText = this.value;
+      btn.href = `/spotbot/${this.value}`;
+      // btn.href = `/spotbot`;
+      console.log(document.getElementById('sendCurrency').href);
+    });
+  </script>
+</html>
