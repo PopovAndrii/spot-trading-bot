@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <%- include('../views/head'); %>
+  <body>
+    <%- include('../views/navbar'); %>
+    <h3><%= title %></h3>
+
+    <table class="table table-secondary table-bordered table-striped table-hover table-striped table-striped">
+      <thead>
+        <tr class="table-primary">
+          <th scope="col"></th>
+          <th scope="col">Asset</th>
+          <th scope="col">Free</th>
+          <th scope="col">Locked</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% info.balances.forEach((currency, index) => { %>
+          <tr>
+            <th scope="row"><%= index + 1 %></th>
+            <td><%= currency.asset %></td>
+            <td><%= currency.free %></td>
+            <td><%= currency.locked %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+
+    <table class="table table-sm">
+      <tbody>
+        <tr><td>maker:</td><td><span class="badge text-bg-primary"><%= info.commissionRates.maker %></span></td></tr>
+        <tr><td>taker:</td><td><span class="badge text-bg-primary"><%= info.commissionRates.taker %></span></td></tr>
+        <tr><td>buyer:</td><td><span class="badge text-bg-primary"><%= info.commissionRates.buyer %></span></td></tr>
+        <tr><td>seller:</td><td><span class="badge text-bg-primary"><%= info.commissionRates.seller %></span></td></tr>
+      </tbody>
+    </table>
+
+    <%= new Date(info.updateTime).toLocaleString() %>
+  </body>
+</html>

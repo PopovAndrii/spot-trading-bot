@@ -1,0 +1,43 @@
+#!/bin/bash
+
+######################################
+# Create temporary folders for data.
+# redis postgres app(logs)
+######################################
+if [[ -d ./tmp/ ]]; then
+	echo 'OK ./tmp'
+else
+	read -p 'The .tmp (.tmp/app) folder does`not exist. Create [y/n]' tmp_folder
+	if [[ $tmp_folder = 'y' ]] && [[ ! -z $tmp_folder ]]; then
+		mkdir -vp ./tmp/app
+	fi
+fi
+
+#######################################
+# Create .bash_istory file
+# History of executed commands
+# Search: Ctrl + r and arrow Up & Down
+#######################################
+if [[ ! -f .bash_history ]]; then
+	read -p 'The command history file does not exist. Create file? [y/n]' bash_history
+	if [[ $bash_history = 'y' ]] && [[ -n $bash_history ]]; then
+		echo '
+composer install
+npm install
+npm run watch' >> .bash_history
+		echo 'Created .bash_history file'
+	fi
+else
+	echo 'OK .ash_history'
+fi
+
+# Create simbolic link .env file
+if [[ ! -L .env ]]; then
+	read -p 'The .env file is not symbolic link or does`not exist. Create link? [y/n]' env_symlink
+	if [[ $env_symlink = 'y' ]] && [[ ! -z $env_symlink ]]; then
+		ln -sf ./src/.env ./.env
+		echo 'Created .env Symbolic link'
+	fi
+else
+	echo 'OK .env'
+fi

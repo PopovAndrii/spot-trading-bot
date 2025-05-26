@@ -1,0 +1,146 @@
+{
+  "id": "hash-hash",
+  "status": 3,
+  "pair": "BNBUSDT",
+  "param": {
+    "field-currency": "673.60000000",
+    "field-strategy": "long",
+    "field-tickSize": "2",
+    "field-stepSize": "3",
+    "field-deposit": "428.13",
+    "field-orderSize": "0.019",
+    "field-profit": "0.7",
+    "field-fibonachiStep": "0.7",
+    "field-martingail": "70",
+    "field-indent": "0.001",
+    "field-trackPrice": "0.3",
+    "field-staticStep": "0",
+    "field-requestFrequency": "800"
+  },
+  "date_added": "2025-05-23T14:47:02.065Z",
+  "date_modified": "2025-05-24T07:04:56.966Z-",
+  "BUY": [
+    {
+      "status": "FILLED",
+      "symbol": "BNBUSDT",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.019",
+      "price": "673.59",
+      "timeInForce": "GTC",
+      "orderId": 8122575632
+    },
+    {
+      "status": "FILLED",
+      "symbol": "BNBUSDT",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.033",
+      "price": "668.88",
+      "timeInForce": "GTC",
+      "orderId": 8122575691
+    },
+    {
+      "status": "FILLED",
+      "symbol": "BNBUSDT",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.056",
+      "price": "659.45",
+      "timeInForce": "GTC",
+      "orderId": 8122575725
+    },
+    {
+      "status": "NEW",
+      "symbol": "BNBUSDT",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.097",
+      "price": "645.30",
+      "timeInForce": "GTC",
+      "orderId": 8122575759
+    },
+    {
+      "status": "NEW",
+      "symbol": "BNBUSDT",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.171",
+      "price": "626.44",
+      "timeInForce": "GTC",
+      "orderId": 8122575824
+    },
+    {
+      "status": "NEW",
+      "symbol": "BNBUSDT",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.301",
+      "price": "602.87",
+      "timeInForce": "GTC",
+      "orderId": 8122575879
+    }
+  ],
+  "SELL": [
+    {
+      "status": "CANCELED",
+      "symbol": "BNBUSDT",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.019",
+      "price": "679.66",
+      "timeInForce": "GTC",
+      "orderId": 8122634858
+    },
+    {
+      "status": "CANCELED",
+      "symbol": "BNBUSDT",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.052",
+      "price": "676.65",
+      "timeInForce": "GTC",
+      "orderId": 8123034064
+    },
+    {
+      "status": "FILLED",
+      "symbol": "BNBUSDT",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.108",
+      "price": "670.78",
+      "timeInForce": "GTC",
+      "orderId": 8124581620
+    },
+    {
+      "status": null,
+      "symbol": "BNBUSDT",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.205",
+      "price": "661.43",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "BNBUSDT",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.376",
+      "price": "648.10",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "BNBUSDT",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.677",
+      "price": "630.38",
+      "timeInForce": "GTC",
+      "orderId": null
+    }
+  ]
+}
