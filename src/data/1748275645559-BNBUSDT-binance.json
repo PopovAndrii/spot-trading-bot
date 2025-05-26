@@ -1,6 +1,6 @@
 {
   "id": "hash-hash",
-  "status": 0,
+  "status": 3,
   "pair": "BNBUSDT",
   "param": {
     "field-currency": "673.97000000",
@@ -18,7 +18,7 @@
     "field-requestFrequency": "800"
   },
   "date_added": "2025-05-26T08:34:57.505Z",
-  "date_modified": null,
+  "date_modified": "2025-05-26T16:07:25.559Z",
   "BUY": [
     {
       "status": "FILLED",
