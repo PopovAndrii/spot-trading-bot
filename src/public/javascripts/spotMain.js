@@ -1,17 +1,43 @@
 import { CancelAllOrders } from './CancelAllOrders.js';
 import { LoadDataCalculator } from './LoadDataCalculator.js';
 import { LoadDataFromFileCalculator } from './LoadDataFromFileCalculator.js';
+import { Notifications } from './ui/Notifications.js';
 import { SetStrategy } from './SetStrategy.js';
 import { SpotWS } from './SpotWS.js';
+import { Theme } from './ui/Theme.js';
 
-new CancelAllOrders();
+new UiElements.SpinBox();
+new UiElements.Switch();
 
-const loadDataCalculator = new LoadDataCalculator();
+const notifications = new Notifications();
+
+const cancelAllOrders = new CancelAllOrders(notifications);
+
+const colors = {
+  null: '',
+  NEW: 'color-success',
+  FILLED: 'color-primary',
+  PARTIALLY_FILLED: 'color-warning',
+  CANCELED: 'color-secondary',
+};
+
+const loadDataCalculator = new LoadDataCalculator(notifications, colors);
 loadDataCalculator.save();
 
-new LoadDataFromFileCalculator();
-new SetStrategy();
-new SpotWS();
+const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
+  notifications,
+  loadDataCalculator,
+  colors
+);
 
+const setStrategy = new SetStrategy();
 
+new SpotWS(
+  notifications,
+  loadDataFromFileCalculator,
+  loadDataCalculator,
+  cancelAllOrders,
+  setStrategy
+);
 
+new Theme();

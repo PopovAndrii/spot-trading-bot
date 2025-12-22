@@ -1,0 +1,41 @@
+@use './var' as *;
+
+.login {
+  display: grid;
+  background-color: $c-i-100;
+  border: 1px solid $c-i-500;
+  border-radius: $border-radius;
+  padding: 1.0rem;
+  gap: 1rem;
+
+  &-field {
+    display: grid;
+
+    &>label {
+      font-size: 1.0rem;
+      color: $c-g-500;
+    }
+
+    &>input {
+      height: 3rem;
+      background-color: $c-i-50;
+      border-radius: $border-radius;
+      border: 1px solid $c-i-500;
+      font-size: 2.0rem;
+      padding: 0.5rem;
+      color: $c-g-500;
+    }
+  }
+
+  &-submit {
+    color: $c-i-50;
+    background-color: $c-i-500;
+    padding: 0.5rem;
+    font-size: 1.5rem;
+    border-radius: $border-radius;
+
+    &:hover {
+      background-color: $c-i-700;
+    }
+  }
+}

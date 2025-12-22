@@ -1,0 +1,49 @@
+@use 'var';
+@use 'themes';
+@use 'normalize';
+
+@use 'button-group';
+@use 'button';
+@use 'currency';
+@use 'icon';
+@use 'input-btn';
+@use 'line';
+@use 'login';
+@use 'nav';
+@use 'notifications';
+@use 'switch';
+@use 'table';
+
+@use 'media';
+@use 'layout';
+
+html {
+  font-size: var.$font-size-base;
+}
+
+body {
+  padding: 0px;
+  background-color: var.$c-g-50;
+  color: var.$c-g-950;
+  transition: background 0.3s ease;
+}
+
+.color-primary {
+  color: var.$c-p-500;
+  background-color: var.$c-p-100;
+}
+
+.color-success {
+  color: var.$c-s-500;
+  background-color: var.$c-s-100;
+}
+
+.color-secondary {
+  color: var.$c-g-500;
+  background-color: var.$c-g-100;
+}
+
+.color-warning {
+  color: var.$c-w-500;
+  background-color: var.$c-w-100;
+}

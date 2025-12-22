@@ -1,22 +1,28 @@
 const express = require('express');
 const router = express.Router();
 
-const Dotenv = require('dotenv');
-Dotenv.config();
-
 const { Spot } = require('@binance/connector');
 const client = new Spot(process.env.API_KEY, process.env.API_SECRET);
 
-/* GET home page. */
-function exchangeInfo(data) {
-  router.get('/', function(req, res, next) {
-    res.render('index', { title: 'Express', info: data});
-  });
-}
+const { ensureAuthenticated } = require('./login');
+router.use(ensureAuthenticated);
 
-client.exchangeInfo({ symbols:["BTCUSDT", "BNBUSDT"] }) // symbols:["BTCUSDT"]
-    .then(response => exchangeInfo(response.data))
-    // .then(response => client.logger.log(response.data))
-    .catch(error => client.logger.error(error));
+router.get('/', function (req, res, next) {
+  client
+    .exchangeInfo({ symbols: ['BTCUSDT', 'BNBUSDT'] })
+    .then((response) => {
+      // Как только данные получены, рендерим страницу
+      res.render('index', {
+        title: 'Main Page',
+        user: req.session.user.name,
+        info: response.data, // Передаем свежие данные
+      });
+    })
+    .catch((error) => {
+      // Обработка ошибки, если Binance API недоступен
+      console.error(error);
+      res.status(500).render('error', { message: 'Ошибка получения данных Binance API' });
+    });
+});
 
 module.exports = router;

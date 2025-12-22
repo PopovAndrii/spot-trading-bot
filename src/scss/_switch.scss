@@ -1,0 +1,110 @@
+@use './var' as *;
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.25rem 0.5rem;
+
+
+  &-icon {
+    font-size: $font-size-base -0.9;
+  }
+
+  &-text {
+    color: $c-g-950;
+  }
+
+  input {
+    display: none;
+  }
+
+  &.switch-danger>.switch-slider {
+    border-color: $c-d-500;
+  }
+
+  &.switch-danger>.switch-slider::before {
+    background-color: $c-d-500;
+  }
+
+  &.switch-info>.switch-slider {
+    border-color: $c-i-500;
+  }
+
+  &.switch-info>.switch-slider::before {
+    background-color: $c-i-500;
+  }
+
+  &.switch-primary>.switch-slider {
+    border-color: $c-p-500;
+  }
+
+  &.switch-primary>.switch-slider::before {
+    background-color: $c-p-500;
+  }
+
+  &.switch-success>.switch-slider {
+    border-color: $c-s-500;
+  }
+
+  &.switch-success>.switch-slider::before {
+    background-color: $c-s-500;
+  }
+
+  &.switch-warning>.switch-slider {
+    border-color: $c-w-500;
+  }
+
+  &.switch-warning>.switch-slider::before {
+    background-color: $c-w-500;
+  }
+
+  &.switch-warning>&-slider {
+    background-color: $c-w-100;
+  }
+
+  &.switch-warning>input:checked+&-slider {
+    background-color: $c-w-900;
+  }
+
+  &-slider {
+    width: 36px;
+    height: 20px;
+    background: $c-g-300;
+    border-radius: 13px;
+    border: 1px solid $c-g-700;
+    position: relative;
+    transition: background 0.5s;
+
+    &::before {
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 2px;
+      top: 2px;
+      background: $c-g-700;
+      border-radius: 50%;
+      transition: transform 0.5s;
+    }
+
+    &:hover {
+      background-color: $c-g-500;
+    }
+
+  }
+
+  &>:checked+&-slider::before {
+    transform: translateX(16px);
+  }
+
+  &>input:checked+&-slider {
+    background: $c-g-300;
+
+    &:hover {
+      background-color: $c-g-500;
+    }
+  }
+}

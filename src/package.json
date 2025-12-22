@@ -3,29 +3,39 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "build-css": "sass scss/:public/stylesheets/ --no-source-map",
+    "dev": "concurrently \"npm:watch-css\" \"npm:start\"",
     "start": "nodemon ./bin/www",
+    "prod-start": "pm2 start ./bin/www --name 'my-app' --env production",
     "lint": "eslint . --ext .js,.ts",
-    "lint:fix": "eslint . --ext .js,.ts --fix"
+    "lint:fix": "eslint . --ext .js,.ts --fix",
+    "watch-css": "sass --style=compressed --no-source-map --watch scss/:public/stylesheets/"
   },
   "dependencies": {
     "@binance/connector": "^3.6.1",
-    "bootstrap": "^5.3.3",
-    "bootstrap-icons": "^1.12.1",
+    "@popovandrii/ui-elements": "^0.0.16",
+    "bcrypt": "^6.0.0",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "dotenv": "^16.4.7",
-    "ejs": "~2.6.1",
-    "express": "~4.16.1",
+    "ejs": "^3.1.10",
+    "express": "^4.22.1",
+    "express-rate-limit": "^8.2.1",
+    "express-session": "^1.18.2",
     "http-errors": "~1.6.3",
-    "morgan": "~1.9.1",
+    "morgan": "^1.10.1",
     "node-fetch": "^3.3.2",
+    "pm2": "^6.0.14",
     "ws": "^8.18.1"
   },
   "devDependencies": {
+    "browser-sync": "^3.0.4",
+    "concurrently": "^9.1.2",
     "eslint": "^9.27.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.4.0",
     "nodemon": "^3.1.9",
-    "prettier": "^3.5.3"
+    "prettier": "^3.5.3",
+    "sass": "^1.89.0"
   }
 }

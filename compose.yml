@@ -1,43 +1,45 @@
 services:
     app:
         build:
-            args:
-                - USER=${USER}
-                - UID=${UID-1000}
-                - GID=${GID-1000}
             context: .
             dockerfile: docker-config/Dockerfile
         image: exchange-crypto
-        container_name: exchange-crypto-app
+        container_name: exchange-crypto-${PREFIX_CONTAINER_NAME}
         restart: unless-stopped
-        working_dir: /var/www/
+        working_dir: /var/www/src
         volumes:
-            - ./src:/var/www
-            - ./docker-config/php.ini:/usr/local/etc/php/conf.d/php.ini
-            - ./.bash_history:/home/${USER}/.bash_history
-            - ./tmp/app/:/home/${USER}/.npm/
+            - .:/var/www
+            # - ./.bash_history:/home/${USER}/.bash_history
+            # - ${SSH_PATH}:/home/${USER}/.ssh:ro
+            - ./.bash_history:/home/node/.bash_history:rw
+            - ${SSH_PATH}:/home/node/.ssh:ro
+            - ${GITCONFIG_PATH}:/home/${USER}/.gitconfig:ro
+            - ./tmp/app/:/home/node/.npm/
             - /etc/localtime:/etc/localtime:ro
         depends_on:
             - nginx
         networks:
             - exchange-crypto
         ports:
-            - ${PORT}:3002
+            - ${PORT}:${PORT}
+        env_file:
+            - .env
+        command: ["sleep", "infinity"]
 
     nginx:
         image: nginx:latest
-        container_name: exchange-crypto-nginx
+        container_name: exchange-crypto-nginx-${PREFIX_CONTAINER_NAME}
         restart: unless-stopped
         ports:
             - ${NGINX_PORT}:80
             - ${NGINX_PORT_SSL}:443
         volumes:
-            - ./src:/var/www
+            - .:/var/www
             - ./docker-config/nginx/conf.d/:/etc/nginx/conf.d/
         networks:
             - exchange-crypto
 
-
 networks:
     exchange-crypto:
         driver: bridge
+        name: exchange-crypto-${PREFIX_CONTAINER_NAME}

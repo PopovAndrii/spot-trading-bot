@@ -1,3 +1,4 @@
+/src/data
 /src/node_modules
 /src/storage/*.key
 /src/vendor
@@ -8,6 +9,7 @@
 /src/public/hot
 /src/public/js
 /src/public/css
+/src/public/stylesheets/syle.css
 /src/public/fonts
 /src/public/build
 /src/public/storage

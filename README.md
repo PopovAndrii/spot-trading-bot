@@ -13,15 +13,13 @@ That is, you have the opportunity to calculate your trading strategy before it i
 ## Installation
 
 ```sh
-git clone https://gitlab.com/AndreyPopov/exchange-crypto.git
+git clone git@gitlab.com:AndreyPopov/exchange-crypto.git
 cd ./exchange-crypto
 ```
 
-The entire environment is based on Docker. It must be installed.
+The entire environment is based on Docker. It must be installed - [Docker.](https://docs.docker.com/engine/install/) And Docker Desktop on Windows
 What's inside?
 ```sh
-php-fpm #8.2 and packeges...
-composer
 nodejs
 npm # packege.json
 ```
@@ -30,6 +28,27 @@ On a Linux system, you need to create a file /src/.env with the following conten
 
 ```sh
 APP_NAME=Exchange 💰 Cryptocurrencies
+
+# NODE_ENV=development
+# for pm2 production
+NODE_ENV=production
+
+ADMIN_LOGIN=admin
+# Generate password
+# node -e "console.log(require('bcrypt').hashSync('you-password-hash', 10))"
+ADMIN_PASSWORD_HASH=$2b$10$duSulJ1o08aAsw8xOCg/4eAu.vasc6kdim.1G.i/IwfMcWlCVDzQ2
+SESSION_SECRET=1o08aAsw8xOCg
+
+# SSH_PATH=/c/Users/YourUsername/.ssh # for Windows users
+SSH_PATH=~/.ssh # for Linux users 
+USER=YourUsername # Windows and Linux
+
+# GITCONFIG_PATH=/c/Users/YourUsername/.gitconfig # for Windows users
+GITCONFIG_PATH=~/.gitconfig # for Linux users
+
+PREFIX_CONTAINER_NAME=dev # or prod | If 2 containers are required to operate simultaneously
+ 
+STATUS_APP=false # false === dev mode. Without a request on Binance 
 
 API_KEY='you_key_form_binance_api'
 API_SECRET='you_secret_key_form_binance_api'
@@ -55,27 +74,45 @@ In Windows, create two identical files (the contents of the file above):
 ## Usage
 
 ```sh
-docker compouse up -d --build # upload image and run
-docker compouse up -d # only run
-docker compouse up down # stop everything
-docker compouse ps # see the state of all containers in the project
-docker compouse exec app bush # access the application
-npm start # run project
+docker compouse up -d --build # Upload image and run. First start or update images
+docker compouse up -d # Only run. Typical work
+docker compouse down # Stop everything
+docker compouse ps # See the state of all containers in the project
+docker stats # Check container loads
+docker compouse exec app bush # Access the application
+npm start # Run a project
+npm run dev # Run a project with sass watching
+npm run build-css # Build only sass file
+# For git. Return to /
+cd .. # return on folder back /var/www/src -> /var/www Or cd /var/www
+git status 
 
+# Launch the application (production)
+docker compose exec app sh -c "cd /var/www/src && npm run prod-start"
+# Application status information (cpu logs mem) 
+docker compose exec app sh -c "cd /var/www/src && npm exec pm2 monit"
+# Logs
+docker compose exec app sh -c "cd /var/www/src && npm exec pm2 logs my-app --lines 20"
+# Quick logs
+docker compose exec app sh -c "cd /var/www/src && npm exec pm2 list"
+# For restart app after reboot server
+docker compose exec app sh -c "cd /var/www/src && npm exec pm2 save"
+# Stop
+docker compose exec app sh -c "cd /var/www/src && npm exec pm2 stop id|name|namespace"
 ```
 
 ## Formating ESLint (inside Docker)
 - ESlint and Pretier work automatically. (spaces and tabs are formatted only by VScode) But if necessary, you can run it manually.
 - Check and fix one file
 
-```
+```sh
 npx eslint /var/www/lib/job.js
 npx eslint /var/www/lib/job.js --fix
 ```
 
 ## Config .vscode/settings.json in root dirrectory
-
-```
+VScode must have the ESlint plugin from Microsoft installed.
+```json
 {
   "editor.formatOnSave": true,
   "editor.insertSpaces": true,
@@ -92,20 +129,5 @@ npx eslint /var/www/lib/job.js --fix
 }
 ```
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/AndreyPopov/exchange-crypto.git
-git branch -M main
-git push -uf origin main
-```
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
 
 

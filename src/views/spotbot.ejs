@@ -1,179 +1,144 @@
 <!DOCTYPE html>
-<html>
-  <%- include('../views/head'); %>
+<html data-theme="">
+<%- include('../views/head'); %>
+
   <body>
-    <%- include('../views/navbar'); %>
-    <div class="container">
-      <form>
+    <div class="wrapper">
+      <header class="">
+        <%- include('../views/navbar'); %>
+      </header>
+      <main class="container-adaptive content">
+        <form>
+          <div class="symbol">
+            <div id="settings-strategy" class="input-btn">
+              <input id="short" type="radio" name="btnradio">
+              <label class="" for="short">short</label>
+              <input id="long" type="radio" name="btnradio">
+              <label class="" for="long">long</label>
+              <input id="longDynamic" type="radio" name="btnradio">
+              <label class="" for="longDynamic">longD</label>
+            </div>
+
+            <div class="symbol-bar">
+              <div class="symbol-bar__text">
+                <%= bace + quote %>
+              </div>
+              <input type="" id="field-currency" disabled readonly>
+            </div>
+          </div>
+
+          <div>
+            <input type="hidden" id="field-strategy">
+            <input type="hidden" id="field-tickSize">
+            <input type="hidden" id="field-stepSize">
+          </div>
+          <div class="line">
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-deposit' , label:'Available balance' , min: 0 , max: 0 ,
+                step: formatInfo.tickSize || 0 }); %>
+            </div>
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-orderSize' , label:'Order Size' , min: 0 , max: 0 , step:
+                formatInfo.stepSize || 0 }); %>
+            </div>
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-profit' , label:'Profit 0.1 - 0.4' , min: 0.1 , step: 1,
+                max: 0 }); %>
+            </div>
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Fibonachi step' , min: 0 , max: 0 ,
+                step: 1 }); %>
+            </div>
+          </div>
+
+          <div class="line">
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 50 , max: 150 ,
+                step: 0 }); %>
+            </div>
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2
+                }); %>
+            </div>
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-trackPrice' , label:'Track price' , min:0.1 , max:1, step:
+                1, }); %>
+            </div>
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-requestFrequency' , label:'Request frequency' , min:1000,
+                max:5000, step:0 }); %>
+            </div>
+          </div>
+
+          <div class="line line-press line-between">
+            <div>
+              <div class="button-group lg">
+                <button id="settings-calculate" value="long" type="button" class="">Calculate
+                  <svg class="icon">
+                    <use href="/sprite.svg#calc"></use>
+                  </svg>
+                </button>
+                <button id="settings-calculate-save" type="button" class="">Save
+                  <svg class="icon">
+                    <use href="/sprite.svg#save"></use>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="stream-currency">
+            </div>
+            <div class="line-line">
+              <button id="toggleBtn" type="button" class="button primary lg">
+                Start
+                <svg class="icon">
+                  <use href="/sprite.svg#play"></use>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+        </form>
+
+        <table id="settings-table" class="t t-border t-striped t-hover">
+          <thead>
+            <tr>
+              <th class="center">#</th>
+              <th>%</th>
+              <th>Buy currency</th>
+              <th>BUY</th>
+              <th>SELL</th>
+              <th>Sell currency</th>
+              <th>Spent. did buy</th>
+              <th>Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+
         <div class="row">
           <div class="col">
-            <%= currency %>
-          </div>
-          <div class="col">
-            <div id="settings-strategy" class="btn-group" role="group" aria-label="Basic radio toggle button group">
-              <input id="short" type="radio" class="btn-check" name="btnradio" autocomplete="off" >
-              <label class="btn btn-outline-primary" for="short">short</label>
-              <input id="long" type="radio" class="btn-check" name="btnradio" autocomplete="off">
-              <label class="btn btn-outline-primary" for="long">long</label>
-            </div>
-          </div>
-          <!-- <div class="col">
-            <span id="settings-balance" class="badge p-2 text-bg-success"></span>(you balance)
-          </div> -->
-        </div>
-
-        <div class="row pt-3">
-          <div class="col">
             <div class="mb-1">
-              <label class="form-label">Currency</label>
-              <input type="" class="form-control" id="field-currency" placeholder="0" disabled readonly>
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-strategy" class="form-label">Strategy</label>
-              <input type="" class="form-control" id="field-strategy" placeholder="" disabled readonly>
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-tickSize" class="form-label">tickSize price</label>
-              <input type="" class="form-control" id="field-tickSize" placeholder="" disabled readonly>
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-stepSize" class="form-label">stepSize quantity</label>
-              <input type="" class="form-control" id="field-stepSize" placeholder="" disabled readonly>
+              <button id="cancel-all-orders" type="button" class="button lg danger">
+                Cancel all <%= bace + quote %> pairs
+                  <svg class="icon">
+                    <use href="/sprite.svg#close"></use>
+                  </svg>
+              </button>
             </div>
           </div>
         </div>
-        <div class="row pt-3">
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-deposit" class="form-label">Deposite</label>
-              <input type="" class="form-control" id="field-deposit" placeholder="0">
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-orderSize" class="form-label">Order Size <i class="small" id="info-quoteAsset1"></i></label>
-              <input type="" class="form-control" id="field-orderSize" placeholder="0">
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-profit" class="form-label">Profit 0.1 - 0.4</label>
-              <input type="" class="form-control" id="field-profit" placeholder="0">
-            </div>
-          </div>
-        </div>
-          
-        <div class="row pt-3">
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-fibonachiStep" class="form-label">Fibonachi step</label>
-              <input type="" class="form-control" id="field-fibonachiStep" placeholder="0">
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-martingail" class="form-label">Martingail</label>
-              <input type="" class="form-control" id="field-martingail" placeholder="0">
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-indent" class="form-label">Indent from the price</label>
-              <input type="" class="form-control" id="field-indent" placeholder="0">
-            </div>
-          </div>
-        </div>
-          
-        <div class="row pt-3">
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-trackPrice" class="form-label">Track price</label>
-              <input type="" class="form-control" id="field-trackPrice" placeholder="0">
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-staticStep" class="form-label">Static Step</label>
-              <input type="" class="form-control" id="field-staticStep" placeholder="0">
-            </div>
-          </div>
-          <div class="col">
-            <div class="mb-1">
-              <label for="field-requestFrequency" class="form-label">Request frequency</label>
-              <input type="" class="form-control" id="field-requestFrequency" placeholder="0">
-            </div>
-          </div>
-        </div>
-
-        <div class="row pt-3">
-          <div class="col">
-            <div class="mb-1">
-              <div class="btn-group btn-group-sm" role="group" aria-label="Basic mixed styles example">
-                <button id="settings-calculate" value="long" type="button" class="btn btn-info">Calculate</button>
-                <button id="settings-calculate-save" type="button" class="btn btn-outline-info">save</button>
-              </div>
-            </div>
-          </div>
-          <div class="col">
-            <div class="row">
-              <div class="col">
-               <button id="toggleBtn" type="button" class="btn btn-sm btn-info">Start <i class="bi bi-caret-right-fill"></i></button>
-              </div>
-            </div>
-          </div>
-        </div>
-          
-      </form>
-
-      <table id="settings-table" class="table table-secondary table-bordered table-striped table-hover table-striped table-striped">
-        <thead>
-          <tr class="table-primary">
-            <th scope="col">#</th>
-            <th scope="col">%</th>
-            <th scope="col">Buy currency</th>
-            <th scope="col">BUY</th>
-            <th scope="col">SELL</th>
-            <th scope="col">Sell currency</th>
-            <th scope="col">Spent. did buy</th>
-            <th scope="col">Balance</th>
-            <th scope="col">stat</th>
-          </tr>
-        </thead>
-        <tbody>
-        </tbody>
-      </table>
-            
-      <div class="row">
-        <div class="col">
-          <div class="mb-1">
-            <button id="cancel-all-orders" type="button" class="btn btn-danger btn-sm">Cancel all order</button>
-          </div>
-        </div>
-      </div>
+      </main>
+      <%- include('../views/footer'); %>
+        <div id="notifications"></div>
     </div>
-    <br>
-    <br>
-    <%- include('../views/footer'); %>
   </body>
   <script>
-    
-    const currency = '<%= currency %>';
-    var orders = [
-      //  symbol: 'BTCUSDT',     // пара
-      //  side: 'BUY',           // или 'SELL'
-      //  type: 'LIMIT',         // лимитный ордер
-      //  quantity: 0.001,       // количество BTC
-      //  price: 50000,          // цена в USDT
-      //  timeInForce: 'GTC',    // "Good Til Cancelled" — ордер висит, пока не исполнится
-    ];
-    
+    const bace = '<%= bace %>';
+    const quote = '<%= quote %>';
+    var orders = {};
+
   </script>
-  <!-- <script src="/lib/job.js"></script> -->
   <script type="module" src="/javascripts/spotMain.js"></script>
+
 </html>
