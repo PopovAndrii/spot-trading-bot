@@ -1,19 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { Spot } = require('@binance/connector');
+const { InvokeApi } = require('../lib/invokeAPI');
 
-const client = new Spot(process.env.API_KEY, process.env.API_SECRET);
+const apiMethod = new InvokeApi();
 
-function info(data){
-  router.get('/', function(req, res, next) {
-    res.render('info', { 
-      title: 'Acount Information ', 
-      info: data, });
+const { ensureAuthenticated } = require('./login');
+router.use(ensureAuthenticated);
+
+router.get('/', async function (req, res, next) {
+  res.render('info', {
+    title: 'Acount Information ',
   });
-}
+});
 
-client.account({ omitZeroBalances: true })
-  .then(response => info(response.data))
-  .catch(error => client.logger.error(error));
+router.post('/account-info', async function (req, res, next) {
+  // res.render('info', { title: 'Express' });
+  try {
+    const data = await apiMethod.getAccount();
 
+    res.json({ message: data });
+  } catch (err) {
+    console.error('Error saving file:', err);
+    res.status(500).json({ message: 'Error saving file' });
+  }
+});
 module.exports = router;

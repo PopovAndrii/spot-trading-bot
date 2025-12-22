@@ -1,0 +1,26 @@
+<html>
+<%- include('../views/head'); %>
+
+  <body>
+    <!-- <%- include('../views/navbar'); %> -->
+    <div class="container-adaptive content">
+
+      <div class="line">
+        <form action="/login" method="POST">
+          <div class="login">
+            <div class="login-field">
+              <label for="username">Username:</label>
+              <input type="text" id="username" name="username" required>
+            </div>
+            <div class="login-field">
+              <label for="password">Password:</label>
+              <input type="password" id="password" name="password" required>
+            </div>
+            <button class="login-submit" type="submit">Log In</button>
+          </div>
+        </form>
+      </div>
+
+  </body>
+
+</html>

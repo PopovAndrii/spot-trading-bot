@@ -5,7 +5,7 @@ const Status = Object.freeze({
   DONE: 3, // 3 - not done(error etc)
 });
 
-const orderState = Object.freeze({
+const state = Object.freeze({
   NEW: 'NEW', // Ордер создан, но ещё не исполнен
   CANCELED: 'CANCELED', // Ордер был отменён пользователем до исполнения
   PARTIALLY_FILLED: 'PARTIALLY_FILLED', // Ордер частично исполнен, но ещё не завершён полностью.
@@ -20,61 +20,46 @@ class Job {
     this.test = test;
   }
 
-  long = (model, i, el) => {
-    let data = {};
+  long = (obj, i, el) => {
+    if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-    if (this.test === true) return { status: 'pass', method: false, side: null, data: {}, id: i };
-
-    if (el.status === orderState.FILLED && model['SELL'][i].status === orderState.CANCELED) {
-      // уже отмененный ордер. цена пошла вниз. Запрос API не нужен
-      return { status: 'pass', method: false, side: null, data: {}, id: i };
+    if (el.status === state.FILLED && obj['SELL'][i].status === state.CANCELED) {
+      return { status: 'pass', method: false, side: null, id: i, data: {} };
     }
 
-    if (
-      el.status === orderState.FILLED &&
-      model['SELL'][i].status === orderState.PARTIALLY_FILLED
-    ) {
+    if (el.status === state.FILLED && obj['SELL'][i].status === state.PARTIALLY_FILLED) {
       return {
-        // продан частично. нужен статус ибо может быть уже отработан. ждать пока исполнится
-        status: orderState.PARTIALLY_FILLED,
+        status: state.PARTIALLY_FILLED,
         method: 'getOrder',
         side: 'SELL',
         id: i,
         data: {
           symbol: el.symbol,
-          orderId: model['SELL'][i].orderId,
+          orderId: obj['SELL'][i].orderId,
         },
       };
     }
 
-    if (model['SELL'][i].status !== orderState.FILLED) {
+    if (obj['SELL'][i].status !== state.FILLED) {
       switch (el.status) {
-        case orderState.FILLED: // исполненный
-          // "отменить" если есть предидущий ордер продажи. Освободить валюту на продажу.
+        case state.FILLED:
           if (i > 0) {
-            if (
-              model['SELL'][i - 1].status !== orderState.CANCELED
-              // || (model['BUY'][i - 1].status === orderState.FILLED && model['SELL'][i - 1].status !== null)
-              // || (model['BUY'][i - 1].status === orderState.FILLED && model['SELL'][i - 1].status !== orderState.PARTIALLY_FILLED)
-              // && (model['BUY'][i - 1].status === orderState.FILLED && model['SELL'][i].status !== orderState.NEW)
-            ) {
+            if (obj['SELL'][i - 1].status !== state.CANCELED) {
               return {
-                // отмена предыдущего ордера CANCELED
                 status: null,
                 method: 'cancelOrder',
                 side: 'SELL',
                 id: i - 1,
                 data: {
                   symbol: el.symbol,
-                  orderId: model['SELL'][i - 1].orderId,
+                  orderId: obj['SELL'][i - 1].orderId,
                 },
               };
             }
           }
 
-          if (model['SELL'][i].status === null) {
+          if (obj['SELL'][i].status === null) {
             return {
-              // placing an order SELL. This order is final
               status: null,
               method: 'newOrder',
               side: 'SELL',
@@ -84,32 +69,31 @@ class Job {
                 side: 'SELL',
                 type: 'LIMIT',
                 timeInForce: 'GTC',
-                quantity: model['SELL'][i].quantity,
-                price: model['SELL'][i].price,
+                quantity: obj['SELL'][i].quantity,
+                price: obj['SELL'][i].price,
               },
             };
           } else if (
-            model['SELL'][i].status === orderState.NEW ||
-            model['SELL'][i].status === orderState.PARTIALLY_FILLED
+            obj['SELL'][i].status === state.NEW ||
+            obj['SELL'][i].status === state.PARTIALLY_FILLED
           ) {
             return {
-              status: orderState.NEW ? orderState.NEW : orderState.PARTIALLY_FILLED,
+              status: state.NEW ? state.NEW : state.PARTIALLY_FILLED,
               method: 'getOrder',
               side: 'SELL',
               id: i,
               data: {
                 symbol: el.symbol,
-                orderId: model['SELL'][i].orderId,
+                orderId: obj['SELL'][i].orderId,
               },
             };
           }
 
-          return { status: 'pass', method: false, side: null, data: {}, id: i };
+          return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-        case orderState.NEW: // installed
+        case state.NEW:
           return {
-            // check status and update satus
-            status: orderState.NEW,
+            status: state.NEW,
             method: 'getOrder',
             side: 'BUY',
             id: i,
@@ -119,10 +103,9 @@ class Job {
             },
           };
 
-        case orderState.PARTIALLY_FILLED: // order placed, partially executed
+        case state.PARTIALLY_FILLED:
           return {
-            // check status and update satus
-            status: orderState.PARTIALLY_FILLED,
+            status: state.PARTIALLY_FILLED,
             method: 'getOrder',
             side: 'BUY',
             id: i,
@@ -134,7 +117,6 @@ class Job {
 
         default:
           return {
-            // установка ордера BUY. Пустой статус
             status: null,
             method: 'newOrder',
             side: 'BUY',
@@ -150,23 +132,21 @@ class Job {
           };
       }
     } else {
-      if (model['SELL'][i].status === orderState.NEW) {
+      if (obj['SELL'][i].status === state.NEW) {
         return {
-          // проверка на продажу. этот ордер должен исполнится и конец цикла
-          status: orderState.NEW,
+          status: state.NEW,
           method: 'getOrder',
           side: 'SELL',
           id: i,
           data: {
             symbol: el.symbol,
-            orderId: model['SELL'][i].orderId,
+            orderId: obj['SELL'][i].orderId,
           },
         };
       }
 
-      if (model['SELL'][i].status === orderState.FILLED) {
+      if (obj['SELL'][i].status === state.FILLED) {
         return {
-          // FILLED cycle completed. Cancelling all orders
           status: 'final',
           method: 'cancelOpenOrders',
           side: null,
@@ -179,123 +159,332 @@ class Job {
     }
   };
 
-  short = (model, i, el) => {
-    let data = {};
+  short = (obj, i, el) => {
+    if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-    if (this.test === true) return { status: 'pass', method: false, side: null, data: data, id: i };
-
-    if (el.status === 'FILLED' && model['BUY'][i].status === 'CANCELED') {
-      return { status: 'pass', method: false, side: null, data: data, id: i };
+    if (el.status === state.FILLED && obj['BUY'][i].status === state.CANCELED) {
+      return { status: 'pass', method: false, side: null, id: i, data: {} };
     }
 
-    if (el.status === 'FILLED' && model['BUY'][i].status === 'PARTIALLY_FILLED') {
-      data = {
-        symbol: el.symbol,
-        orderId: model['BUY'][i].orderId,
+    if (el.status === state.FILLED && obj['BUY'][i].status === state.PARTIALLY_FILLED) {
+      return {
+        status: state.PARTIALLY_FILLED,
+        method: 'getOrder',
+        side: 'BUY',
+        id: i,
+        data: {
+          symbol: el.symbol,
+          orderId: obj['BUY'][i].orderId,
+        },
       };
-      // проверка на статус. и обновление статуса
-      return { status: 'PARTIALLY_FILLED', method: 'getOrder', side: 'BUY', data: data, id: i };
     }
 
-    if (model['BUY'][i].status !== 'FILLED') {
+    if (obj['BUY'][i].status !== state.FILLED) {
       switch (el.status) {
-        case 'FILLED': // исполненный
-          // "отменить" если есть предидущий ордер продажи. Освободить валюту на продажу.
+        case state.FILLED:
           if (i > 0) {
-            if (
-              model['SELL'][i - 1].status === 'FILLED' &&
-              model['BUY'][i - 1].status !== 'CANCELED'
-            ) {
-              data = {
-                symbol: el.symbol,
-                orderId: model['BUY'][i - 1].orderId,
-              }; // отмена предNдущего ордера CANCELED
-              return { status: null, method: 'cancelOrder', side: 'BUY', data: data, id: i - 1 };
+            if (obj['BUY'][i - 1].status !== state.CANCELED) {
+              return {
+                status: null,
+                method: 'cancelOrder',
+                side: 'BUY',
+                id: i - 1,
+                data: {
+                  symbol: el.symbol,
+                  orderId: obj['BUY'][i - 1].orderId,
+                },
+              };
             }
           }
 
-          if (model['BUY'][i].status === null) {
-            // установка ордера BUY
-            data = {
-              symbol: el.symbol,
+          if (obj['BUY'][i].status === null) {
+            return {
+              status: null,
+              method: 'newOrder',
               side: 'BUY',
-              type: 'LIMIT',
-              timeInForce: 'GTC',
-              quantity: model['BUY'][i].quantity,
-              price: model['BUY'][i].price,
+              id: i,
+              data: {
+                symbol: el.symbol,
+                side: 'BUY',
+                type: 'LIMIT',
+                timeInForce: 'GTC',
+                quantity: obj['BUY'][i].quantity,
+                price: obj['BUY'][i].price,
+              },
             };
-            return { status: null, method: 'newOrder', side: 'BUY', data: data, id: i };
-          } else if (model['BUY'][i].status === 'NEW') {
-            data = {
-              symbol: el.symbol,
-              orderId: model['BUY'][i].orderId,
+          } else if (
+            obj['BUY'][i].status === state.NEW ||
+            obj['BUY'][i].status === state.PARTIALLY_FILLED
+          ) {
+            return {
+              status: state.NEW ? state.NEW : state.PARTIALLY_FILLED,
+              method: 'getOrder',
+              side: 'BUY',
+              id: i,
+              data: {
+                symbol: el.symbol,
+                orderId: obj['BUY'][i].orderId,
+              },
             };
-            return { status: 'NEW', method: 'getOrder', side: 'BUY', data: data, id: i };
           }
 
-        case 'NEW': // ордер установлен, в очереди
-          data = {
-            symbol: el.symbol,
-            orderId: el.orderId,
-          }; // проверка на статус. и обновление статуса
-          return { status: 'NEW', method: 'getOrder', side: 'SELL', data: data, id: i };
+          return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-        case 'PARTIALLY_FILLED': // ордер установлен, исполнен частично
-          data = {
-            symbol: el.symbol,
-            orderId: el.orderId,
-          }; // проверка на статус. и обновление статуса
+        case state.NEW:
           return {
-            status: 'PARTIALLY_FILLED',
+            status: state.NEW,
             method: 'getOrder',
             side: 'SELL',
-            data: data,
             id: i,
+            data: {
+              symbol: el.symbol,
+              orderId: el.orderId,
+            },
+          };
+
+        case state.PARTIALLY_FILLED:
+          return {
+            status: state.PARTIALLY_FILLED,
+            method: 'getOrder',
+            side: 'SELL',
+            id: i,
+            data: {
+              symbol: el.symbol,
+              orderId: el.orderId,
+            },
           };
 
         default:
-          data = {
-            symbol: el.symbol,
+          return {
+            status: null,
+            method: 'newOrder',
             side: 'SELL',
-            type: 'LIMIT',
-            timeInForce: 'GTC',
-            quantity: el.quantity, // купить колличество
-            price: el.price, // купить по курсу
+            id: i,
+            data: {
+              symbol: el.symbol,
+              side: 'SELL',
+              type: 'LIMIT',
+              timeInForce: 'GTC',
+              quantity: el.quantity,
+              price: el.price,
+            },
           };
-          // установка ордера BUY. Пустой статус
-          return { status: null, method: 'newOrder', side: 'SELL', data: data, id: i };
       }
     } else {
-      if (model['BUY'][i].status === 'NEW') {
-        data = {
-          symbol: el.symbol,
-          orderId: model['BUY'][i].orderId,
+      if (obj['BUY'][i].status === state.NEW) {
+        return {
+          status: state.NEW,
+          method: 'getOrder',
+          side: 'BUY',
+          id: i,
+          data: {
+            symbol: el.symbol,
+            orderId: obj['BUY'][i].orderId,
+          },
         };
-        // проверка на продажу.
-        return { status: 'NEW', method: 'getOrder', side: 'BUY', data: data, id: i };
       }
 
-      if (model['BUY'][i].status === 'FILLED') {
-        // FILLED цикл закончен
-        data = { symbol: el.symbol };
-        // отмена всех ордеров
-        return { status: 'final', method: null, side: null, data: data, id: i };
+      if (obj['BUY'][i].status === state.FILLED) {
+        return {
+          status: 'final',
+          method: 'cancelOpenOrders',
+          side: null,
+          id: i,
+          data: {
+            symbol: el.symbol,
+          },
+        };
       }
     }
   };
 
-  decimalCount = (e, s = '.') => {
-    var str = parseFloat(e).toString().split(s)[1] || '';
-    return str.length;
-  };
+  longDynamic = (obj, i, el, delta = {}, sailPrice) => {
+    if (this.test === true)
+      return { status: 'pass', method: false, side: null, id: i, data: delta };
 
-  stepCount = (e) => {
-    const str = parseFloat(e).toString();
+    if (el.status === state.FILLED && obj['SELL'][i].status === state.CANCELED) {
+      return { status: 'pass', method: false, side: null, id: i, data: {} };
+    }
 
-    if (str.includes('.')) return str.split('.')[1].length;
+    // ордер BUY заверщен и ордер SELL частично исполнен
+    if (el.status === state.FILLED && obj['SELL'][i].status === state.PARTIALLY_FILLED) {
+      return {
+        status: state.PARTIALLY_FILLED,
+        method: 'getOrder',
+        side: 'SELL',
+        id: i,
+        data: {
+          symbol: el.symbol,
+          orderId: obj['SELL'][i].orderId,
+        },
+      };
+    }
 
-    return 0;
-    //  return str.split('.')[0];
+    const THRESHOLD = { buy: -0.0005, sell: 0.0005 };
+
+    // // сигнал падения for BUY
+    // if (delta.ofsetPrice < 0 && delta.ofsetPrice <= THRESHOLD.buy) {
+    //   return;
+    // }
+
+    // // сигнал роста for SELL
+    // if (delta.ofsetPrice > 0 && delta.ofsetPrice >= THRESHOLD.sell) {
+    //   return;
+    // }
+
+    if (obj['SELL'][i].status !== state.FILLED) {
+      switch (el.status) {
+        case state.FILLED:
+          if (i > 0) {
+            if (obj['SELL'][i - 1].status !== state.CANCELED) {
+              return {
+                status: null,
+                method: 'cancelOrder',
+                side: 'SELL',
+                id: i - 1,
+                data: {
+                  symbol: el.symbol,
+                  orderId: obj['SELL'][i - 1].orderId,
+                },
+              };
+            }
+          }
+
+          if (obj['SELL'][i].status === null) {
+            if (delta.ofsetPrice > 0 && delta.ofsetPrice >= THRESHOLD.sell) {
+              if (delta.streamPrice > sailPrice) {
+                return {
+                  status: null,
+                  method: 'newOrder',
+                  side: 'SELL',
+                  id: i,
+                  data: {
+                    symbol: el.symbol,
+                    side: 'SELL',
+                    type: 'LIMIT',
+                    timeInForce: 'GTC',
+                    quantity: obj['SELL'][i].quantity,
+                    price: obj['SELL'][i].price,
+                  },
+                };
+              } else {
+                return { status: 'pass', method: false, side: null, id: i, data: {} };
+              }
+            } else {
+              return { status: 'pass', method: false, side: null, id: i, data: {} };
+            }
+          } else if (
+            obj['SELL'][i].status === state.NEW ||
+            obj['SELL'][i].status === state.PARTIALLY_FILLED
+          ) {
+            return {
+              status: state.NEW ? state.NEW : state.PARTIALLY_FILLED,
+              method: 'getOrder',
+              side: 'SELL',
+              id: i,
+              data: {
+                symbol: el.symbol,
+                orderId: obj['SELL'][i].orderId,
+              },
+            };
+          }
+
+          return { status: 'pass', method: false, side: null, id: i, data: {} };
+
+        case state.NEW:
+          return {
+            status: state.NEW,
+            method: 'getOrder',
+            side: 'BUY',
+            id: i,
+            data: {
+              symbol: el.symbol,
+              orderId: el.orderId,
+            },
+          };
+
+        case state.PARTIALLY_FILLED:
+          return {
+            status: state.PARTIALLY_FILLED,
+            method: 'getOrder',
+            side: 'BUY',
+            id: i,
+            data: {
+              symbol: el.symbol,
+              orderId: el.orderId,
+            },
+          };
+
+        default:
+          // First Order
+          if (i == 0) {
+            return {
+              status: null,
+              method: 'newOrder',
+              side: 'BUY',
+              id: i,
+              data: {
+                symbol: el.symbol,
+                side: 'BUY',
+                type: 'LIMIT',
+                timeInForce: 'GTC',
+                quantity: el.quantity,
+                price: el.price,
+              },
+            };
+          } else {
+            // price drop signal for BUY
+            if (delta.ofsetPrice < 0 && delta.ofsetPrice <= THRESHOLD.buy) {
+              // взять расчетную цену и текущую и поставить лимитный ордер
+              if (delta.streamPrice < el.price) {
+                return {
+                  status: null,
+                  method: 'newOrder',
+                  side: 'BUY',
+                  id: i,
+                  data: {
+                    symbol: el.symbol,
+                    side: 'BUY',
+                    type: 'LIMIT',
+                    timeInForce: 'GTC',
+                    quantity: el.quantity,
+                    price: delta.streamPrice,
+                  },
+                };
+              } else {
+                return { status: 'pass', method: false, side: null, id: i, data: {} };
+              }
+            } else {
+              return { status: 'pass', method: false, side: null, id: i, data: {} };
+            }
+          }
+      }
+    } else {
+      if (obj['SELL'][i].status === state.NEW) {
+        return {
+          status: state.NEW,
+          method: 'getOrder',
+          side: 'SELL',
+          id: i,
+          data: {
+            symbol: el.symbol,
+            orderId: obj['SELL'][i].orderId,
+          },
+        };
+      }
+
+      if (obj['SELL'][i].status === state.FILLED) {
+        return {
+          status: 'final',
+          method: 'cancelOpenOrders',
+          side: null,
+          id: i,
+          data: {
+            symbol: el.symbol,
+          },
+        };
+      }
+    }
   };
 }
 

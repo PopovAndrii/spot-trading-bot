@@ -1,26 +1,56 @@
-<nav class="navbar navbar-expand-lg  bg-primary" data-bs-theme="dark">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="#">Navbar</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNavDropdown">
-        <ul class="navbar-nav">
-          <li class="nav-item">
-            <a class="nav-link active" aria-current="page" href="/">Home</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="/info">My Balance</a>
-          </li>
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              More
-            </a>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="/info">My Balance</a></li>
-            </ul>
-          </li>
-        </ul>
-      </div>
+<div class="nav info -nav-condenced">
+  <div class="nav-container">
+    <div class="logo">
+      <a class="" href="/">
+        <svg fill="currentColor" viewBox="0 0 16 16">
+          <path
+            d="M5.5 13v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.5v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.084c1.992 0 3.416-1.033 3.416-2.82 0-1.502-1.007-2.323-2.186-2.44v-.088c.97-.242 1.683-.974 1.683-2.19C11.997 3.93 10.847 3 9.092 3H9V1.75a.25.25 0 0 0-.25-.25h-1a.25.25 0 0 0-.25.25V3h-.573V1.75a.25.25 0 0 0-.25-.25H5.75a.25.25 0 0 0-.25.25V3l-1.998.011a.25.25 0 0 0-.25.25v.989c0 .137.11.25.248.25l.755-.005a.75.75 0 0 1 .745.75v5.505a.75.75 0 0 1-.75.75l-.748.011a.25.25 0 0 0-.25.25v1c0 .138.112.25.25.25zm1.427-8.513h1.719c.906 0 1.438.498 1.438 1.312 0 .871-.575 1.362-1.877 1.362h-1.28zm0 4.051h1.84c1.137 0 1.756.58 1.756 1.524 0 .953-.626 1.45-2.158 1.45H6.927z" />
+        </svg></a>
     </div>
-</nav>
+
+    <ul id="main-menu">
+      <li class="-active"><a href="/info">My Balance</a></li>
+      <li class="ddown">
+        <button>In progress<span class="arrow"></span></button>
+        <div class="ddown-menu">
+        </div>
+      </li>
+    </ul>
+
+    <label class="switch1 nav-container__logout">
+      <a href="/login/logout">Logout</a>
+    </label>
+    <label class="switch">
+      <span class="switch-icon" id="themeIcon">☀️</span>
+      <input type="checkbox" id="themeToggle">
+      <span class="switch-slider"></span>
+    </label>
+
+  </div>
+</div>
+
+<script>
+  async function fetchActiveSymbols() {
+    const res = await fetch('/api/symbols');
+    const symbols = await res.json();
+
+    const ddown = document.querySelector('#main-menu .ddown-menu');
+
+    for (const [key, value] of symbols.entries()) {
+      const a = document.createElement('a');
+
+      var status = '';
+
+      if (value.status != 0) {
+        status = value.status == 1 ? 'running' : 'pause';
+      }
+
+      a.href = `/spotbot/${value.symbol}?base=${value.bace}&quote=${value.quote}`;
+      a.textContent = `${value.symbol} ${status}`;
+
+      ddown.appendChild(a);
+    }
+  }
+
+  fetchActiveSymbols();
+</script>

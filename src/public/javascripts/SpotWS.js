@@ -1,65 +1,161 @@
-export class SpotWS{
-    constructor(){
-        this.ws;
+export class SpotWS {
+  constructor(
+    notifications,
+    loadDataFromFileCalculator,
+    loadDataCalculator,
+    cancelAllOrders,
+    setStrategy
+  ) {
+    this.ws;
 
-        window.addEventListener('load', () => {
-            this.connectWebSocket();
-        });
+    this.notifications = notifications;
 
-        this.btnStart();
-    }
-    
-    connectWebSocket() {
-        this.ws = new WebSocket(`ws://${location.host}`);
-        
-        this.ws.onopen = () => {
-            console.log('✅ WS onopen()');
-            // Можно отправить сообщение при подключении
-            // ws.send(JSON.stringify({ type: 'start' })); // не нужно )
-        };
-        
-        this.ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            console.log('📩 Message received:', data);
-            // Обновление UI или выполнение логики
-            try {
-                const message = JSON.parse(event.data);
-                if (message.type === 'data') {
-                    // console.log(JSON.stringify(message.data, null, 2));
-                    console.log('ok');
-                }
-            } catch (err) { console.error('❌ Parsing error:', err); }
-        };
-        
-        this.ws.onclose = (event) => {
-            console.warn('❌ Connect. onclose() Code:', event.code);
-            // reconnect
-            setTimeout(connectWebSocket, 2000);
-        };
-        
-        this.ws.onerror = (err) => { console.error('⚠️ WebSocket error:', err); };
-    }
-    
-    btnStart() {
-        const toggleBtn = document.getElementById('toggleBtn');
-        let isRunning = false;
+    this.loadDataFromFileCalculator = loadDataFromFileCalculator;
 
-        toggleBtn.addEventListener('click', () => {
-            if (!isRunning) {
-                this.ws.send(JSON.stringify({ 
-                    type: 'start', 
-                    symbol: currency  
-                }));
-                
-                toggleBtn.innerHTML = 'Stop <i class="bi bi-stop-fill"></i>';
-                isRunning = true;
-            } else {
-                this.ws.send(JSON.stringify({ 
-                    type: 'stop' 
-                }));
-                toggleBtn.innerHTML = 'Start <i class="bi bi-caret-right-fill"></i>';
-                isRunning = false;
+    this.loadDataCalculator = loadDataCalculator;
+
+    this.cancelAllOrders = cancelAllOrders;
+
+    this.setStrategy = setStrategy;
+
+    window.addEventListener('load', () => {
+      this.connectWebSocket();
+    });
+
+    this.isRunning = false;
+    this.btnStart();
+  }
+
+  #isWebSocketOpen(ws) {
+    return ws && ws.readyState === WebSocket.OPEN;
+  }
+
+  connectWebSocket() {
+    this.ws = new WebSocket(`ws://${location.host}`);
+
+    this.ws.onopen = () => {
+      console.log('🟢 WS open');
+      this.ws.send(
+        JSON.stringify({
+          type: 'subscribe',
+          symbol: bace + quote,
+          bace: bace,
+          strategy: this.loadDataFromFileCalculator.getStrategyName(),
+          quote: quote,
+        })
+      );
+    };
+
+    this.ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+
+        switch (message.event) {
+          case 'spotStatus':
+            if (message.data === true) {
+              this.#btnRule(true);
+
+              this.notifications.showNotification('Table data loaded. Bot in progress.', 'success');
+
+              this.isRunning = true;
             }
-        });
+            break;
+          case 'updateTableData':
+            if (message.data === 1) {
+              this.interval = setInterval(() => {
+                if (this.#isWebSocketOpen(this.ws)) {
+                  this.loadDataFromFileCalculator.getStateCalculator();
+                }
+              }, 20000);
+            }
+            if (message.data === 0) {
+              if (this.interval) {
+                clearInterval(this.interval);
+                this.interval = null;
+              }
+            }
+            break;
+          case 'updatePrice':
+            const text = document.querySelector('.stream-currency');
+            text.innerHTML = `${message.data.s} ${parseFloat(message.data.c).toFixed(2)}`;
+            break;
+        }
+      } catch (err) {
+        console.error('❌ WS Parsing error in browse:', err);
+      }
+    };
+
+    this.ws.onclose = (event) => {
+      console.warn('🛑 WS close', event.code);
+      setTimeout(this.connectWebSocket, 2000);
+
+      if (this.interval) {
+        clearInterval(this.interval);
+        this.interval = null;
+      }
+    };
+
+    this.ws.onerror = (err) => {
+      console.error('⚠️ WS in browser error:', err);
+    };
+  }
+
+  btnStart() {
+    const toggleBtn = document.getElementById('toggleBtn');
+
+    toggleBtn.addEventListener('click', () => {
+      if (!this.isRunning) {
+        this.ws.send(
+          JSON.stringify({
+            type: 'start',
+            symbol: bace + quote,
+            strategy: this.setStrategy.getStrategy(),
+            bace: bace,
+            quote: quote,
+          })
+        );
+
+        this.#btnRule(true);
+
+        this.notifications.showNotification('Start of Spot Trading', 'success', 8000);
+
+        this.isRunning = true;
+      } else {
+        this.ws.send(
+          JSON.stringify({
+            type: 'stop',
+            bace: bace,
+            quote: quote,
+          })
+        );
+
+        this.#btnRule();
+
+        this.notifications.showNotification('Pause of Spot Trading', 'warning', false);
+
+        this.isRunning = false;
+      }
+    });
+  }
+
+  #btnRule(status) {
+    this.loadDataCalculator.setListenerStatus(status);
+    this.cancelAllOrders.setListenerStatus(status);
+
+    const toggleBtn = document.getElementById('toggleBtn');
+    const settingsCalculate = document.getElementById('settings-calculate');
+    const settingsCalculateSave = document.getElementById('settings-calculate-save');
+    const cancelAllOrders = document.getElementById('cancel-all-orders');
+
+    toggleBtn.classList.toggle('danger');
+    if (status) {
+      toggleBtn.innerHTML = `Stop <svg class="icon active"><use href="/sprite.svg#stop"></use></svg>`;
+    } else {
+      toggleBtn.innerHTML = `Start <svg class="icon"><use href="/sprite.svg#play"></use></svg>`;
     }
+
+    settingsCalculate.classList.toggle('disabled');
+    settingsCalculateSave.classList.toggle('disabled');
+    cancelAllOrders.classList.toggle('disabled');
+  }
 }

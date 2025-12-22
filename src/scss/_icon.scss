@@ -1,0 +1,22 @@
+.icon {
+  width: 1.0rem;
+  height: 1.0rem;
+  fill: currentColor;
+
+  &.active {
+    animation: pulse 1.0s ease-in-out infinite;
+    transform-origin: center;
+  }
+
+  @keyframes pulse {
+
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.4);
+    }
+  }
+}

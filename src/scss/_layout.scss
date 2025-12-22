@@ -1,0 +1,22 @@
+@use './var' as *;
+
+.wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.container-adaptive {
+  width: 100%;
+  max-width: $container-max-width;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: $container-padding;
+  padding-right: $container-padding;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}

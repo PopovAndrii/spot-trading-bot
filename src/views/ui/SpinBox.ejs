@@ -1,0 +1,19 @@
+<!-- spin-box -->
+<div class="UIsp" data-step="<%= step %>" data-min="<%= min %>" data-max="<%= max %>" role="spinbutton" tabindex="0"
+  aria-label="Numeric input">
+  <div class="UIsp-label">
+    <%= label %>
+  </div>
+  <button class="UIsp__btn" type="button" aria-label="Decrease value">
+    <svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
+      <path d="M1 7h14v2H1" />
+    </svg>
+  </button>
+  <input class="UIsp__input" id="<%= id %>" type="text" value="<%= min %>" aria-hidden="true" inputmode="decimal">
+  <button class="UIsp__btn" type="button" aria-label="Increase value">
+    <svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
+      <path d="M9 1v6h6v2H9v6H7V9H1V7h6V1" />
+    </svg>
+  </button>
+</div>
+<!-- #spin-box -->

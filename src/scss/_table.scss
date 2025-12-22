@@ -1,0 +1,42 @@
+@use './var' as *;
+
+.t {
+  width: 100%;
+  margin: 1rem 0;
+  background-color: $c-g-50;
+  border-spacing: 0;
+  border-collapse: collapse;
+  color: $c-g-950;
+
+  &>thead {
+    background-color: $c-g-300;
+  }
+
+  &>*th,
+  &>*td {
+    padding: 0.25rem;
+    text-align: left;
+  }
+
+  &.t-border th,
+  &.t-border td {
+    border: 1px solid $c-g-500;
+  }
+
+  &.t-striped tbody tr:nth-child(even) {
+    background-color: $c-g-100;
+  }
+
+  &>*th {
+    font-weight: bold;
+  }
+
+  &.t-hover tbody tr:hover {
+    z-index: 1;
+    background-color: $c-g-300;
+  }
+
+  & .center {
+    text-align: center;
+  }
+}

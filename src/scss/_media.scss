@@ -1,0 +1,25 @@
+@media (min-width: 1024px) {
+  :root {
+    --container-padding: 5.0rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --container-padding: 0.25rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --container-max-width: 1800px;
+    --container-padding: 10.0rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --container-max-width: 1600px;
+    --container-padding: 15.0rem;
+  }
+}

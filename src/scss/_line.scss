@@ -1,0 +1,52 @@
+@use './var' as *;
+
+.line {
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  justify-items: center;
+  padding: 0.5rem 0;
+
+  &.line-press {
+    grid-template-columns: repeat(auto-fit, minmax(0, max-content));
+  }
+
+  &.line-end {
+    justify-content: end;
+  }
+
+  &.line-between {
+    justify-content: space-between;
+  }
+
+  &-line {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  &.align-center {
+    align-items: center;
+  }
+
+  &.align-center {
+    align-items: center;
+  }
+
+  &.align-end {
+    align-items: end;
+  }
+
+  &.justify-start {
+    justify-items: start;
+  }
+
+  // |
+  &>.self-stretch {
+    justify-self: stretch;
+  }
+
+  // -
+  &>.self-align-stretch {
+    align-items: stretch;
+  }
+}

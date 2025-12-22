@@ -7,8 +7,8 @@
 const app = require('../app');
 const debug = require('debug')('www:server');
 const http = require('http');
-const JsonTimerSender = require('../modules/jsonTimerSender');
-
+// const JsonTimerSender = require('../modules/jsonTimerSender');
+const WebSocketRouter = require('../lib/websocketRouter');
 /**
  * Get port from environment and store in Express.
  */
@@ -16,49 +16,10 @@ const JsonTimerSender = require('../modules/jsonTimerSender');
 var port = normalizePort(process.env.PORT || '3002');
 app.set('port', port);
 
-/**
- * Create HTTP server.
- */
-
 var server = http.createServer(app);
 
-const WebSocket = require('ws');
+new WebSocketRouter(server);
 
-// WebSocket сервер на том же HTTP сервере
-const wss = new WebSocket.Server({ server });
-
-const timerSender = new JsonTimerSender(wss);
-
-// Подключённые клиенты
-let clients = [];
-
-wss.on('connection', (ws) => {
-  clients.push(ws);
-  console.log('🟢 www connected');
-
-  ws.on('message', (msg) => {
-    let data;
-    try {
-      data = JSON.parse(msg);
-    } catch (err) {
-      return ws.send(JSON.stringify({ error: 'www JSON error' }));
-    }
-
-    if (data.type === 'start') timerSender.start(data);
-    if (data.type === 'stop') timerSender.stop();
-  });
-
-  // ws.on('message', (message) => {
-  //   console.log('📨 Get msg(WS):', message);
-  //   ws.send(JSON.stringify({ status: `Response ws: ${message}` }));
-  // });
-
-  // ws.send(JSON.stringify({ status: 'Start WebSocket!' }));
-});
-
-const serviceInformation = require('../sockets/serviceInformation');
-
-serviceInformation(wss);
 /**
  * Listen on provided port, on all network interfaces.
  */

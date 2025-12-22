@@ -1,0 +1,31 @@
+@use './var' as *;
+
+.input-btn {
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: min-content min-content;
+  align-content: center;
+
+  &>input {
+    position: absolute;
+    display: none;
+  }
+
+  &>label {
+    cursor: pointer;
+    height: 48px;
+    padding: 0.25rem 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: $c-g-300;
+    border: 1px solid $c-g-500;
+    border-radius: $border-radius;
+    font-size: $font-size-base + 0.5;
+
+    &:hover {
+      background-color: $c-g-500;
+      color: $c-g-50;
+    }
+  }
+}
