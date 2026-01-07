@@ -1,0 +1,29 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: docker-config/Dockerfile
+        image: exchange-crypto:latest # tag for prod
+        container_name: exchange-crypto-app
+        restart: unless-stopped
+        working_dir: /var/www/src
+        volumes:
+            - .:/var/www
+            - ./.bash_history:/home/node/.bash_history:rw
+            - ./tmp/app/:/home/node/.npm/
+            - /etc/localtime:/etc/localtime:ro
+            # mount for production script
+            - ./docker-config/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro 
+            # start for production script
+        command: ['/usr/local/bin/entrypoint.sh']
+
+        networks:
+            - proxy-network
+        env_file:
+            - .env
+
+networks:
+    proxy-network:
+        name: nginxproxymanager_proxy-network
+        external: true
+

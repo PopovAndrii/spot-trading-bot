@@ -36,8 +36,8 @@ NODE_ENV=production
 ADMIN_LOGIN=admin
 # Generate password
 # node -e "console.log(require('bcrypt').hashSync('you-password-hash', 10))"
-ADMIN_PASSWORD_HASH=$2b$10$duSulJ1o08aAsw8xOCg/4eAu.vasc6kdim.1G.i/IwfMcWlCVDzQ2
-SESSION_SECRET=1o08aAsw8xOCg
+ADMIN_PASSWORD_HASH='$2b$10$duSulJ1o08aAsw8xOCg/4eAu.vasc6kdim.1G.i/IwfMcWlCVDzQ2'
+SESSION_SECRET='1o08aAsw8xOCg'
 
 # SSH_PATH=/c/Users/YourUsername/.ssh # for Windows users
 SSH_PATH=~/.ssh # for Linux users 
@@ -83,22 +83,25 @@ docker compouse exec app bush # Access the application
 npm start # Run a project
 npm run dev # Run a project with sass watching
 npm run build-css # Build only sass file
-# For git. Return to /
-cd .. # return on folder back /var/www/src -> /var/www Or cd /var/www
-git status 
+
+# If production mod (For install devdevDependencies)
+NODE_ENV=development npm install # for generete css style etc... 
+
+# start script pm2
+chmod +x docker-config/entrypoint.sh
 
 # Launch the application (production)
-docker compose exec app sh -c "cd /var/www/src && npm run prod-start"
+docker compose exec app sh -c "npm run prod-start"
 # Application status information (cpu logs mem) 
-docker compose exec app sh -c "cd /var/www/src && npm exec pm2 monit"
+docker compose exec app sh -c "npm exec pm2 monit"
 # Logs
-docker compose exec app sh -c "cd /var/www/src && npm exec pm2 logs my-app --lines 20"
+docker compose exec app sh -c "npm exec pm2 logs my-app --lines 20"
 # Quick logs
-docker compose exec app sh -c "cd /var/www/src && npm exec pm2 list"
+docker compose exec app sh -c "npm exec pm2 list"
 # For restart app after reboot server
-docker compose exec app sh -c "cd /var/www/src && npm exec pm2 save"
+docker compose exec app sh -c "npm exec pm2 save"
 # Stop
-docker compose exec app sh -c "cd /var/www/src && npm exec pm2 stop id|name|namespace"
+docker compose exec app sh -c "npm exec pm2 stop id|name|namespace"
 ```
 
 ## Formating ESLint (inside Docker)
