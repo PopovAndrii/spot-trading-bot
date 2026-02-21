@@ -4,8 +4,7 @@ const path = require('path');
 const { Job, Status } = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const { StreamAPI } = require('../lib/streamAPI');
-const { DeltaPrice } = require('../lib/deltaPrice');
-const { MartingaleCalculator } = require('../lib/martingaleCalculator');
+// const { UserStreamAPI } = require('../lib/UserStreamApi');
 
 const activeSymbols = new Set();
 
@@ -32,7 +31,8 @@ class JsonTimerSender extends EventEmitter {
       return null;
     }
 
-    const apiMethod = new InvokeApi(data);
+    const apiMethod = new InvokeApi();
+    apiMethod.setData(data);
 
     if (typeof apiMethod[data.method] === 'function') {
       try {
@@ -55,10 +55,6 @@ class JsonTimerSender extends EventEmitter {
 
     if (this.strategy === 'long') {
       return { method: 'long', side: 'BUY' };
-    }
-
-    if (this.strategy === 'longDynamic') {
-      return { method: 'longDynamic', side: 'BUY' };
     }
 
     return null;
@@ -95,7 +91,7 @@ class JsonTimerSender extends EventEmitter {
 
         if (currentOrder.status === 'pass') {
           console.log(currentOrder);
-          await this.#sleep(200);
+          await this.#sleep(100);
           continue;
         } // processed order (api request not needed) or test loop
 
@@ -108,7 +104,7 @@ class JsonTimerSender extends EventEmitter {
 
         if (resAPI.status === currentOrder.status) {
           // ["PARTIALLY_FILLED"] or ["NEW"]
-          await this.#sleep(200);
+          await this.#sleep(100);
           continue; /** no need to write to file */
         }
 
@@ -123,77 +119,7 @@ class JsonTimerSender extends EventEmitter {
 
         await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
 
-        await this.#sleep(1000);
-      }
-    }
-  }
-
-  async #dynamicJobIterator(obj = {}, streamPrice) {
-    const strategy = this.#strategy();
-
-    if (obj.status == Status.REDY && strategy != null) {
-      const history = await this.#runToApi({
-        method: 'getHistory',
-        symbol: obj.pair,
-        interval: '1s',
-        limit: '30',
-      });
-      const deltaPrice = new DeltaPrice(history, false);
-      const delta = deltaPrice.calculate(streamPrice);
-
-      const martingaleCalculator = new MartingaleCalculator(obj);
-      const avgPrice = martingaleCalculator.calculateAverageEntryPrice();
-      const sailPrice = martingaleCalculator.calculateTargetSalePrice(avgPrice);
-
-      for (const [key, val] of obj[strategy.side].entries()) {
-        let currentOrder = this.job[strategy.method](obj, key, val, delta, sailPrice);
-
-        if (currentOrder.status === 'final') {
-          const result = await this.#runToApi(currentOrder);
-
-          // this.#applyStatusesToOrders(obj['BUY'], result);
-          // this.#applyStatusesToOrders(obj['SELL'], result);
-
-          obj['status'] = Status.DONE;
-          obj['date_modified'] = new Date().toISOString();
-
-          // final write
-          await fs.writeFile(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
-
-          await this.stop(); // new cycle here
-          return;
-        }
-
-        if (currentOrder.status === 'pass') {
-          console.log(currentOrder);
-          continue;
-        } // processed order (api request not needed) or test loop
-
-        const resAPI = await this.#runToApi(currentOrder);
-
-        if (resAPI === null) {
-          console.error('Incorrect method');
-          continue;
-        }
-
-        if (resAPI.status === currentOrder.status) {
-          // ["PARTIALLY_FILLED"] or ["NEW"]
-          await this.#sleep(200);
-          continue; /** no need to write to file */
-        }
-
-        const toObj = {
-          status: resAPI.status,
-          orderId: resAPI.orderId,
-        };
-
-        // resAPI.side == "SELL" or "BUY"
-        // currentOrder['id'] !== [key] !!!
-        Object.assign(obj[resAPI.side][currentOrder['id']], toObj);
-
-        await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
-
-        await this.#sleep(1000);
+        await this.#sleep(500);
       }
     }
   }
@@ -233,56 +159,35 @@ class JsonTimerSender extends EventEmitter {
     this.timer = setTimeout(() => this.readLoop(), this.interval);
   }
 
-  async #readLoopDynamic(streamPrice) {
-    if (!this.running[this.symbol]) return;
-
-    try {
-      const content = await fs.readFile(this.#filePath(), 'utf8');
-      const data = JSON.parse(content);
-
-      this.#dynamicJobIterator(data, streamPrice);
-
-      // @TODO remove in UI ->> data['param']['field-requestFrequency'];
-
-      // @TODO calculate in REALTIME table data (depends on current price)
-      // update teble on UI
-      const message = JSON.stringify({ type: 'data', data });
-
-      this.wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-          client.send(message);
-        }
-      });
-    } catch (err) {
-      console.error(this.#filePath(), 'Error reading file:', err);
-    }
-  }
-
   async start(symbol, strategy) {
     if (!this.running[symbol]) {
       // this.strategy from file settings(back) or strategy from click on button (front)
       this.strategy = this.strategy ? this.strategy : strategy;
 
-      this.stream = new StreamAPI(symbol);
-      this.stream.startTracking();
+      const api = new InvokeApi();
 
-      this.stream.on('message', (data) => {
+      // const userStream = api.getUserStream();
+      // userStream.start();
+      // userStream.on('executionReport', (order) => {
+      //   console.log(`Execute order Stream`);
+      // });
+      // userStream.on('balance', (data) => {
+      //   console.log(`Balance Stream`);
+      // });
+
+      const streamAPI = api.getPublicStream(symbol);
+      streamAPI.start();
+      streamAPI.on('message', (data) => {
         this.emit('price', data);
-        if (this.strategy == 'longDynamic') {
-          console.log('START LONGDYNAMIC', data.c);
-          // this.#readLoopDynamic(data, data.c);
-        }
       });
 
       this.running[symbol] = true;
 
       this.symbol = symbol;
 
-      if (this.strategy != 'longDynamic') {
-        this.readLoop();
-      }
+      this.readLoop();
 
-      console.log('🟢 Start:', symbol, this.strategy);
+      console.log('🟢 Button Start:', symbol, this.strategy);
     }
   }
 
@@ -292,11 +197,14 @@ class JsonTimerSender extends EventEmitter {
 
   async stop(symbol) {
     clearTimeout(this.timer);
-    this.stream.stopTracking();
+
+    // UserStreamAPI.removeInstance();
+    StreamAPI.removeInstance(symbol);
+
     this.timer = null;
     this.running[symbol] = false;
 
-    console.log('🛑 Stop:', symbol);
+    console.log('🛑 Button Stop:', symbol);
   }
 
   #sleep(ms) {

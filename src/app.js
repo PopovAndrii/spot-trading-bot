@@ -64,6 +64,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/login', loginRouter.router);
+app.use(loginRouter.ensureAuthenticated);
 
 app.use('/api', navRouter);
 app.use('/', indexRouter);

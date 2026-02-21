@@ -17,11 +17,17 @@ function delay(ms) {
 // console.log(hash);
 
 function ensureAuthenticated(req, res, next) {
+  // STATUS_LOGIN=false # login disabled
+  if (process.env.STATUS_LOGIN === 'false') {
+    console.log('🔴 STATUS_LOGIN=', process.env.STATUS_LOGIN);
+    return next();
+  }
+
   if (req.session && req.session.user) {
     return next();
-  } else {
-    res.redirect('/login');
   }
+
+  res.redirect('/login');
 }
 
 router.get('/', (req, res) => {

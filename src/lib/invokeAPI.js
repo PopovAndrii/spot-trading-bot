@@ -1,9 +1,74 @@
 const { Spot } = require('@binance/connector');
+const { UserStreamAPI } = require('../lib/UserStreamApi');
+const { StreamAPI } = require('../lib/streamAPI');
 
 class InvokeApi {
-  constructor(obj = {}) {
-    this.client = new Spot(process.env.API_KEY, process.env.API_SECRET);
-    this.data = obj.data;
+  static instance = null;
+
+  constructor() {
+    if (InvokeApi.instance) {
+      // console.log('❕ InvokeApi already exists, returning it ❕');
+      return InvokeApi.instance;
+    }
+
+    let api_key = process.env.API_KEY;
+    let api_secret = process.env.API_SECRET;
+    let baseURL = 'https://api.binance.com/api';
+
+    this.wssUserURL = 'wss://stream.binance.com:9443/ws/';
+
+    if (!api_key || !api_secret) {
+      throw new Error('Binance API keys are not set');
+    }
+
+    if (process.env.NODE_ENV == 'development') {
+      api_key = process.env.API_KEY_TEST;
+      api_secret = process.env.API_SECRET_TEST;
+      baseURL = 'https://testnet.binance.vision/';
+
+      this.wssUserURL = 'wss://stream.testnet.binance.vision:9443/ws/';
+    }
+
+    this.client = new Spot(api_key, api_secret, { baseURL: baseURL });
+    this.data = null;
+
+    InvokeApi.instance = this;
+  }
+
+  setData(obj = {}) {
+    this.data = obj;
+  }
+
+  getPublicStream(symbol) {
+    if (!symbol) return false;
+    return new StreamAPI(symbol);
+  }
+
+  getUserStream(wssUserURL = null) {
+    const url = wssUserURL ? wssUserURL : this.wssUserURL;
+    return new UserStreamAPI(this.client, url);
+  }
+
+  getClientKey() {
+    return this.client;
+  }
+
+  async openOrders() {
+    try {
+      const res = await this.client.openOrders(this.data.symbol);
+
+      console.log('✅ newOrder():');
+
+      return res.data;
+    } catch (error) {
+      if (error.response) {
+        console.error('❌ error.response.data newOrder():', error.response.data);
+      } else {
+        console.error('❌ message newOrder():', error.message);
+      }
+
+      return null;
+    }
   }
 
   async newOrder() {
@@ -61,24 +126,19 @@ class InvokeApi {
 
   async getHistory() {
     try {
-      const res = await this.client.klines({
-        symbol: this.data.symbol,
-        interval: this.data.interval || '5s',
+      const res = await this.client.klines(this.data.symbol, this.data.interval || '5s', {
         limit: this.data.limit || 60,
       });
 
-      // return only prices informations
-      // const candles = res.data.map((c) => ({
-      //   open: c[1],
-      //   high: c[2],
-      //   low: c[3],
-      //   close: c[4],
-      // }));
+      // const res = await this.client.klines({
+      //   symbol: this.data.symbol,
+      //   interval: this.data.interval || '5s',
+      //   limit: this.data.limit || 60,
+      // });
 
-      // Binance возвращает массив массивов
-      console.log('✅ getHistory():', res.length, 'candles');
+      // console.log('✅ getHistory():', candles, 'candles');
 
-      return res;
+      return res.data;
     } catch (error) {
       if (error.response) {
         console.error('❌ error.response.data getHistory():', error.response.data);
