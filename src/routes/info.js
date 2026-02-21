@@ -4,9 +4,6 @@ const { InvokeApi } = require('../lib/invokeAPI');
 
 const apiMethod = new InvokeApi();
 
-const { ensureAuthenticated } = require('./login');
-router.use(ensureAuthenticated);
-
 router.get('/', async function (req, res, next) {
   res.render('info', {
     title: 'Acount Information ',

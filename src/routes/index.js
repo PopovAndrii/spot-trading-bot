@@ -2,10 +2,22 @@ const express = require('express');
 const router = express.Router();
 
 const { Spot } = require('@binance/connector');
-const client = new Spot(process.env.API_KEY, process.env.API_SECRET);
 
-const { ensureAuthenticated } = require('./login');
-router.use(ensureAuthenticated);
+let api_key = process.env.API_KEY;
+let api_secret = process.env.API_SECRET;
+let baseURL = 'https://api.binance.com/api';
+
+if (!api_key || !api_secret) {
+  throw new Error('Binance API keys are not set');
+}
+
+if (process.env.NODE_ENV === 'development') {
+  api_key = process.env.API_KEY_TEST;
+  api_secret = process.env.API_SECRET_TEST;
+  baseURL = 'https://testnet.binance.vision/';
+}
+
+const client = new Spot(api_key, api_secret, { baseURL: baseURL });
 
 router.get('/', function (req, res, next) {
   client
@@ -14,7 +26,7 @@ router.get('/', function (req, res, next) {
       // Как только данные получены, рендерим страницу
       res.render('index', {
         title: 'Main Page',
-        user: req.session.user.name,
+        // user: req.session.user.name,
         info: response.data, // Передаем свежие данные
       });
     })

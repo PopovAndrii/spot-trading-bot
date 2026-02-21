@@ -6,10 +6,21 @@ const path = require('path');
 const { Spot } = require('@binance/connector');
 const { Calculator } = require('../lib/calculator');
 
-const client = new Spot(process.env.API_KEY, process.env.API_SECRET);
+let api_key = process.env.API_KEY;
+let api_secret = process.env.API_SECRET;
+let baseURL = 'https://api.binance.com/api';
 
-const { ensureAuthenticated } = require('./login');
-router.use(ensureAuthenticated);
+if (!api_key || !api_secret) {
+  throw new Error('Binance API keys are not set');
+}
+
+if (process.env.NODE_ENV === 'development') {
+  api_key = process.env.API_KEY_TEST;
+  api_secret = process.env.API_SECRET_TEST;
+  baseURL = 'https://testnet.binance.vision/';
+}
+
+const client = new Spot(api_key, api_secret, { baseURL: baseURL });
 
 router.get('/', function (req, res, next) {
   res.render('spotbot', { title: 'Express', currency: 'req.params1' });
@@ -42,15 +53,6 @@ router.get('/:currency', async function (req, res, next) {
       tickSize: decimalCount(priceFilter?.tickSize),
       stepSize: decimalCount(lotSizeFilter?.stepSize),
     };
-
-    // Logging for debugging VPS
-    console.log('=== GET /:currency DEBUG ===');
-    console.log('currency:', currency);
-    console.log('bace:', bace);
-    console.log('quote:', quote);
-    console.log('priceFilter:', priceFilter);
-    console.log('lotSizeFilter:', lotSizeFilter);
-    console.log('===========================');
   } catch (error) {
     console.error('Err /:currency', error.message);
   }
@@ -144,17 +146,6 @@ router.post('/:symbol', async function (req, res, next) {
     const tickSize = priceFilter ? parseFloat(priceFilter.tickSize) : 0;
     const stepSize = lotSizeFilter ? parseFloat(lotSizeFilter.stepSize) : 0;
 
-    // ==== Logging for debugging VPS ====
-    console.log('=== Spotbot DEBUG ===');
-    console.log('symbol:', req.query.symbol);
-    console.log('asset:', asset);
-    console.log('balanceEntry:', balanceEntry);
-    console.log('tickerPrice:', ticker);
-    console.log('priceFilter:', priceFilter);
-    console.log('lotSizeFilter:', lotSizeFilter);
-    console.log('minNotionalFilter:', minNotionalFilter);
-    console.log('=====================');
-
     res.json({
       symbol: {
         symbol: symbolData.symbol || req.query.symbol,
@@ -196,10 +187,6 @@ router.post('/calculator/save', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
 
-    // Логирование для VPS
-    console.log('Saving file:', filePath);
-
-    // Сохраняем файл
     await fs.writeFile(filePath, jsonString, 'utf8');
 
     res.json({ message: 'Order settings table saved' });
