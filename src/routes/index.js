@@ -5,7 +5,7 @@ const { Spot } = require('@binance/connector');
 
 let api_key = process.env.API_KEY;
 let api_secret = process.env.API_SECRET;
-let baseURL = 'https://api.binance.com/api';
+let baseURL = 'https://api.binance.com';
 
 if (!api_key || !api_secret) {
   throw new Error('Binance API keys are not set');
@@ -23,17 +23,15 @@ router.get('/', function (req, res, next) {
   client
     .exchangeInfo({ symbols: ['BTCUSDT', 'BNBUSDT'] })
     .then((response) => {
-      // Как только данные получены, рендерим страницу
       res.render('index', {
         title: 'Main Page',
         // user: req.session.user.name,
-        info: response.data, // Передаем свежие данные
+        info: response.data,
       });
     })
     .catch((error) => {
-      // Обработка ошибки, если Binance API недоступен
-      console.error(error);
-      res.status(500).render('error', { message: 'Ошибка получения данных Binance API' });
+      console.error('BINANCE ERROR:', error.message, error.response?.data);
+      res.status(500).render('error', { message: 'Error get data Binance API' });
     });
 });
 
