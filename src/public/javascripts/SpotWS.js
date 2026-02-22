@@ -31,7 +31,8 @@ export class SpotWS {
   }
 
   connectWebSocket() {
-    this.ws = new WebSocket(`ws://${location.host}`);
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    this.ws = new WebSocket(`${protocol}${location.host}`);
 
     this.ws.onopen = () => {
       console.log('🟢 WS open');
