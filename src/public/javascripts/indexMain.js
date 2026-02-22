@@ -5,7 +5,7 @@ new Theme();
 new UiElements.Select();
 
 const select = document.getElementById('selectCurrency');
-select?.addEventListener('change', (e) => {
+select?.addEventListener('ui-select-change', (e) => {
   const value = e.detail?.val;
 
   const [symbol, queryString] = value.split('?');
