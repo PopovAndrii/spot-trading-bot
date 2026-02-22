@@ -6,7 +6,7 @@ export class SpotWS {
     cancelAllOrders,
     setStrategy
   ) {
-    this.ws;
+    this.ws = null;
 
     this.notifications = notifications;
 
@@ -23,6 +23,7 @@ export class SpotWS {
     });
 
     this.isRunning = false;
+    this.btnClickHandler = null;
     this.btnStart();
   }
 
@@ -78,7 +79,11 @@ export class SpotWS {
             break;
           case 'updatePrice':
             const text = document.querySelector('.stream-currency');
-            text.innerHTML = `${message.data.s} ${parseFloat(message.data.c).toFixed(2)}`;
+
+            if (text) {
+              text.innerHTML = `${message.data.s} ${parseFloat(message.data.c).toFixed(2)}`;
+            }
+
             break;
         }
       } catch (err) {
@@ -88,7 +93,11 @@ export class SpotWS {
 
     this.ws.onclose = (event) => {
       console.warn('🛑 WS close', event.code);
-      setTimeout(this.connectWebSocket, 2000);
+
+      setTimeout(() => {
+        console.log('🔄 Front Reconnecting...');
+        this.connectWebSocket();
+      }, 2000);
 
       if (this.interval) {
         clearInterval(this.interval);
@@ -101,10 +110,40 @@ export class SpotWS {
     };
   }
 
+  // not used method
+  disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+
+    const toggleBtn = document.getElementById('toggleBtn');
+    if (toggleBtn && this.btnClickHandler) {
+      toggleBtn.removeEventListener('click', this.btnClickHandler);
+    }
+  }
+
   btnStart() {
     const toggleBtn = document.getElementById('toggleBtn');
 
-    toggleBtn.addEventListener('click', () => {
+    // delete old handler
+    if (this.btnClickHandler) {
+      toggleBtn.removeEventListener('click', this.btnClickHandler);
+    }
+
+    // new handler
+    this.btnClickHandler = () => {
+      // test WebSocket open?
+      if (!this.#isWebSocketOpen(this.ws)) {
+        console.warn('⚠️ WebSocket not open');
+        return;
+      }
+
       if (!this.isRunning) {
         this.ws.send(
           JSON.stringify({
@@ -115,11 +154,8 @@ export class SpotWS {
             quote: quote,
           })
         );
-
         this.#btnRule(true);
-
         this.notifications.showNotification('Start of Spot Trading', 'success', 8000);
-
         this.isRunning = true;
       } else {
         this.ws.send(
@@ -129,14 +165,13 @@ export class SpotWS {
             quote: quote,
           })
         );
-
         this.#btnRule();
-
         this.notifications.showNotification('Pause of Spot Trading', 'warning', false);
-
         this.isRunning = false;
       }
-    });
+    };
+
+    toggleBtn.addEventListener('click', this.btnClickHandler);
   }
 
   #btnRule(status) {
