@@ -8,7 +8,7 @@ const { Calculator } = require('../lib/calculator');
 
 let api_key = process.env.API_KEY;
 let api_secret = process.env.API_SECRET;
-let baseURL = 'https://api.binance.com/api';
+let baseURL = 'https://api.binance.com';
 
 if (!api_key || !api_secret) {
   throw new Error('Binance API keys are not set');

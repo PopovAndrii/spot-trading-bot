@@ -13,7 +13,7 @@ class InvokeApi {
 
     let api_key = process.env.API_KEY;
     let api_secret = process.env.API_SECRET;
-    let baseURL = 'https://api.binance.com/api';
+    let baseURL = 'https://api.binance.com';
 
     this.wssUserURL = 'wss://stream.binance.com:9443/ws/';
 
