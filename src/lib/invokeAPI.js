@@ -73,6 +73,8 @@ class InvokeApi {
 
   async newOrder() {
     try {
+      console.log('✅ newOrder():', this.data);
+
       const res = await this.client.newOrder(this.data.symbol, this.data.side, this.data.type, {
         price: this.data.price,
         quantity: this.data.quantity,

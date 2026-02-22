@@ -18,7 +18,7 @@ class JsonTimerSender extends EventEmitter {
     this.running = [];
     this.exchangeName = 'binance';
 
-    this.job = new Job(process.env.STATUS_APP ? true : false); // Test === true
+    this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
   }
 
   getSpotStatus(symbol) {
@@ -32,7 +32,7 @@ class JsonTimerSender extends EventEmitter {
     }
 
     const apiMethod = new InvokeApi();
-    apiMethod.setData(data);
+    apiMethod.setData(data.data);
 
     if (typeof apiMethod[data.method] === 'function') {
       try {
@@ -72,7 +72,7 @@ class JsonTimerSender extends EventEmitter {
       // never started 0
       for (const [key, val] of obj[strategy.side].entries()) {
         let currentOrder = this.job[strategy.method](obj, key, val); // strategy.
-
+        // console.log(currentOrder)
         if (currentOrder.status === 'final') {
           const result = await this.#runToApi(currentOrder);
 
