@@ -31,12 +31,25 @@ class InvokeApi {
 
     this.client = new Spot(api_key, api_secret, { baseURL: baseURL });
     this.data = null;
+    this.errors = {};
 
     InvokeApi.instance = this;
   }
 
   setData(obj = {}) {
     this.data = obj;
+  }
+
+  setError(method, message) {
+    this.errors[method] = { message, time: new Date() };
+  }
+
+  getError(method) {
+    const err = this.errors[method] || null
+
+    delete this.errors[method];
+
+    return err;
   }
 
   getPublicStream(symbol) {
@@ -73,7 +86,6 @@ class InvokeApi {
 
   async newOrder() {
     try {
-      console.log('✅ newOrder():', this.data);
 
       const res = await this.client.newOrder(this.data.symbol, this.data.side, this.data.type, {
         price: this.data.price,
@@ -216,19 +228,14 @@ class InvokeApi {
   }
 
   async getAccount() {
-    try {
-      const res = await this.client.account({ omitZeroBalances: true });
+    const res = await this.client.account({ omitZeroBalances: true });
 
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data getAccount():', error.response.data);
-      } else {
-        console.error('❌ message getAccount():', error.message);
-      }
-
+    if (res.data?.code < 0) {
+      this.setError('getAccount', res.data.msg);
       return null;
     }
+
+    return res.data;
   }
 }
 

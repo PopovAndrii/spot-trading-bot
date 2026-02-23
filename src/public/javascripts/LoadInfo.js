@@ -1,5 +1,7 @@
 export class LoadInfo {
-  constructor() {
+  constructor(notifications) {
+    this.notifications = notifications;
+
     this.loadPersonalInfo();
   }
 
@@ -12,13 +14,21 @@ export class LoadInfo {
 
       const data = await res.json();
 
-      this.fillCurrency(data);
-      this.commissionRates(data);
-      this.updateTime(data);
-
-      console.log('Response loadPersonalInfo():', data.message);
+      if (data.success) {
+        this.fillCurrency(data);
+        this.commissionRates(data);
+        this.updateTime(data);
+        this.notifications.showNotification('Balance loaded.', 'success', 10000);
+      } else {
+        this.notifications.showNotification(data.message, 'danger', 10000);
+      }
     } catch (err) {
       console.error('❌ loadPersonalInfo():', err);
+      this.notifications.showNotification(
+        err.message,
+        'danger',
+        10000
+      );
       return null;
     }
   }

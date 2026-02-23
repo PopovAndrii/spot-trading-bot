@@ -6,19 +6,22 @@ const apiMethod = new InvokeApi();
 
 router.get('/', async function (req, res, next) {
   res.render('info', {
-    title: 'Acount Information ',
+    title: 'Acount Information: You Balances ',
   });
 });
 
 router.post('/account-info', async function (req, res, next) {
-  // res.render('info', { title: 'Express' });
   try {
     const data = await apiMethod.getAccount();
 
-    res.json({ message: data });
+    if (!data) {
+      const err = apiMethod.getError('getAccount');
+      return res.status(500).json({ success: false, message: err?.message || 'Failed to fetch account' });
+    }
+
+    res.json({ success: true, message: data });
   } catch (err) {
-    console.error('Error saving file:', err);
-    res.status(500).json({ message: 'Error saving file' });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 module.exports = router;
