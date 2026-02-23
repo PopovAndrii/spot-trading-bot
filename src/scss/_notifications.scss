@@ -63,6 +63,24 @@
     }
   }
 
+  &.info {
+    background-color: $c-i-900;
+    color: $c-i-100;
+
+    &:hover {
+      background-color: $c-i-950;
+      color: $c-i-50;
+    }
+
+    &>button {
+      color: $c-i-500;
+
+      &:hover {
+        color: $c-i-300;
+      }
+    }
+  }
+
   &.success {
     background-color: $c-s-900;
     color: $c-s-100;

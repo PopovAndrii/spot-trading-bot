@@ -36,7 +36,7 @@ export class SpotWS {
     this.ws = new WebSocket(`${protocol}${location.host}`);
 
     this.ws.onopen = () => {
-      console.log('🟢 WS open');
+      this.notifications.showNotification('Web Socket open', 'success');
       this.ws.send(
         JSON.stringify({
           type: 'subscribe',
@@ -88,14 +88,14 @@ export class SpotWS {
         }
       } catch (err) {
         console.error('❌ WS Parsing error in browse:', err);
+        this.notifications.showNotification(`WS Parsing error in browse: ${err}`, 'danger');
       }
     };
 
     this.ws.onclose = (event) => {
-      console.warn('🛑 WS close', event.code);
-
+      this.notifications.showNotification(`Web Socket closed: ${event.code}`, 'info');
       setTimeout(() => {
-        console.log('🔄 Front Reconnecting...');
+        this.notifications.showNotification(`Web Socket Reconnecting...`, 'warning');
         this.connectWebSocket();
       }, 2000);
 
@@ -107,6 +107,7 @@ export class SpotWS {
 
     this.ws.onerror = (err) => {
       console.error('⚠️ WS in browser error:', err);
+      this.notifications.showNotification(`WS in browser error: ${err}`, 'danger');
     };
   }
 
@@ -141,6 +142,7 @@ export class SpotWS {
       // test WebSocket open?
       if (!this.#isWebSocketOpen(this.ws)) {
         console.warn('⚠️ WebSocket not open');
+        this.notifications.showNotification(`WebSocket not open`, 'danger');
         return;
       }
 
