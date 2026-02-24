@@ -211,7 +211,7 @@ router.post('/cancel/allorders', async (req, res, next) => {
     return res.status(500).json(result);
   }
 
-  res.json({ success: true, data: result.data || result });
+  res.json(result);
 });
 
 router.post('/calculator/result', async (req, res, next) => {

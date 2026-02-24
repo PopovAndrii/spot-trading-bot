@@ -11,17 +11,12 @@ router.get('/', async function (req, res, next) {
 });
 
 router.post('/account-info', async function (req, res, next) {
-  try {
-    const data = await apiMethod.getAccount();
+  const result = await apiMethod.getAccount();
 
-    if (!data) {
-      const err = apiMethod.getError('getAccount');
-      return res.status(500).json({ success: false, message: err?.message || 'Failed to fetch account' });
-    }
-
-    res.json({ success: true, message: data });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+  if (!result.success) {
+    return res.status(500).json(result);
   }
+
+  res.json(result);
 });
 module.exports = router;

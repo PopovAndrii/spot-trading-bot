@@ -31,7 +31,7 @@ class InvokeApi {
 
     this.client = new Spot(api_key, api_secret, { baseURL: baseURL });
     this.data = null;
-    this.errors = {};
+    this.stateErrors = true;
 
     InvokeApi.instance = this;
   }
@@ -40,16 +40,14 @@ class InvokeApi {
     this.data = obj;
   }
 
-  setError(method, message) {
-    this.errors[method] = { message, time: new Date() };
-  }
+  getConsoleMsg(err) {
+    if (!err || !this.stateErrors) return;
 
-  getError(method) {
-    const err = this.errors[method] || null
+    const d = new Date()
+    const parts = d.toUTCString().split(' ');
+    const formatted = `${parts[0].replace(',', '')} ${parts[2]} ${parts[1]} ${parts[4]}`;
 
-    delete this.errors[method];
-
-    return err;
+    return console.log(`${formatted} ${err}`);
   }
 
   getPublicStream(symbol) {
@@ -214,9 +212,11 @@ class InvokeApi {
       const res = await this.client.cancelOpenOrders(symbol);
 
       if (res.data?.code < 0) {
+        this.getConsoleMsg(res.data.msg);
         return { success: false, message: res.data.msg };
       }
 
+      this.getConsoleMsg(`✅ cancelOpenOrders(${symbol})`);
       return { success: true, message: res.data };
     } catch (err) {
       const data = err.response?.data;
@@ -226,20 +226,33 @@ class InvokeApi {
         data?.msg || data?.message
       ].filter(Boolean).join(' | ');
 
+      this.getConsoleMsg(message);
       return { success: false, message };
     }
   }
 
   async getAccount() {
-    const res = await this.client.account({ omitZeroBalances: true });
+    try {
+      const res = await this.client.account({ omitZeroBalances: true });
 
-    if (res.data?.code < 0) {
-      this.setError('getAccount', res.data.msg);
-      // @TODO return { success: false, message: res.data.msg }
-      return null;
+      if (res.data?.code < 0) {
+        this.getConsoleMsg(res.data.msg);
+        return { success: false, message: res.data.msg };
+      }
+
+      this.getConsoleMsg('✅ getAccount()');
+      return { success: true, message: res.data };
+    } catch (err) {
+      const data = err.response?.data;
+      const message = [
+        err.message,
+        data?.code,
+        data?.msg || data?.message
+      ].filter(Boolean).join(' | ');
+
+      this.getConsoleMsg(message);
+      return { success: false, message };
     }
-
-    return res.data;
   }
 }
 
