@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require('fs/promises');
 const path = require('path');
 
+const { InvokeApi } = require('../lib/invokeAPI');
 const { Spot } = require('@binance/connector');
 const { Calculator } = require('../lib/calculator');
 
@@ -21,6 +22,8 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const client = new Spot(api_key, api_secret, { baseURL: baseURL });
+
+const apiMethod = new InvokeApi();
 
 router.get('/', function (req, res, next) {
   res.render('spotbot', { title: 'Express', currency: 'req.params1' });
@@ -197,21 +200,18 @@ router.post('/calculator/save', async (req, res, next) => {
 });
 
 router.post('/cancel/allorders', async (req, res, next) => {
-  try {
-    const symbol = req.body.message;
-    if (!symbol) {
-      return res.status(400).json({ error: 'Symbol is required in request body' });
-    }
-
-    const cancelOrder = await client.cancelOpenOrders(symbol);
-
-    // Checking that there is data
-    const data = cancelOrder?.data || cancelOrder || [];
-    res.json({ message: data });
-  } catch (err) {
-    console.error('Error cancelling all orders:', err.response?.data || err.message);
-    res.status(500).json({ error: err.response?.data || err.message || 'Internal Server Error' });
+  const symbol = req.body.message;
+  if (!symbol) {
+    return res.status(500).json({ success: false, message: 'Symbol is required in request body' });
   }
+
+  const result = await apiMethod.cancelOpenOrders(symbol);
+
+  if (!result.success) {
+    return res.status(500).json(result);
+  }
+
+  res.json({ success: true, data: result.data || result });
 });
 
 router.post('/calculator/result', async (req, res, next) => {

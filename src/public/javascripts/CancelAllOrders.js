@@ -26,7 +26,6 @@ export class CancelAllOrders {
     return this.listenerStatus;
   }
 
-  // @TODO move to invokeApi
   async cancel(currency) {
     try {
       const res = await fetch(`/spotbot/cancel/allorders`, {
@@ -36,9 +35,15 @@ export class CancelAllOrders {
       });
 
       const data = await res.json();
-      console.log('response cancel():', data);
+
+      if (data.success) {
+        this.notifications.showNotification(`Order ${currency} canceled`, 'success');
+      } else {
+        this.notifications.showNotification(data.message, 'danger');
+      }
     } catch (err) {
       console.error('❌ cancelAllOrders():', err);
+      this.notifications.showNotification(err.message, 'danger');
       return null;
     }
   }

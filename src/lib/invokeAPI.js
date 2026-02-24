@@ -209,21 +209,24 @@ class InvokeApi {
     }
   }
 
-  async cancelOpenOrders() {
+  async cancelOpenOrders(symbol = '') {
     try {
-      const res = await this.client.cancelOpenOrders(this.data.symbol);
+      const res = await this.client.cancelOpenOrders(symbol);
 
-      console.log('✅ cancelOpenOrders():', res.data);
-
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data cancelOpenOrders():', error.response.data);
-      } else {
-        console.error('❌ message cancelOpenOrders():', error.message);
+      if (res.data?.code < 0) {
+        return { success: false, message: res.data.msg };
       }
 
-      return null;
+      return { success: true, message: res.data };
+    } catch (err) {
+      const data = err.response?.data;
+      const message = [
+        err.message,
+        data?.code,
+        data?.msg || data?.message
+      ].filter(Boolean).join(' | ');
+
+      return { success: false, message };
     }
   }
 
@@ -232,6 +235,7 @@ class InvokeApi {
 
     if (res.data?.code < 0) {
       this.setError('getAccount', res.data.msg);
+      // @TODO return { success: false, message: res.data.msg }
       return null;
     }
 
