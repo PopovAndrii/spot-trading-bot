@@ -40,7 +40,7 @@ class WebSocketRouter {
             pair.addSymbol({
               symbol: currentSymbol, // @TODO remove
               status: statusPair.NEW,
-              bace: data.bace,
+              base: data.base,
               quote: data.quote,
             });
 

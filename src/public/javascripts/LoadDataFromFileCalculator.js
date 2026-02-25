@@ -18,15 +18,15 @@ export class LoadDataFromFileCalculator {
 
   async getStateCalculator() {
     const url = new URL(window.location.href);
-    const bace = url.searchParams.get('base');
+    const base = url.searchParams.get('base');
     const quote = url.searchParams.get('quote');
 
     const res = await this.notifications.fetchWithHandling(
-      `/spotbot/table/${bace}${quote}?symbol=${bace + quote}&bace=${bace}&quote=${quote}`,
+      `/spotbot/table/${base}${quote}?symbol=${base + quote}&base=${base}&quote=${quote}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: bace + quote }),
+        body: JSON.stringify({ message: base + quote }),
       },
       { '404-': 'Trading pair settings file not found', '500-': 'Server Error' }
     );

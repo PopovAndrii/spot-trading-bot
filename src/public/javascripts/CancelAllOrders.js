@@ -7,7 +7,7 @@ export class CancelAllOrders {
     const orders = document.getElementById('cancel-all-orders');
     orders.addEventListener('click', () => {
       if (this.getListenerStatus()) {
-        this.cancel(bace + quote);
+        this.cancel(base + quote);
       } else {
         this.notifications.showNotification(
           'Cancel "all order" is locked. <br>Press the "Stop" button.',

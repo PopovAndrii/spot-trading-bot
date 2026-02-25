@@ -40,8 +40,8 @@ export class SpotWS {
       this.ws.send(
         JSON.stringify({
           type: 'subscribe',
-          symbol: bace + quote,
-          bace: bace,
+          symbol: base + quote,
+          base: base,
           strategy: this.loadDataFromFileCalculator.getStrategyName(),
           quote: quote,
         })
@@ -150,9 +150,9 @@ export class SpotWS {
         this.ws.send(
           JSON.stringify({
             type: 'start',
-            symbol: bace + quote,
+            symbol: base + quote,
             strategy: this.setStrategy.getStrategy(),
-            bace: bace,
+            base: base,
             quote: quote,
           })
         );
@@ -163,7 +163,7 @@ export class SpotWS {
         this.ws.send(
           JSON.stringify({
             type: 'stop',
-            bace: bace,
+            base: base,
             quote: quote,
           })
         );

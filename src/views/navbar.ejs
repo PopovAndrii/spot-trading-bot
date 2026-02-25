@@ -45,7 +45,7 @@
         status = value.status == 1 ? 'running' : 'pause';
       }
 
-      a.href = `/spotbot/${value.symbol}?base=${value.bace}&quote=${value.quote}`;
+      a.href = `/spotbot/${value.symbol}?base=${value.base}&quote=${value.quote}`;
       a.textContent = `${value.symbol} ${status}`;
 
       ddown.appendChild(a);

@@ -254,6 +254,54 @@ class InvokeApi {
       return { success: false, message };
     }
   }
+
+  async exchangeInfo(symbols) {
+    try {
+      const res = await this.client.exchangeInfo(symbols);
+
+      if (res.data?.code < 0) {
+        this.getConsoleMsg(res.data.msg);
+        return { success: false, message: res.data.msg };
+      }
+
+      this.getConsoleMsg(`✅ exchangeInfo(${symbols.symbol})`);
+      return { success: true, message: res.data };
+    } catch (err) {
+      const data = err.response?.data;
+      const message = [
+        err.message,
+        data?.code,
+        data?.msg || data?.message
+      ].filter(Boolean).join(' | ');
+
+      this.getConsoleMsg(message);
+      return { success: false, message };
+    }
+  }
+
+  async tickerPrice(symbol) {
+    try {
+      const res = await this.client.tickerPrice(symbol);
+
+      if (res.data?.code < 0) {
+        this.getConsoleMsg(res.data.msg);
+        return { success: false, message: res.data.msg };
+      }
+
+      this.getConsoleMsg('✅ tickerPrice()');
+      return { success: true, message: res.data };
+    } catch (err) {
+      const data = err.response?.data;
+      const message = [
+        err.message,
+        data?.code,
+        data?.msg || data?.message
+      ].filter(Boolean).join(' | ');
+
+      this.getConsoleMsg(message);
+      return { success: false, message };
+    }
+  }
 }
 
 module.exports = { InvokeApi };

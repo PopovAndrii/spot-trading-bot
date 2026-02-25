@@ -5,10 +5,10 @@ export class SetStrategy {
     document.querySelectorAll('#settings-strategy > input').forEach((el) => {
       el.addEventListener('click', (e) => {
         const url = new URL(window.location.href);
-        const bace = url.searchParams.get('base');
+        const base = url.searchParams.get('base');
         const quote = url.searchParams.get('quote');
         this.strategyName = e.target.id;
-        this.#getStrategyData(bace, quote);
+        this.#getStrategyData(base, quote);
       });
     });
 
@@ -37,10 +37,10 @@ export class SetStrategy {
     });
   }
 
-  async #getStrategyData(bace, quote) {
+  async #getStrategyData(base, quote) {
     try {
       const response = await fetch(
-        `/spotbot/${bace + quote}?symbol=${bace + quote}&bace=${bace}&quote=${quote}`,
+        `/spotbot/${base + quote}?symbol=${base + quote}&base=${base}&quote=${quote}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
