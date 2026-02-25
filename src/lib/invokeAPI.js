@@ -226,7 +226,7 @@ class InvokeApi {
       }
 
       this.getConsoleMsg(`cancelOpenOrders() ${data.symbol}`);
-      return { success: true, message: res.data };
+      return { success: true, message: res.data.length };
     } catch (err) {
       const message = this.#getCatchMsg(err);
 

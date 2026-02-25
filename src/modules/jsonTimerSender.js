@@ -91,7 +91,6 @@ class JsonTimerSender extends EventEmitter {
         const result = await this.#runToApi(currentOrder);
 
         if (result === null || result.success === false) {
-          console.error('Incorrect method');
           continue;
         }
 
