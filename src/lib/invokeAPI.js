@@ -40,14 +40,16 @@ class InvokeApi {
     this.data = obj;
   }
 
-  getConsoleMsg(err) {
+  getConsoleMsg(err, status = true) {
     if (!err || !this.stateErrors) return;
+
+    const icon = status ? '✅' : '❌';
 
     const d = new Date()
     const parts = d.toUTCString().split(' ');
     const formatted = `${parts[0].replace(',', '')} ${parts[2]} ${parts[1]} ${parts[4]}`;
 
-    return console.log(`${formatted} ${err}`);
+    return console.log(`${formatted} ${icon} ${err}`);
   }
 
   getPublicStream(symbol) {
@@ -64,9 +66,10 @@ class InvokeApi {
     return this.client;
   }
 
-  async openOrders() {
+  // @TODO not used!
+  async openOrders(data) {
     try {
-      const res = await this.client.openOrders(this.data.symbol);
+      const res = await this.client.openOrders(data.symbol);
 
       console.log('✅ newOrder():');
 
@@ -82,39 +85,37 @@ class InvokeApi {
     }
   }
 
-  async newOrder() {
+  async newOrder(data) {
     try {
 
-      const res = await this.client.newOrder(this.data.symbol, this.data.side, this.data.type, {
-        price: this.data.price,
-        quantity: this.data.quantity,
-        timeInForce: this.data.timeInForce,
+      const res = await this.client.newOrder(data.symbol, data.side, data.type, {
+        price: data.price,
+        quantity: data.quantity,
+        timeInForce: data.timeInForce,
       });
 
-      console.log('✅ newOrder():', [
+      const msg = [
         res.data.symbol,
         res.data.status,
         res.data.side,
         res.data.price,
         res.data.origQty,
-      ]);
+      ];
 
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data newOrder():', error.response.data);
-      } else {
-        console.error('❌ message newOrder():', error.message);
-      }
+      this.getConsoleMsg(`newOrder() ${msg}`);
+      return { success: true, message: res.data };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
 
-      return null;
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
     }
   }
-
-  async newMarketOrder() {
+  // @TODO not used!
+  async newMarketOrder(data) {
     try {
-      const res = await this.client.newOrder(this.data.symbol, this.data.side, this.data.type, {
-        quantity: this.data.quantity,
+      const res = await this.client.newOrder(data.symbol, data.side, data.type, {
+        quantity: data.quantity,
       });
 
       console.log('✅ newMarketOrder():', [
@@ -135,11 +136,11 @@ class InvokeApi {
       return null;
     }
   }
-
-  async getHistory() {
+  // @TODO not used!
+  async getHistory(data) {
     try {
-      const res = await this.client.klines(this.data.symbol, this.data.interval || '5s', {
-        limit: this.data.limit || 60,
+      const res = await this.client.klines(data.symbol, data.interval || '5s', {
+        limit: data.limit || 60,
       });
 
       // const res = await this.client.klines({
@@ -161,72 +162,62 @@ class InvokeApi {
     }
   }
 
-  async getOrder() {
+  async getOrder(data) {
     try {
-      const res = await this.client.getOrder(this.data.symbol, {
-        orderId: this.data.orderId,
+      const res = await this.client.getOrder(data.symbol, {
+        orderId: data.orderId,
       });
 
-      console.log('✅ getOrder():', [
+      const msg = [
         res.data.symbol,
         res.data.status,
         res.data.side,
         res.data.price,
         res.data.origQty,
-      ]);
+      ];
 
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data getOrder():', error.response.data);
-      } else {
-        console.error('❌ message getOrder():', error.message);
-      }
+      this.getConsoleMsg(`getOrder() ${msg}`);
+      return { success: true, message: res.data };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
 
-      return null;
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
     }
   }
 
-  async cancelOrder() {
+  async cancelOrder(data) {
     try {
-      const res = await this.client.cancelOrder(this.data.symbol, {
-        orderId: this.data.orderId,
+      const res = await this.client.cancelOrder(data.symbol, {
+        orderId: data.orderId,
       });
 
-      console.log('✅ cancelOrder():', res.data);
+      // @TODO orderID, orderSymbol, orderPrice
+      this.getConsoleMsg(`cancelOrder() ${res.data}`);
+      return { success: true, message: res.data };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
 
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data cancelOrder():', error.response.data);
-      } else {
-        console.error('❌ message cancelOrder():', error.message);
-      }
-
-      return null;
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
     }
   }
 
-  async cancelOpenOrders(symbol = '') {
+  async cancelOpenOrders(data) {
     try {
-      const res = await this.client.cancelOpenOrders(symbol);
+      const res = await this.client.cancelOpenOrders(data.symbol);
 
       if (res.data?.code < 0) {
-        this.getConsoleMsg(res.data.msg);
+        this.getConsoleMsg(res.data.msg, false);
         return { success: false, message: res.data.msg };
       }
 
-      this.getConsoleMsg(`✅ cancelOpenOrders(${symbol})`);
+      this.getConsoleMsg(`cancelOpenOrders(${data.symbol})`);
       return { success: true, message: res.data };
     } catch (err) {
-      const data = err.response?.data;
-      const message = [
-        err.message,
-        data?.code,
-        data?.msg || data?.message
-      ].filter(Boolean).join(' | ');
+      const message = this.#getCatchMsg(err);
 
-      this.getConsoleMsg(message);
+      this.getConsoleMsg(message, false);
       return { success: false, message };
     }
   }
@@ -236,71 +227,66 @@ class InvokeApi {
       const res = await this.client.account({ omitZeroBalances: true });
 
       if (res.data?.code < 0) {
-        this.getConsoleMsg(res.data.msg);
+        this.getConsoleMsg(res.data.msg, false);
         return { success: false, message: res.data.msg };
       }
 
-      this.getConsoleMsg('✅ getAccount()');
+      this.getConsoleMsg('getAccount()');
       return { success: true, message: res.data };
     } catch (err) {
-      const data = err.response?.data;
-      const message = [
-        err.message,
-        data?.code,
-        data?.msg || data?.message
-      ].filter(Boolean).join(' | ');
+      const message = this.#getCatchMsg(err);
 
-      this.getConsoleMsg(message);
+      this.getConsoleMsg(message, false);
       return { success: false, message };
     }
   }
 
-  async exchangeInfo(symbols) {
+  async exchangeInfo(data) {
     try {
-      const res = await this.client.exchangeInfo(symbols);
+      const res = await this.client.exchangeInfo(data);
 
       if (res.data?.code < 0) {
-        this.getConsoleMsg(res.data.msg);
+        this.getConsoleMsg(res.data.msg, false);
         return { success: false, message: res.data.msg };
       }
 
-      this.getConsoleMsg(`✅ exchangeInfo(${symbols.symbol})`);
+      this.getConsoleMsg(`exchangeInfo(${data.symbol})`);
       return { success: true, message: res.data };
     } catch (err) {
-      const data = err.response?.data;
-      const message = [
-        err.message,
-        data?.code,
-        data?.msg || data?.message
-      ].filter(Boolean).join(' | ');
+      const message = this.#getCatchMsg(err);
 
-      this.getConsoleMsg(message);
+      this.getConsoleMsg(message, false);
       return { success: false, message };
     }
   }
 
-  async tickerPrice(symbol) {
+  async tickerPrice(data = {}) {
     try {
-      const res = await this.client.tickerPrice(symbol);
+      const res = await this.client.tickerPrice(data.symbol);
 
       if (res.data?.code < 0) {
-        this.getConsoleMsg(res.data.msg);
+        this.getConsoleMsg(res.data.msg, false);
         return { success: false, message: res.data.msg };
       }
 
-      this.getConsoleMsg('✅ tickerPrice()');
+      this.getConsoleMsg('tickerPrice()');
       return { success: true, message: res.data };
     } catch (err) {
-      const data = err.response?.data;
-      const message = [
-        err.message,
-        data?.code,
-        data?.msg || data?.message
-      ].filter(Boolean).join(' | ');
+      const message = this.#getCatchMsg(err);
 
-      this.getConsoleMsg(message);
+      this.getConsoleMsg(message, false);
       return { success: false, message };
     }
+  }
+
+  #getCatchMsg(err) {
+    const data = err.response?.data;
+
+    return [
+      err.message,
+      data?.code,
+      data?.msg || data?.message
+    ].filter(Boolean).join(' | ');
   }
 }
 

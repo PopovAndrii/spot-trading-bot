@@ -147,7 +147,7 @@ class Job {
 
       if (obj['SELL'][i].status === state.FILLED) {
         return {
-          status: 'final',
+          status: Status.DONE,
           method: 'cancelOpenOrders',
           side: null,
           id: i,
@@ -286,7 +286,7 @@ class Job {
 
       if (obj['BUY'][i].status === state.FILLED) {
         return {
-          status: 'final',
+          status: Status.DONE,
           method: 'cancelOpenOrders',
           side: null,
           id: i,

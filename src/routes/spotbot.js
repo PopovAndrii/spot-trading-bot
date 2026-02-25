@@ -85,10 +85,10 @@ router.post('/table/:symbol', async (req, res, next) => {
 });
 
 router.post('/:symbol', async function (req, res, next) {
-  const { base, quote } = req.query;
+  const { base, quote, symbol } = req.query;
   const { message } = req.body;
 
-  if (!base || !quote) {
+  if (!base || !quote || !symbol) {
     return res.status(400).json({ success: false, message: 'base and quote are required' });
   }
 
@@ -97,8 +97,8 @@ router.post('/:symbol', async function (req, res, next) {
   // We receive data from Binance in parallel
   const [account, tickerPrice, exchangeInfo] = await Promise.all([
     API.getAccount(),
-    API.tickerPrice(req.query.symbol),
-    API.exchangeInfo({ symbol: req.query.symbol }),
+    API.tickerPrice({ symbol }),
+    API.exchangeInfo({ symbol }),
   ]);
 
   const symbolData = exchangeInfo.message.symbols[0] || {};
@@ -184,7 +184,7 @@ router.post('/cancel/allorders', async (req, res, next) => {
     return res.status(500).json({ success: false, message: 'Symbol is required in request body' });
   }
 
-  const result = await API.cancelOpenOrders(symbol);
+  const result = await API.cancelOpenOrders({ symbol });
 
   if (!result.success) {
     return res.status(500).json(result);

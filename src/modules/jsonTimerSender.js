@@ -18,6 +18,7 @@ class JsonTimerSender extends EventEmitter {
     this.running = [];
     this.exchangeName = 'binance';
 
+    this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
   }
 
@@ -31,17 +32,9 @@ class JsonTimerSender extends EventEmitter {
       return null;
     }
 
-    const apiMethod = new InvokeApi();
-    apiMethod.setData(data.data);
-
-    if (typeof apiMethod[data.method] === 'function') {
-      try {
-        const result = await apiMethod[data.method]();
-        return result;
-      } catch (err) {
-        console.error('Call error API:', err);
-        return null;
-      }
+    if (typeof this.API[data.method] === 'function') {
+      const result = await this.API[data.method](data.data);
+      return result;
     }
 
     console.error(`Method [${data.method}] does not exist`);
@@ -72,8 +65,8 @@ class JsonTimerSender extends EventEmitter {
       // never started 0
       for (const [key, val] of obj[strategy.side].entries()) {
         let currentOrder = this.job[strategy.method](obj, key, val); // strategy.
-        // console.log(currentOrder)
-        if (currentOrder.status === 'final') {
+
+        if (currentOrder.status === Status.DONE) {
           const result = await this.#runToApi(currentOrder);
 
           // this.#applyStatusesToOrders(obj['BUY'], result);
@@ -95,27 +88,27 @@ class JsonTimerSender extends EventEmitter {
           continue;
         } // processed order (api request not needed) or test loop
 
-        const resAPI = await this.#runToApi(currentOrder);
+        const result = await this.#runToApi(currentOrder);
 
-        if (resAPI === null) {
+        if (result === null || result.success === false) {
           console.error('Incorrect method');
           continue;
         }
 
-        if (resAPI.status === currentOrder.status) {
+        if (result.message.status === currentOrder.status) {
           // ["PARTIALLY_FILLED"] or ["NEW"]
           await this.#sleep(100);
           continue; /** no need to write to file */
         }
 
         const toObj = {
-          status: resAPI.status,
-          orderId: resAPI.orderId,
+          status: result.message.status,
+          orderId: result.message.orderId,
         };
 
-        // resAPI.side == "SELL" or "BUY"
+        // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
-        Object.assign(obj[resAPI.side][currentOrder['id']], toObj);
+        Object.assign(obj[result.message.side][currentOrder['id']], toObj);
 
         await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
 
