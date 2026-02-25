@@ -66,25 +66,6 @@ class InvokeApi {
     return this.client;
   }
 
-  // @TODO not used!
-  async openOrders(data) {
-    try {
-      const res = await this.client.openOrders(data.symbol);
-
-      console.log('✅ newOrder():');
-
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data newOrder():', error.response.data);
-      } else {
-        console.error('❌ message newOrder():', error.message);
-      }
-
-      return null;
-    }
-  }
-
   async newOrder(data) {
     try {
 
@@ -102,7 +83,7 @@ class InvokeApi {
         res.data.origQty,
       ];
 
-      this.getConsoleMsg(`newOrder() ${msg}`);
+      this.getConsoleMsg(`newOrder() ${msg.join(' | ')}`);
       return { success: true, message: res.data };
     } catch (err) {
       const message = this.#getCatchMsg(err);
@@ -169,6 +150,7 @@ class InvokeApi {
       });
 
       const msg = [
+        data.orderId,
         res.data.symbol,
         res.data.status,
         res.data.side,
@@ -176,7 +158,7 @@ class InvokeApi {
         res.data.origQty,
       ];
 
-      this.getConsoleMsg(`getOrder() ${msg}`);
+      this.getConsoleMsg(`getOrder() ${msg.join(' | ')}`);
       return { success: true, message: res.data };
     } catch (err) {
       const message = this.#getCatchMsg(err);
@@ -192,8 +174,16 @@ class InvokeApi {
         orderId: data.orderId,
       });
 
-      // @TODO orderID, orderSymbol, orderPrice
-      this.getConsoleMsg(`cancelOrder() ${res.data}`);
+      const msg = [
+        data.orderId,
+        res.data.symbol,
+        res.data.status,
+        res.data.side,
+        res.data.price,
+        res.data.origQty,
+      ];
+
+      this.getConsoleMsg(`cancelOrder() ${msg.join(' | ')}`);
       return { success: true, message: res.data };
     } catch (err) {
       const message = this.#getCatchMsg(err);
@@ -203,7 +193,30 @@ class InvokeApi {
     }
   }
 
+  // @TODO not used!
+  async openOrders(data) {
+    try {
+      const res = await this.client.openOrders(data.symbol);
+
+      const msg = { count: res.data.length };
+
+      this.getConsoleMsg(`openOrders() ${msg.count} active orders`);
+      return { success: true, message: Number(msg.count) };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
+
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
+    }
+  }
+
   async cancelOpenOrders(data) {
+    const resultOpenOrders = await this.openOrders(data);
+
+    if (resultOpenOrders.message === 0) {
+      return { success: true, message: resultOpenOrders.message };
+    }
+
     try {
       const res = await this.client.cancelOpenOrders(data.symbol);
 
@@ -212,7 +225,7 @@ class InvokeApi {
         return { success: false, message: res.data.msg };
       }
 
-      this.getConsoleMsg(`cancelOpenOrders(${data.symbol})`);
+      this.getConsoleMsg(`cancelOpenOrders() ${data.symbol}`);
       return { success: true, message: res.data };
     } catch (err) {
       const message = this.#getCatchMsg(err);
