@@ -48,7 +48,7 @@ export class Notifications {
 
     var dateTime = '';
     if (duration === false) {
-      dateTime = `<i>${this.#date()}</i>`;
+      dateTime = `<i>${this.#date()}</i><br>`;
     }
 
     notification.innerHTML = `${dateTime} ${msg}<button onclick="this.parentElement.remove()">×</button>`;

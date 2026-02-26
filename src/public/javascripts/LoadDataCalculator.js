@@ -91,7 +91,7 @@ export class LoadDataCalculator {
       orders = {
         id: 'hash-hash',
         status: 0, // 0 - calc(can deletad), 1 - in process, 3 - not done(error etc)
-        pair: bace + quote,
+        pair: base + quote,
         param: {},
         date_added: new Date().toISOString(),
         date_modified: null,
@@ -114,7 +114,7 @@ export class LoadDataCalculator {
 
         orders['BUY'][index] = {
           status: null,
-          symbol: bace + quote,
+          symbol: base + quote,
           side: 'BUY',
           type: 'LIMIT',
           quantity: el.buy,
@@ -125,7 +125,7 @@ export class LoadDataCalculator {
 
         orders['SELL'][index] = {
           status: null,
-          symbol: bace + quote,
+          symbol: base + quote,
           side: 'SELL',
           type: 'LIMIT',
           quantity: el.totalSell,

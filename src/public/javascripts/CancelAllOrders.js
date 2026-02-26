@@ -7,7 +7,7 @@ export class CancelAllOrders {
     const orders = document.getElementById('cancel-all-orders');
     orders.addEventListener('click', () => {
       if (this.getListenerStatus()) {
-        this.cancel(bace + quote);
+        this.cancel(base + quote);
       } else {
         this.notifications.showNotification(
           'Cancel "all order" is locked. <br>Press the "Stop" button.',
@@ -26,7 +26,6 @@ export class CancelAllOrders {
     return this.listenerStatus;
   }
 
-  // @TODO move to invokeApi
   async cancel(currency) {
     try {
       const res = await fetch(`/spotbot/cancel/allorders`, {
@@ -36,9 +35,15 @@ export class CancelAllOrders {
       });
 
       const data = await res.json();
-      console.log('response cancel():', data);
+
+      if (data.success) {
+        this.notifications.showNotification(`${data.message} active orders cancelled per pair ${currency}`, 'success');
+      } else {
+        this.notifications.showNotification(data.message, 'danger');
+      }
     } catch (err) {
       console.error('❌ cancelAllOrders():', err);
+      this.notifications.showNotification(err.message, 'danger');
       return null;
     }
   }

@@ -15,13 +15,11 @@
               <label class="" for="short">short</label>
               <input id="long" type="radio" name="btnradio">
               <label class="" for="long">long</label>
-              <input id="longDynamic" type="radio" name="btnradio">
-              <label class="" for="longDynamic">longD</label>
             </div>
 
             <div class="symbol-bar">
               <div class="symbol-bar__text">
-                <%= bace + quote %>
+                <%= base + quote %>
               </div>
               <input type="" id="field-currency" disabled readonly>
             </div>
@@ -120,7 +118,7 @@
           <div class="col">
             <div class="mb-1">
               <button id="cancel-all-orders" type="button" class="button lg danger">
-                Cancel all <%= bace + quote %> pairs
+                Cancel all <%= base + quote %> pairs
                   <svg class="icon">
                     <use href="/sprite.svg#close"></use>
                   </svg>
@@ -134,7 +132,7 @@
     </div>
   </body>
   <script>
-    const bace = '<%= bace %>';
+    const base = '<%= base %>';
     const quote = '<%= quote %>';
     var orders = {};
 

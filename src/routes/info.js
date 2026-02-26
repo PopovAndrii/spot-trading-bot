@@ -6,19 +6,17 @@ const apiMethod = new InvokeApi();
 
 router.get('/', async function (req, res, next) {
   res.render('info', {
-    title: 'Acount Information ',
+    title: 'Acount Information: You Balances ',
   });
 });
 
 router.post('/account-info', async function (req, res, next) {
-  // res.render('info', { title: 'Express' });
-  try {
-    const data = await apiMethod.getAccount();
+  const result = await apiMethod.getAccount();
 
-    res.json({ message: data });
-  } catch (err) {
-    console.error('Error saving file:', err);
-    res.status(500).json({ message: 'Error saving file' });
+  if (!result.success) {
+    return res.status(500).json(result);
   }
+
+  res.json(result);
 });
 module.exports = router;

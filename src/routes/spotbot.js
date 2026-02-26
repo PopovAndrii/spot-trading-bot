@@ -3,32 +3,17 @@ const router = express.Router();
 const fs = require('fs/promises');
 const path = require('path');
 
-const { Spot } = require('@binance/connector');
+const { InvokeApi } = require('../lib/invokeAPI');
 const { Calculator } = require('../lib/calculator');
 
-let api_key = process.env.API_KEY;
-let api_secret = process.env.API_SECRET;
-let baseURL = 'https://api.binance.com';
-
-if (!api_key || !api_secret) {
-  throw new Error('Binance API keys are not set');
-}
-
-if (process.env.NODE_ENV === 'development') {
-  api_key = process.env.API_KEY_TEST;
-  api_secret = process.env.API_SECRET_TEST;
-  baseURL = 'https://testnet.binance.vision/';
-}
-
-const client = new Spot(api_key, api_secret, { baseURL: baseURL });
-
-router.get('/', function (req, res, next) {
-  res.render('spotbot', { title: 'Express', currency: 'req.params1' });
-});
+const API = new InvokeApi();
 
 router.get('/:currency', async function (req, res, next) {
   const currency = req.params.currency; // BNBUSDT
-  let bace = '';
+
+  if (!/^[A-Za-z0-9]{3,20}$/.test(currency)) return next();
+
+  let base = '';
   let quote = '';
   let formatInfo = {};
 
@@ -38,29 +23,25 @@ router.get('/:currency', async function (req, res, next) {
     return str.length;
   };
 
-  try {
-    const exchangeInfo = await client.exchangeInfo({ symbol: currency });
-    const symbolData = exchangeInfo.data.symbols[0] || {};
-    const filters = symbolData.filters || [];
+  const exchangeInfo = await API.exchangeInfo({ symbol: currency });
+  const symbolData = exchangeInfo.message.symbols[0] || {};
+  const filters = symbolData.filters || [];
 
-    bace = symbolData.baseAsset || '';
-    quote = symbolData.quoteAsset || '';
+  base = symbolData.baseAsset || '';
+  quote = symbolData.quoteAsset || '';
 
-    const priceFilter = filters.find((f) => f.filterType === 'PRICE_FILTER');
-    const lotSizeFilter = filters.find((f) => f.filterType === 'LOT_SIZE');
+  const priceFilter = filters.find((f) => f.filterType === 'PRICE_FILTER');
+  const lotSizeFilter = filters.find((f) => f.filterType === 'LOT_SIZE');
 
-    formatInfo = {
-      tickSize: decimalCount(priceFilter?.tickSize),
-      stepSize: decimalCount(lotSizeFilter?.stepSize),
-    };
-  } catch (error) {
-    console.error('Err /:currency', error.message);
-  }
+  formatInfo = {
+    tickSize: decimalCount(priceFilter?.tickSize),
+    stepSize: decimalCount(lotSizeFilter?.stepSize),
+  };
 
   res.render('spotbot', {
-    title: `${bace}/${quote}`,
-    currency: bace + quote,
-    bace,
+    title: `${base}/${quote}`,
+    currency: base + quote,
+    base,
     quote,
     formatInfo,
   });
@@ -104,65 +85,66 @@ router.post('/table/:symbol', async (req, res, next) => {
 });
 
 router.post('/:symbol', async function (req, res, next) {
-  try {
-    // Defining assets safely
-    const asset = req.body.message === 'short' ? req.query.bace : req.query.quote;
+  const { base, quote, symbol } = req.query;
+  const { message } = req.body;
 
-    // We receive data from Binance in parallel
-    const [account, tickerPrice, exchangeInfo] = await Promise.all([
-      client.account({ omitZeroBalances: true }),
-      client.tickerPrice(req.query.symbol),
-      client.exchangeInfo({ symbol: req.query.symbol }),
-    ]);
-
-    const symbolData = exchangeInfo.data.symbols[0] || {};
-    const filters = symbolData.filters || [];
-
-    // Safely take filters if they don't exist - undefined
-    const priceFilter = filters.find((f) => f.filterType === 'PRICE_FILTER');
-    const lotSizeFilter = filters.find((f) => f.filterType === 'LOT_SIZE');
-    const minNotionalFilter = filters.find((f) => f.filterType === 'NOTIONAL');
-
-    // Function for counting decimal places
-    const decimalCount = (value, separator = '.') => {
-      if (!value) return 0;
-      const str = parseFloat(value).toString().split(separator)[1] || '';
-      return str.length;
-    };
-
-    // Rounding to the nearest step
-    const roundToStep = (value, step) => {
-      if (typeof value !== 'number' || isNaN(value) || !step) return 0;
-      const precision = Math.floor(-Math.log10(step));
-      return Number((Math.floor(value / step) * step).toFixed(precision));
-    };
-
-    // Get your balance safely
-    const balanceEntry = account.data.balances.find((b) => b.asset === asset);
-    const balance = balanceEntry ? parseFloat(balanceEntry.free) : 0;
-
-    const ticker = parseFloat(tickerPrice.data.price) || 0;
-    const minNotional = minNotionalFilter ? parseFloat(minNotionalFilter.minNotional) : 0;
-    const tickSize = priceFilter ? parseFloat(priceFilter.tickSize) : 0;
-    const stepSize = lotSizeFilter ? parseFloat(lotSizeFilter.stepSize) : 0;
-
-    res.json({
-      symbol: {
-        symbol: symbolData.symbol || req.query.symbol,
-        baseAsset: symbolData.baseAsset || '',
-        quoteAsset: symbolData.quoteAsset || '',
-        tickSize: decimalCount(tickSize), // price accuracy
-        stepSize: decimalCount(stepSize), // accuracy of quantity
-        balance: roundToStep(balance, tickSize), // free balance
-        minQuoteAsset: roundToStep(minNotional, tickSize), // min. rate quote currency
-        minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize) : 0, // min. base currency rate
-        price: ticker,
-      },
-    });
-  } catch (error) {
-    console.error('Spotbot route error:', error);
-    res.status(500).json({ error: error.message || 'Internal Server Error' });
+  if (!base || !quote || !symbol) {
+    return res.status(400).json({ success: false, message: 'base and quote are required' });
   }
+
+  const asset = message === 'short' ? base : quote;
+
+  // We receive data from Binance in parallel
+  const [account, tickerPrice, exchangeInfo] = await Promise.all([
+    API.getAccount(),
+    API.tickerPrice({ symbol }),
+    API.exchangeInfo({ symbol }),
+  ]);
+
+  const symbolData = exchangeInfo.message.symbols[0] || {};
+  const filters = symbolData.filters || [];
+
+  // Safely take filters if they don't exist - undefined
+  const priceFilter = filters.find((f) => f.filterType === 'PRICE_FILTER');
+  const lotSizeFilter = filters.find((f) => f.filterType === 'LOT_SIZE');
+  const minNotionalFilter = filters.find((f) => f.filterType === 'NOTIONAL');
+
+  // Function for counting decimal places
+  const decimalCount = (value, separator = '.') => {
+    if (!value) return 0;
+    const str = parseFloat(value).toString().split(separator)[1] || '';
+    return str.length;
+  };
+
+  // Rounding to the nearest step
+  const roundToStep = (value, step) => {
+    if (typeof value !== 'number' || isNaN(value) || !step) return 0;
+    const precision = Math.floor(-Math.log10(step));
+    return Number((Math.floor(value / step) * step).toFixed(precision));
+  };
+
+  // Get your balance safely
+  const balanceEntry = account.message.balances.find((b) => b.asset === asset);
+  const balance = balanceEntry ? parseFloat(balanceEntry.free) : 0;
+
+  const ticker = parseFloat(tickerPrice.message.price) || 0;
+  const minNotional = minNotionalFilter ? parseFloat(minNotionalFilter.minNotional) : 0;
+  const tickSize = priceFilter ? parseFloat(priceFilter.tickSize) : 0;
+  const stepSize = lotSizeFilter ? parseFloat(lotSizeFilter.stepSize) : 0;
+
+  res.json({
+    symbol: {
+      symbol: symbolData.symbol || req.query.symbol,
+      baseAsset: symbolData.baseAsset || '',
+      quoteAsset: symbolData.quoteAsset || '',
+      tickSize: decimalCount(tickSize), // price accuracy
+      stepSize: decimalCount(stepSize), // accuracy of quantity
+      balance: roundToStep(balance, tickSize), // free balance
+      minQuoteAsset: roundToStep(minNotional, tickSize), // min. rate quote currency
+      minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize) : 0, // min. base currency rate
+      price: ticker,
+    },
+  });
 });
 
 router.post('/calculator/save', async (req, res, next) => {
@@ -197,21 +179,18 @@ router.post('/calculator/save', async (req, res, next) => {
 });
 
 router.post('/cancel/allorders', async (req, res, next) => {
-  try {
-    const symbol = req.body.message;
-    if (!symbol) {
-      return res.status(400).json({ error: 'Symbol is required in request body' });
-    }
-
-    const cancelOrder = await client.cancelOpenOrders(symbol);
-
-    // Checking that there is data
-    const data = cancelOrder?.data || cancelOrder || [];
-    res.json({ message: data });
-  } catch (err) {
-    console.error('Error cancelling all orders:', err.response?.data || err.message);
-    res.status(500).json({ error: err.response?.data || err.message || 'Internal Server Error' });
+  const symbol = req.body.message;
+  if (!symbol) {
+    return res.status(500).json({ success: false, message: 'Symbol is required in request body' });
   }
+
+  const result = await API.cancelOpenOrders({ symbol });
+
+  if (!result.success) {
+    return res.status(500).json(result);
+  }
+
+  res.json(result);
 });
 
 router.post('/calculator/result', async (req, res, next) => {
