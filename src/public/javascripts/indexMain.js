@@ -3,6 +3,7 @@ import { Theme } from './ui/Theme.js';
 new Theme();
 
 new UiElements.Select();
+new UiElements.Button();
 
 const select = document.getElementById('selectCurrency');
 select?.addEventListener('ui-select-change', (e) => {
@@ -17,6 +18,8 @@ select?.addEventListener('ui-select-change', (e) => {
     btn.removeAttribute('aria-disabled');
     btn.href = `/spotbot/${value}`;
     btn.innerText = symbol;
+    btn.setAttribute('aria-label', symbol);
+    btn.dataset.value = symbol;
   } else {
     btn.classList.add('disabled');
     btn.setAttribute('aria-disabled', 'true');
@@ -24,6 +27,8 @@ select?.addEventListener('ui-select-change', (e) => {
     btn.innerHTML = `<svg class="icon">
                       <use href="/sprite.svg#bun"></use>
                     </svg>Select currency!`;
+    btn.removeAttribute('aria-label');
+    delete btn.dataset.value;
   }
 });
 
