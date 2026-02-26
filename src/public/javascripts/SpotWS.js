@@ -75,6 +75,8 @@ export class SpotWS {
                 clearInterval(this.interval);
                 this.interval = null;
               }
+              this.#btnRule(false);
+              this.isRunning = false;
             }
             break;
           case 'updatePrice':
