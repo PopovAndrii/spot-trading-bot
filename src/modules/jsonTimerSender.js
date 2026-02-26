@@ -179,7 +179,7 @@ class JsonTimerSender extends EventEmitter {
 
       this.readLoop();
 
-      console.log('🟢 Button Start:', symbol, this.strategy);
+      console.log('🟢 Button Start:', this.symbol, this.strategy);
     }
   }
 
@@ -187,16 +187,17 @@ class JsonTimerSender extends EventEmitter {
     return path.join(__dirname, '../data', `${timestamp}${this.symbol}-${this.exchangeName}.json`);
   }
 
-  async stop(symbol) {
+  async stop() {
     clearTimeout(this.timer);
 
     // UserStreamAPI.removeInstance();
-    StreamAPI.removeInstance(symbol);
+    StreamAPI.removeInstance(this.symbol);
 
     this.timer = null;
-    this.running[symbol] = false;
+    this.running[this.symbol] = false;
 
-    console.log('🛑 Button Stop:', symbol);
+    console.log('🛑 Button Stop:', this.symbol);
+    this.emit('stopped', this.symbol);
   }
 
   #sleep(ms) {

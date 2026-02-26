@@ -14,7 +14,7 @@ class WebSocketRouter {
   setup() {
     this.wss.on('connection', (ws) => {
       let currentSymbol = null;
-      console.log('🟢 www connected');
+      console.log('🟢 WebSocket connected');
 
       ws.on('message', (msg) => {
         let data;
@@ -52,6 +52,17 @@ class WebSocketRouter {
                 });
               }
             });
+
+            ts.on('stopped', (symbol) => {
+              pair.updateSymbol({ symbol, status: statusPair.STOP });
+
+              for (const client of this.clients.get(symbol) || []) {
+                this.safeSend(client, {
+                  event: 'updateTableData',
+                  data: 0,
+                });
+              }
+            });
           }
 
           const ts = this.timerSenders.get(currentSymbol);
@@ -62,7 +73,6 @@ class WebSocketRouter {
         if (data.type === 'start' && currentSymbol) {
           const ts = this.timerSenders.get(currentSymbol);
           ts.start(currentSymbol, data.strategy);
-
           pair.updateSymbol({ symbol: currentSymbol, status: statusPair.START });
 
           for (const client of this.clients.get(currentSymbol) || []) {
@@ -75,7 +85,7 @@ class WebSocketRouter {
 
         if (data.type === 'stop' && currentSymbol) {
           const ts = this.timerSenders.get(currentSymbol);
-          ts.stop(currentSymbol);
+          ts.stop();
 
           pair.updateSymbol({ symbol: currentSymbol, status: statusPair.STOP });
 

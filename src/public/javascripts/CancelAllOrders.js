@@ -4,11 +4,16 @@ export class CancelAllOrders {
 
     this.notifications = notifications;
 
+    new UiElements.Button();
+
     const orders = document.getElementById('cancel-all-orders');
-    orders.addEventListener('click', () => {
+    orders?.addEventListener('ui-button-change', (e) => {
       if (this.getListenerStatus()) {
-        this.cancel(base + quote);
+        e.target.disabled = false;
+        this.cancel(e.detail.val);
       } else {
+        e.target.disabled = true;
+
         this.notifications.showNotification(
           'Cancel "all order" is locked. <br>Press the "Stop" button.',
           'warning',

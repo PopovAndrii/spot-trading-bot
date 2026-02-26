@@ -75,6 +75,8 @@ export class SpotWS {
                 clearInterval(this.interval);
                 this.interval = null;
               }
+              this.#btnRule(false);
+              this.isRunning = false;
             }
             break;
           case 'updatePrice':
@@ -183,7 +185,9 @@ export class SpotWS {
     const toggleBtn = document.getElementById('toggleBtn');
     const settingsCalculate = document.getElementById('settings-calculate');
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
+
     const cancelAllOrders = document.getElementById('cancel-all-orders');
+    cancelAllOrders.disabled = !cancelAllOrders.disabled;
 
     toggleBtn.classList.toggle('danger');
     if (status) {
@@ -194,6 +198,5 @@ export class SpotWS {
 
     settingsCalculate.classList.toggle('disabled');
     settingsCalculateSave.classList.toggle('disabled');
-    cancelAllOrders.classList.toggle('disabled');
   }
 }
