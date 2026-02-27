@@ -4,7 +4,7 @@ export class LoadDataCalculator {
 
     this.notifications = notifications;
 
-    document.querySelector('#settings-calculate').addEventListener('click', () => {
+    document.querySelector('#settings-calculate').addEventListener('ui-button-change', () => {
       if (this.getListenerStatus()) {
         document.querySelector('#settings-table tbody').innerHTML = '';
         this.getSettings();
@@ -38,7 +38,7 @@ export class LoadDataCalculator {
   }
 
   save() {
-    document.getElementById('settings-calculate-save').addEventListener('click', () => {
+    document.getElementById('settings-calculate-save').addEventListener('ui-button-change', () => {
       if (this.getListenerStatus()) {
         this.settingsSave();
       } else {
@@ -161,7 +161,7 @@ export class LoadDataCalculator {
       });
 
       const data = await res.json();
-      console.log('Response settingsSave():', data.message);
+      console.log('settingsSave():', data.message);
       this.notifications.showNotification(data.message, 'success', 10000);
     } catch (err) {
       console.error('❌ settingsSave():', err);
