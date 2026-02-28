@@ -125,21 +125,21 @@ export class SpotWS {
       this.interval = null;
     }
 
-    const btnStart = document.getElementById('toggleBtn');
-    if (btnStart && this.btnClickHandler) {
-      btnStart.removeEventListener('click', this.btnClickHandler);
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn && this.btnClickHandler) {
+      startBtn.removeEventListener('click', this.btnClickHandler);
     }
   }
 
   btnStart() {
-    const btnStart = document.getElementById('toggleBtn');
-    if (!btnStart) return;
+    const startBtn = document.getElementById('startBtn');
+    if (!startBtn) return;
 
     if (this.btnClickHandler) {
-      btnStart.removeEventListener('click', this.btnClickHandler);
+      startBtn.removeEventListener('click', this.btnClickHandler);
     }
 
-    const { base, quote } = JSON.parse(btnStart.dataset.value);
+    const { base, quote } = JSON.parse(startBtn.dataset.value);
 
     this.btnClickHandler = () => {
       // test WebSocket open?
@@ -176,7 +176,7 @@ export class SpotWS {
       }
     };
 
-    btnStart.addEventListener('ui-button-change', this.btnClickHandler);
+    startBtn.addEventListener('ui-button-change', this.btnClickHandler);
   }
 
   #btnRule(status) {
@@ -192,16 +192,15 @@ export class SpotWS {
     const cancelAllOrders = document.getElementById('cancel-all-orders');
     cancelAllOrders.disabled = !cancelAllOrders.disabled;
 
-    const btnStart = document.getElementById('toggleBtn');
+    const startBtn = document.getElementById('startBtn');
     if (status) {
-      btnStart.classList.add('danger');
-      btnStart.classList.remove('success');
-      btnStart.innerHTML = `Stop <svg class="icon active"><use href="/sprite.svg#stop"></use></svg>`;
+      startBtn.classList.add('danger');
+      startBtn.classList.remove('success');
+      startBtn.innerHTML = `Stop <svg class="icon active"><use href="/sprite.svg#stop"></use></svg>`;
     } else {
-      btnStart.classList.add('success');
-      btnStart.classList.remove('danger');
-      btnStart.innerHTML = `Start <svg class="icon"><use href="/sprite.svg#play"></use></svg>`;
+      startBtn.classList.add('success');
+      startBtn.classList.remove('danger');
+      startBtn.innerHTML = `Start <svg class="icon"><use href="/sprite.svg#play"></use></svg>`;
     }
-
   }
 }
