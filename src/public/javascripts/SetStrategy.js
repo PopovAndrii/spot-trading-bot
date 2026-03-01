@@ -1,15 +1,21 @@
 export class SetStrategy {
-  constructor() {
+  constructor(notifications) {
+    this.notifications = notifications;
+
     this.#getStaticText();
 
-    document.querySelectorAll('#settings-strategy > input').forEach((el) => {
-      el.addEventListener('click', (e) => {
-        const url = new URL(window.location.href);
-        const base = url.searchParams.get('base');
-        const quote = url.searchParams.get('quote');
-        this.strategyName = e.target.id;
-        this.#getStrategyData(base, quote);
-      });
+    const strategyGroup = document.querySelector('.UIbg');
+
+    strategyGroup.addEventListener('ui-button-group-change', (e) => {
+      const { id, value } = e.detail;
+
+      this.notifications.showNotification(`The strategy chosen is: <b>${id}</b>`, 'success', 15000);
+
+      const url = new URL(window.location.href);
+      const base = url.searchParams.get('base');
+      const quote = url.searchParams.get('quote');
+      this.strategyName = id;
+      this.#getStrategyData(base, quote);
     });
 
     this.#indentFromPrice();

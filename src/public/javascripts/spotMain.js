@@ -8,6 +8,7 @@ import { Theme } from './ui/Theme.js';
 
 new UiElements.SpinBox();
 new UiElements.Switch();
+new UiElements.ButtonGroup();
 
 const notifications = new Notifications();
 
@@ -30,7 +31,7 @@ const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
   colors
 );
 
-const setStrategy = new SetStrategy();
+const setStrategy = new SetStrategy(notifications);
 
 new SpotWS(
   notifications,

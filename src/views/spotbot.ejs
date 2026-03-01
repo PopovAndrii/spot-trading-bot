@@ -10,11 +10,12 @@
       <main class="container-adaptive content">
         <form>
           <div class="symbol">
-            <div id="settings-strategy" class="input-btn">
-              <input id="short" type="radio" name="btnradio">
-              <label class="" for="short">short</label>
-              <input id="long" type="radio" name="btnradio">
-              <label class="" for="long">long</label>
+            <div class="UIbg lg" role="group" aria-label="Choosing a trading strategy">
+              <input type="radio" class="UIbg-input" name="strategy" value="short" id="short">
+              <label class="UIbg-btn" for="short">Short</label>
+
+              <input type="radio" class="UIbg-input" name="strategy" value="long" id="long">
+              <label class="UIbg-btn" for="long">Long</label>
             </div>
 
             <div class="symbol-bar">
@@ -68,25 +69,23 @@
             </div>
           </div>
 
-          <div class="line line-press line-between">
-            <div>
-              <div class="button-group lg">
-                <button id="settings-calculate" value="long" type="button" class="">Calculate
-                  <svg class="icon">
-                    <use href="/sprite.svg#calc"></use>
-                  </svg>
-                </button>
-                <button id="settings-calculate-save" type="button" class="">Save
-                  <svg class="icon">
-                    <use href="/sprite.svg#save"></use>
-                  </svg>
-                </button>
-              </div>
-            </div>
+          <div class="line line-press -line-between">
+            <button data-value="stumb" id="settings-calculate" class="UIb lg g-1 " type="button">Calculate
+              <svg class="icon">
+                <use href="/sprite.svg#calc"></use>
+              </svg>
+            </button>
+            <button data-value="stumb" id="settings-calculate-save" class="UIb lg g-1 " type="button">Save
+              <svg class="icon">
+                <use href="/sprite.svg#save"></use>
+              </svg>
+            </button>
+
             <div class="stream-currency">
             </div>
-            <div class="line-line">
-              <button id="toggleBtn" type="button" class="button primary lg">
+            <div class="-line-line">
+              <button data-value='{"base":"<%= base %>", "quote":"<%= quote %>"}' id="startBtn" type="button"
+                class="UIb lg g-1 success">
                 Start
                 <svg class="icon">
                   <use href="/sprite.svg#play"></use>

@@ -125,21 +125,22 @@ export class SpotWS {
       this.interval = null;
     }
 
-    const toggleBtn = document.getElementById('toggleBtn');
-    if (toggleBtn && this.btnClickHandler) {
-      toggleBtn.removeEventListener('click', this.btnClickHandler);
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn && this.btnClickHandler) {
+      startBtn.removeEventListener('click', this.btnClickHandler);
     }
   }
 
   btnStart() {
-    const toggleBtn = document.getElementById('toggleBtn');
+    const startBtn = document.getElementById('startBtn');
+    if (!startBtn) return;
 
-    // delete old handler
     if (this.btnClickHandler) {
-      toggleBtn.removeEventListener('click', this.btnClickHandler);
+      startBtn.removeEventListener('click', this.btnClickHandler);
     }
 
-    // new handler
+    const { base, quote } = JSON.parse(startBtn.dataset.value);
+
     this.btnClickHandler = () => {
       // test WebSocket open?
       if (!this.#isWebSocketOpen(this.ws)) {
@@ -175,28 +176,31 @@ export class SpotWS {
       }
     };
 
-    toggleBtn.addEventListener('click', this.btnClickHandler);
+    startBtn.addEventListener('ui-button-change', this.btnClickHandler);
   }
 
   #btnRule(status) {
     this.loadDataCalculator.setListenerStatus(status);
     this.cancelAllOrders.setListenerStatus(status);
 
-    const toggleBtn = document.getElementById('toggleBtn');
     const settingsCalculate = document.getElementById('settings-calculate');
+    settingsCalculate.classList.toggle('disabled');
+
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
+    settingsCalculateSave.classList.toggle('disabled');
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
     cancelAllOrders.disabled = !cancelAllOrders.disabled;
 
-    toggleBtn.classList.toggle('danger');
+    const startBtn = document.getElementById('startBtn');
     if (status) {
-      toggleBtn.innerHTML = `Stop <svg class="icon active"><use href="/sprite.svg#stop"></use></svg>`;
+      startBtn.classList.add('danger');
+      startBtn.classList.remove('success');
+      startBtn.innerHTML = `Stop <svg class="icon active"><use href="/sprite.svg#stop"></use></svg>`;
     } else {
-      toggleBtn.innerHTML = `Start <svg class="icon"><use href="/sprite.svg#play"></use></svg>`;
+      startBtn.classList.add('success');
+      startBtn.classList.remove('danger');
+      startBtn.innerHTML = `Start <svg class="icon"><use href="/sprite.svg#play"></use></svg>`;
     }
-
-    settingsCalculate.classList.toggle('disabled');
-    settingsCalculateSave.classList.toggle('disabled');
   }
 }
