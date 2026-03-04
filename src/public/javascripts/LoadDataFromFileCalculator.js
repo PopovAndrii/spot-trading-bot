@@ -36,6 +36,10 @@ export class LoadDataFromFileCalculator {
 
     this.strategyName = res.data.param['field-strategy'];
 
+    if (this.strategyName) {
+      document.querySelector(`#${this.strategyName}`).checked = true
+    }
+
     this.#fillInData(res.data);
     this.loadDataCalculator.calculate(res.data);
   }
