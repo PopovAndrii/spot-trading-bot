@@ -10,7 +10,6 @@ export class LoadDataCalculator {
         this.getSettings();
         this.strategy = document.getElementById('field-strategy').value;
         this.calculator();
-        console.log(this.strategy)
       } else {
         this.notifications.showNotification(
           'Calculator is locked. <br>Press the "Stop" button.',
