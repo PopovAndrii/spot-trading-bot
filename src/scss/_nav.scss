@@ -22,14 +22,6 @@
     &__logout {
       align-self: center;
       justify-self: end;
-      background-color: $c-g-300;
-      border-radius: $border-radius;
-      padding: 0.25rem 0.5rem;
-
-      &:hover {
-        background-color: $c-g-900;
-        color: $c-g-50;
-      }
     }
 
     .switch {
