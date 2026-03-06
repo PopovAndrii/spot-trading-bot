@@ -75,7 +75,6 @@ export class LoadDataCalculator {
       'field-fibonachiStep': null,
       'field-martingail': null,
       'field-indent': null,
-      'field-trackPrice': null,
       'field-requestFrequency': null,
       'field-stepSize': null,
       'field-tickSize': null,
