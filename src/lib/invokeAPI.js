@@ -292,6 +292,37 @@ class InvokeApi {
     }
   }
 
+  async bookTicker(data = {}) {
+    try {
+      // if data.symbol empty, Binance return arr for all pairs
+      const res = await this.client.bookTicker(data.symbol || '');
+
+      // Проверка на ошибку в ответе (если API вернуло структуру с ошибкой)
+      if (res.data?.code < 0) {
+        this.getConsoleMsg(res.data.msg, false);
+        return { success: false, message: res.data.msg };
+      }
+
+      this.getConsoleMsg('bookTicker()');
+
+      // return { success: true, message :
+      //  { 
+      //    "symbol": "BTCUSDT",
+      //    "bidPrice": "63450.00000000",
+      //    "bidQty": "0.54210000",
+      //    "askPrice": "63450.01000000",
+      //    "askQty": "1.12540000"
+      //  } 
+      // }
+      return { success: true, message: res.data };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
+
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
+    }
+  }
+
   #getCatchMsg(err) {
     const data = err.response?.data;
 

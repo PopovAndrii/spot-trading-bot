@@ -178,6 +178,43 @@ router.post('/calculator/save', async (req, res, next) => {
   }
 });
 
+router.post('/calculator/restart', async (req, res, next) => {
+  try {
+    const rawPair = req.body.message?.pair;
+    if (!rawPair) {
+      return res.status(400).json({ message: 'Pair is required' });
+    }
+
+    const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
+
+    const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
+
+    const content = await fs.readFile(filePath, 'utf8');
+    let data = JSON.parse(content);
+
+    const newData = req.body.message;
+    // data = { ...data, ...newData };
+    // newData.restart = req.body.message.restart === 'true';
+    newData.restart = String(req.body.message.restart) === 'true';
+    data = Object.assign(data, newData);
+    try {
+      data = JSON.stringify(data, null, 2);
+    } catch (err) {
+      console.error('Invalid data for JSON:', err);
+      return res.status(400).json({ message: 'Invalid data for JSON' });
+    }
+
+    await fs.writeFile(filePath, data, 'utf8');
+
+    const str = newData.restart == "true" ? "on" : "off";
+
+    res.json({ message: `Restart for: ${symbol} is <b>${str}</b>` });
+  } catch (err) {
+    console.error('Error saving file:', err);
+    res.status(500).json({ message: 'Error saving file' });
+  }
+});
+
 router.post('/cancel/allorders', async (req, res, next) => {
   const symbol = req.body.message;
   if (!symbol) {

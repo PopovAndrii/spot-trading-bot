@@ -4,6 +4,7 @@ const path = require('path');
 const { Job, Status } = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const { StreamAPI } = require('../lib/streamAPI');
+const { Calculator } = require('../lib/calculator');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
 
 const activeSymbols = new Set();
@@ -15,6 +16,7 @@ class JsonTimerSender extends EventEmitter {
     this.timer = null;
     this.symbol = null;
     this.strategy = strategy;
+    this.autoRestart = false;  // ← ДОБАВЬ
     this.running = [];
     this.exchangeName = 'binance';
 
@@ -72,14 +74,27 @@ class JsonTimerSender extends EventEmitter {
           // this.#applyStatusesToOrders(obj['BUY'], result);
           // this.#applyStatusesToOrders(obj['SELL'], result);
 
-          obj['status'] = Status.DONE;
-          obj['date_modified'] = new Date().toISOString();
+          obj.status = Status.DONE;
+          obj.date_modified = new Date().toISOString();
 
-          // final write
-          await fs.writeFile(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
+          this.autoRestart = obj.restart == true ? true : false;
 
-          await this.stop(); // new cycle here
-          return;
+          if (this.autoRestart) {
+            // write old data
+            await fs.writeFile(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
+
+            await this.#sleep(500);
+            this.restartCycle(obj);
+            await this.#sleep(500);
+
+            return;
+          } else {
+            // final write
+            this.stop();
+            await fs.writeFile(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
+            return;
+          }
+
         }
 
         if (currentOrder.status === 'pass') {
@@ -151,10 +166,13 @@ class JsonTimerSender extends EventEmitter {
     this.timer = setTimeout(() => this.readLoop(), this.interval);
   }
 
-  async start(symbol, strategy) {
+  async start(symbol, strategy, options = {}) {
+
     if (!this.running[symbol]) {
-      // this.strategy from file settings(back) or strategy from click on button (front)
-      this.strategy = this.strategy ? this.strategy : strategy;
+      console.log("strategy:", strategy)
+      this.strategy = (this.strategy == null) ? strategy : this.strategy;
+
+      this.autoRestart = options.autoRestart || false;
 
       const api = new InvokeApi();
 
@@ -179,7 +197,7 @@ class JsonTimerSender extends EventEmitter {
 
       this.readLoop();
 
-      console.log('🟢 Button Start:', this.symbol, this.strategy);
+      console.log('🟢 Button Start:', this.symbol, this.strategy, 'Auto restart:', this.autoRestart);
     }
   }
 
@@ -198,6 +216,83 @@ class JsonTimerSender extends EventEmitter {
 
     console.log('🛑 Button Stop:', this.symbol);
     this.emit('stopped', this.symbol);
+  }
+
+  async restartCycle(obj = {}) {
+    try {
+      console.log(`🔄 Restarting cycle for ${this.symbol}`);
+
+      // 1. Get current price (and param ??)
+      const data = await this.API.bookTicker({ symbol: this.symbol });
+      // data = await data.json();
+      // console.log("1 Data:", data)
+      const price = (this.strategy === "long") ? data.message.askPrice : data.message.bidPrice;
+
+      // 2. recalculete
+      const settings = {
+        ...obj['param'],
+        'field-currency': `${price}`,
+        'field-indent': "0",
+      }
+      // console.log(obj['param'], "2 Settings:", settings, this.strategy)
+
+      const calc = new Calculator(settings, this.strategy);
+
+      const tmp = this.#config(calc);
+      tmp.param = settings;
+      tmp.restart = true;
+
+      // 3. Сохранить в файл
+      const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
+      await fs.writeFile(filePath, JSON.stringify(tmp, null, 2), 'utf8');
+
+      this.emit('restarted', { symbol: this.symbol, price });
+
+    } catch (err) {
+      console.error('❌ Failed to restart cycle:', err);
+      this.emit('stopped', this.symbol);
+    }
+  }
+
+  #config(calcResult = []) {
+    const config = {
+      id: 'hash-hash',
+      status: 0,
+      pair: this.symbol,
+      param: {},
+      date_added: new Date().toISOString(),
+      date_modified: null,
+      BUY: [],
+      SELL: [],
+    };
+
+    calcResult.forEach((el, index) => {
+      config['BUY'][index] = {
+        index: index + 1,
+        status: null,
+        symbol: this.symbol,
+        side: 'BUY',
+        type: 'LIMIT',
+        quantity: el.buy,
+        price: el.buyCurrency,
+        timeInForce: 'GTC',
+        orderId: null,
+      };
+
+      config['SELL'][index] = {
+        index: index + 1,
+        status: null,
+        symbol: this.symbol,
+        side: 'SELL',
+        type: 'LIMIT',
+        quantity: el.totalSell,
+        price: el.sellCurrency,
+        timeInForce: 'GTC',
+        orderId: null,
+      };
+    })
+
+    return config;
   }
 
   #sleep(ms) {

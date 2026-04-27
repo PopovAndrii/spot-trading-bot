@@ -4,6 +4,7 @@ export class LoadDataCalculator {
 
     this.notifications = notifications;
 
+    // Change any button settings param
     document.querySelector('#group-spinbox').addEventListener('ui-spinbox-change', (e) => {
       if (this.getListenerStatus()) {
         document.querySelector('#settings-table tbody').innerHTML = '';
@@ -19,6 +20,7 @@ export class LoadDataCalculator {
       }
     })
 
+    // Change claculate button
     document.querySelector('#settings-calculate').addEventListener('ui-button-change', () => {
       if (this.getListenerStatus()) {
         document.querySelector('#settings-table tbody').innerHTML = '';
@@ -56,6 +58,22 @@ export class LoadDataCalculator {
     document.getElementById('settings-calculate-save').addEventListener('ui-button-change', () => {
       if (this.getListenerStatus()) {
         this.settingsSave();
+      } else {
+        this.notifications.showNotification(
+          'Save is locked. Press the "Pause" button.',
+          'warning',
+          10000
+        );
+      }
+    });
+  }
+
+  // Chenge button restart
+  restart() {
+    document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {
+      if (this.getListenerStatus()) {
+        console.log(e.detail)
+        this.addRestartStatus(e.detail.value);
       } else {
         this.notifications.showNotification(
           'Save is locked. Press the "Pause" button.',
@@ -179,6 +197,27 @@ export class LoadDataCalculator {
       this.notifications.showNotification(data.message, 'success', 10000);
     } catch (err) {
       console.error('❌ settingsSave():', err);
+      return null;
+    }
+  }
+
+  async addRestartStatus(value) {
+    const obj = {
+      "pair": base + quote,
+      "restart": value
+    }
+
+    try {
+      const res = await fetch(`/spotbot/calculator/restart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: obj }),
+      });
+
+      const data = await res.json();
+      this.notifications.showNotification(data.message, 'success', 10000);
+    } catch (err) {
+      console.error('❌ addRestartStatus(value):', err);
       return null;
     }
   }
