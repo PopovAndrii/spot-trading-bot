@@ -170,7 +170,9 @@ class JsonTimerSender extends EventEmitter {
 
     if (!this.running[symbol]) {
       console.log("strategy:", strategy)
-      this.strategy = (this.strategy == null) ? strategy : this.strategy;
+      // this.strategy = (this.strategy == null) ? strategy : this.strategy;
+      this.strategy = strategy == 'short' ? 'short' : 'long';
+      console.log("Strategy:", this.strategy)
 
       this.autoRestart = options.autoRestart || false;
 
@@ -242,7 +244,7 @@ class JsonTimerSender extends EventEmitter {
       tmp.param = settings;
       tmp.restart = true;
 
-      // 3. Сохранить в файл
+      // 3. Save to file
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
       await fs.writeFile(filePath, JSON.stringify(tmp, null, 2), 'utf8');
 
