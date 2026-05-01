@@ -83,7 +83,7 @@ class InvokeApi {
         res.data.origQty,
       ];
 
-      this.getConsoleMsg(`newOrder() ${msg.join(' | ')}`);
+      this.getConsoleMsg(`newOrder(${data.id}) ${msg.join(' | ')}`);
       return { success: true, message: res.data };
     } catch (err) {
       const message = this.#getCatchMsg(err);
@@ -158,7 +158,7 @@ class InvokeApi {
         res.data.origQty,
       ];
 
-      this.getConsoleMsg(`getOrder() ${msg.join(' | ')}`);
+      this.getConsoleMsg(`getOrder(${data.id}) ${msg.join(' | ')}`);
       return { success: true, message: res.data };
     } catch (err) {
       const message = this.#getCatchMsg(err);

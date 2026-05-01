@@ -270,7 +270,6 @@ class JsonTimerSender extends EventEmitter {
 
     calcResult.forEach((el, index) => {
       config['BUY'][index] = {
-        index: index + 1,
         status: null,
         symbol: this.symbol,
         side: 'BUY',
@@ -282,7 +281,6 @@ class JsonTimerSender extends EventEmitter {
       };
 
       config['SELL'][index] = {
-        index: index + 1,
         status: null,
         symbol: this.symbol,
         side: 'SELL',
