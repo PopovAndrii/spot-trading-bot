@@ -11,9 +11,9 @@ export class Calculator {
       'field-fibonachiStep': 0.2, // fibonachi
       'field-martingail': 49,
       'field-indent': 0.0,
-      'field-trackPrice': 0.15, // в построении не учавствует
-      'field-staticStep': 0.0,
-      'field-requestFrequency': 500, // в построении не учавствует
+      'field-trackPrice': 0.15, // does not participate in the construction
+      'field-activeOrders': 3, // does not participate in the construction
+      'field-requestFrequency': 500, // does not participate in the construction
       'field-stepSize': null,
       'field-tickSize': null,
     };
@@ -56,7 +56,7 @@ export class Calculator {
     for (let i = 0; this.data['field-deposit'] > spentFunds; ++i) {
       if (i == 0) {
         overlapRange = this.data['field-indent'];
-        coverage = this.data['field-staticStep'] + this.data['field-fibonachiStep'];
+        coverage = this.data['field-fibonachiStep'];
       } else {
         overlapRange += coverage;
         coverage += this.data['field-fibonachiStep'];
@@ -115,7 +115,7 @@ export class Calculator {
 
     let buyCurrency = 0.0;
 
-    let coverage = this.data['field-staticStep'] + this.data['field-fibonachiStep'];
+    let coverage = this.data['field-fibonachiStep'];
 
     let sellTotal = 0.0;
 

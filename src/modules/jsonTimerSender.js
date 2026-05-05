@@ -64,8 +64,18 @@ class JsonTimerSender extends EventEmitter {
     const strategy = this.#strategy();
 
     if (obj.status == Status.REDY && strategy != null) {
+      let i = 0;
+
       // never started 0
       for (const [key, val] of obj[strategy.side].entries()) {
+
+        if (obj[strategy.side][key]['status'] === "NEW" || obj[strategy.side][key]['status'] === null) {
+          if (i === parseFloat(obj['param']['field-activeOrders'])) {
+            return;
+          }
+          i++;
+        }
+
         let currentOrder = this.job[strategy.method](obj, key, val); // strategy.
 
         if (currentOrder.status === Status.DONE) {
@@ -169,10 +179,9 @@ class JsonTimerSender extends EventEmitter {
   async start(symbol, strategy, options = {}) {
 
     if (!this.running[symbol]) {
-      console.log("strategy:", strategy)
       // this.strategy = (this.strategy == null) ? strategy : this.strategy;
       this.strategy = strategy == 'short' ? 'short' : 'long';
-      console.log("Strategy:", this.strategy)
+      console.log(strategy, "Strategy:", this.strategy)
 
       this.autoRestart = options.autoRestart || false;
 
@@ -224,19 +233,17 @@ class JsonTimerSender extends EventEmitter {
     try {
       console.log(`🔄 Restarting cycle for ${this.symbol}`);
 
-      // 1. Get current price (and param ??)
+      // Get current price (and param ??)
       const data = await this.API.bookTicker({ symbol: this.symbol });
-      // data = await data.json();
-      // console.log("1 Data:", data)
+
       const price = (this.strategy === "long") ? data.message.askPrice : data.message.bidPrice;
 
-      // 2. recalculete
+      // recalculete
       const settings = {
         ...obj['param'],
         'field-currency': `${price}`,
         'field-indent': "0",
       }
-      // console.log(obj['param'], "2 Settings:", settings, this.strategy)
 
       const calc = new Calculator(settings, this.strategy);
 
@@ -244,7 +251,7 @@ class JsonTimerSender extends EventEmitter {
       tmp.param = settings;
       tmp.restart = true;
 
-      // 3. Save to file
+      // Save to file
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
       await fs.writeFile(filePath, JSON.stringify(tmp, null, 2), 'utf8');
 

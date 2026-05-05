@@ -76,6 +76,7 @@ export class SetStrategy {
       'field-fibonachiStep': 0.6,
       'field-martingail': 68, // %
       'field-indent': 0.1, // %
+      'field-activeOrders': 3,
       'field-requestFrequency': 1500, // ms
       'field-stepSize': data['stepSize'],
       'field-tickSize': data['tickSize'],
