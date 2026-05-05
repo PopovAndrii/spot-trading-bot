@@ -46,6 +46,10 @@
                   max: 0 }); %>
               </div>
               <div class="">
+                <%- include('../views/ui/SpinBox', { id:'field-commission' , label:'Exchange commission' , min: 0.2 ,
+                  step: 2, max: 2 }); %>
+              </div>
+              <div class="">
                 <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Fibonachi step' , min: 0 , max: 0
                   , step: 1 }); %>
               </div>

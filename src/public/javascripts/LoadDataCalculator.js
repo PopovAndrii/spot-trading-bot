@@ -90,6 +90,7 @@ export class LoadDataCalculator {
       'field-deposit': null,
       'field-orderSize': null,
       'field-profit': null,
+      'field-commission': null,
       'field-fibonachiStep': null,
       'field-martingail': null,
       'field-indent': null,
