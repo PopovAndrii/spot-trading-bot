@@ -24,6 +24,7 @@ const colors = {
 
 const loadDataCalculator = new LoadDataCalculator(notifications, colors);
 loadDataCalculator.save();
+loadDataCalculator.restart();
 
 const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
   notifications,

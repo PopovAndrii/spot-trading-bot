@@ -10,10 +10,10 @@ export class Calculator {
       'field-profit': 0.1,
       'field-fibonachiStep': 0.2, // fibonachi
       'field-martingail': 49,
-      'field-indent': 0.1,
-      'field-trackPrice': 0.15, // в построении не учавствует
-      'field-staticStep': 0.0,
-      'field-requestFrequency': 500, // в построении не учавствует
+      'field-indent': 0.0,
+      'field-trackPrice': 0.15, // does not participate in the construction
+      'field-activeOrders': 3, // does not participate in the construction
+      'field-requestFrequency': 500, // does not participate in the construction
       'field-stepSize': null,
       'field-tickSize': null,
     };
@@ -39,7 +39,6 @@ export class Calculator {
 
     const balanceTotal = this.data['field-deposit'];
 
-    // процент отступа ордера
     let overlapRange = 0.0;
 
     let buyPrice = 0.0;
@@ -47,19 +46,17 @@ export class Calculator {
     let sellCurrency = 0.0;
     let coverage = 0.0;
 
-    // всего накоплено для продажи
     let totalSell = 0.0;
 
-    // всего израсходовано баланса
     let spentTotal = 0.0;
 
-    // потраченные средства
+
     let spentFunds = this.data['field-orderSize'] * this.data['field-currency'];
 
     for (let i = 0; this.data['field-deposit'] > spentFunds; ++i) {
       if (i == 0) {
         overlapRange = this.data['field-indent'];
-        coverage = this.data['field-staticStep'] + this.data['field-fibonachiStep'];
+        coverage = this.data['field-fibonachiStep'];
       } else {
         overlapRange += coverage;
         coverage += this.data['field-fibonachiStep'];
@@ -67,26 +64,21 @@ export class Calculator {
         spentFunds = spentFunds * ((100 + this.data['field-martingail']) / 100);
       }
 
-      // курс покупки
       buyPrice = this.data['field-currency'] * ((100 - overlapRange) / 100);
 
-      // всего нужно купить валют.
       if (this.data['field-stepSize'] == 1) {
-        //округление вверх Math.ceil()
+        //rounding up Math.ceil()
         buy = Math.round(spentFunds / buyPrice);
       } else {
         buy = spentFunds / buyPrice;
       }
 
-      // после округления необходимо пересчитать потраченное
       spentFunds = buy * buyPrice;
 
       spentTotal += spentFunds;
 
-      // всего накоплено для продажи
       totalSell = totalSell + buy;
 
-      // sell Число * (100 + Процент) / 100
       sellCurrency = ((spentTotal / totalSell) * (100 + this.data['field-profit'] + 0.2)) / 100;
 
       this.data['field-deposit'] = this.data['field-deposit'] - spentFunds;
@@ -95,13 +87,9 @@ export class Calculator {
 
       const modelDataRow = {
         overlapRange: overlapRange.toFixed(2),
-        // купить по курсу
         buyCurrency: buyPrice.toFixed(this.data['field-tickSize']),
-        // купить колличество
         buy: buy.toFixed(this.data['field-stepSize']),
-        // продать колличество
         totalSell: totalSell.toFixed(this.data['field-stepSize']),
-        // продать по курсу
         sellCurrency: sellCurrency.toFixed(this.data['field-tickSize']),
         didBuy: spentFunds.toFixed(this.data['field-stepSize']), // information data
         calcBalance: this.data['field-deposit'].toFixed(this.data['field-stepSize']), // information data
@@ -121,22 +109,18 @@ export class Calculator {
 
     const balanceTotal = this.data['field-deposit'];
 
-    // процент отступа ордера this.data['field-indent']
     let overlapRange = this.data['field-indent'];
 
     let sellCurrency = 0.0;
 
     let buyCurrency = 0.0;
 
-    let coverage = this.data['field-staticStep'] + this.data['field-fibonachiStep'];
+    let coverage = this.data['field-fibonachiStep'];
 
-    // всего накоплено для покупки
     let sellTotal = 0.0;
 
-    // всего израсходовано баланса
     let spentTotal = 0.0;
 
-    // сттавка SELL
     let sell = this.data['field-orderSize'];
 
     for (let i = 0; this.data['field-deposit'] > this.data['field-orderSize']; ++i) {
@@ -157,19 +141,13 @@ export class Calculator {
 
       sellTotal += sell / sellCurrency;
 
-      // sell Число * (100 + Процент) / 100
       buyCurrency = ((spentTotal / sellTotal) * (100 - (this.data['field-profit'] + 0.2))) / 100;
 
       const modelDataRow = {
         overlapRange: overlapRange.toFixed(2),
-        // купить по курсу
         buyCurrency: buyCurrency.toFixed(this.data['field-tickSize']),
-        // купить колличество
         buy: (balanceTotal - this.data['field-deposit']).toFixed(this.data['field-stepSize']),
-        // "buy": balanceTotal + "-" + this.data['field-deposit'] ,
-        // продать колличество
         totalSell: sell.toFixed(this.data['field-stepSize']),
-        // продать по курсу
         sellCurrency: sellCurrency.toFixed(this.data['field-tickSize']),
         didBuy: sell.toFixed(this.data['field-stepSize']), // information data
         calcBalance: this.data['field-deposit'].toFixed(this.data['field-stepSize']), // information data

@@ -63,6 +63,21 @@ class WebSocketRouter {
                 });
               }
             });
+
+            ts.on('restarted', (data) => {
+              console.log(`🔄 Cycle restarted for ${data.symbol} at price ${data.price}`);
+
+              for (const client of this.clients.get(data.symbol) || []) {
+                this.safeSend(client, {
+                  event: 'cycleRestarted',
+                  data: {
+                    symbol: data.symbol,
+                    price: data.price,
+                    message: 'New + cycle started'
+                  }
+                });
+              }
+            });
           }
 
           const ts = this.timerSenders.get(currentSymbol);
@@ -72,7 +87,11 @@ class WebSocketRouter {
 
         if (data.type === 'start' && currentSymbol) {
           const ts = this.timerSenders.get(currentSymbol);
-          ts.start(currentSymbol, data.strategy);
+
+          ts.start(currentSymbol, data.strategy, {
+            autoRestart: data.autoRestart || false
+          });
+
           pair.updateSymbol({ symbol: currentSymbol, status: statusPair.START });
 
           for (const client of this.clients.get(currentSymbol) || []) {

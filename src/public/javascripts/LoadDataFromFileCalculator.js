@@ -40,6 +40,21 @@ export class LoadDataFromFileCalculator {
       document.querySelector(`#${this.strategyName}`).checked = true
     }
 
+    if (res.data?.restart) {
+      const sw = document.getElementById('settings-calculate-restart');
+      const input = sw.querySelector('input');
+
+      if (String(res.data.restart) === 'true') {
+        input.checked = true
+        input.setAttribute('checked', '')
+        sw.setAttribute('aria-checked', 'true');
+      } else {
+        input.removeAttribute('checked');
+        sw.setAttribute('aria-checked', 'false');
+        input.checked = false
+      }
+    }
+
     this.#fillInData(res.data);
     this.loadDataCalculator.calculate(res.data);
   }
