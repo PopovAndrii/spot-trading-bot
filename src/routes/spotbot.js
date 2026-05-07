@@ -168,7 +168,7 @@ router.post('/calculator/save', async (req, res, next) => {
     }
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
-
+    console.log(jsonString)
     await fs.writeFile(filePath, jsonString, 'utf8');
 
     res.json({ message: 'Order settings table saved' });

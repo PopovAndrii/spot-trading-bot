@@ -9,6 +9,7 @@ import { Theme } from './ui/Theme.js';
 new UiElements.SpinBox();
 new UiElements.Switch();
 new UiElements.ButtonGroup();
+new UiElements.Select();
 
 const notifications = new Notifications();
 

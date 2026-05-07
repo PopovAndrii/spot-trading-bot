@@ -9,6 +9,7 @@ export class Calculator {
       'field-orderSize': 125, // 0.028
       'field-profit': 0.1,
       'field-commission': 0.20,
+      'field-strategyList': '',
       'field-fibonachiStep': 0.2, // fibonachi
       'field-martingail': 49,
       'field-indent': 0.0,
@@ -39,7 +40,10 @@ export class Calculator {
     let mainObj = [];
     let balanceTotal = this.data['field-deposit'];
     let overlapRange = 0.0;
-    let coverage = 0.0;
+
+    let prevStep = 0;
+    let currentStep = this.data['field-fibonachiStep'];
+
     let totalSell = 0.0;
     let spentTotal = 0.0;
 
@@ -48,30 +52,32 @@ export class Calculator {
 
     // Limit the cycle (eg max 100 knees) to avoid freezing
     for (let i = 0; i < 100; ++i) {
-      if (i == 0) {
+      if (i === 0) {
         overlapRange = this.data['field-indent'];
-        coverage = this.data['field-fibonachiStep'];
       } else {
-        overlapRange += coverage;
-        coverage += this.data['field-fibonachiStep'];
+        let nextStep;
 
-        // Martingale
+        if (this.data['strategyList'] === 'fibonacci') {
+          nextStep = this.#getNextStepFibonacci(prevStep, currentStep);
+        } else {
+          nextStep = this.#getNextStepProgressive(prevStep, currentStep);
+        }
+
+        overlapRange += nextStep;
+
+        // Updated the status of the steps for the next iteration
+        prevStep = currentStep;
+        currentStep = nextStep;
+
         targetOrderAmount = targetOrderAmount * ((100 + this.data['field-martingail']) / 100);
       }
 
       let buyPrice = this.data['field-currency'] * ((100 - overlapRange) / 100);
+      if (buyPrice <= 0) break;
 
-      // Calculate the number of coins based on the THEORETICAL amount
       let buy = targetOrderAmount / buyPrice;
-
-      // Round off the number of coins (buy) according to the exchange's stepSize
-      // Если stepSize — это количество знаков (например, 2), используем toFixed
-      if (this.data['field-stepSize'] > 0) {
-        const precision = Math.pow(10, this.data['field-stepSize']);
-        buy = Math.floor(buy * precision) / precision; // Round down to stay on balance
-      } else {
-        buy = Math.round(buy);
-      }
+      const precision = Math.pow(10, this.data['field-stepSize']);
+      buy = Math.floor(buy * precision) / precision; // Round down to stay on balance
 
       // Actual funds spent (may differ from targetOrderAmount)
       let actualSpent = buy * buyPrice;
@@ -99,61 +105,82 @@ export class Calculator {
     return mainObj;
   };
 
+  #getNextStepProgressive(prevStep, currentStep) {
+    return currentStep + this.data['field-fibonachiStep'];
+  }
+
+  #getNextStepFibonacci(prevStep, currentStep) {
+    if (prevStep === 0 && currentStep === 0) {
+      return 0.1;
+    }
+    return prevStep + currentStep;
+  }
+
   short = () => {
     const mainObj = [];
 
-    const balanceTotal = this.data['field-deposit'];
+    let currentBalance = this.data['field-deposit'];
+    const initialDeposit = this.data['field-deposit'];
 
-    let overlapRange = this.data['field-indent'];
+    let overlapRange = 0.0;
+    let prevStep = 0;
+    let currentStep = this.data['field-fibonachiStep'];
 
-    let sellCurrency = 0.0;
+    let sellTotalCoins = 0.0;
+    let spentTotalMoney = 0.0;
 
-    let buyCurrency = 0.0;
+    let currentOrderSell = this.data['field-orderSize'];
 
-    let coverage = this.data['field-fibonachiStep'];
+    for (let i = 0; currentBalance >= currentOrderSell; ++i) {
+      if (i === 0) {
+        overlapRange = this.data['field-indent'];
+      } else {
+        let nextStep;
 
-    let sellTotal = 0.0;
+        if (this.data['strategyList'] === 'fibonacci') {
+          nextStep = this.#getNextStepFibonacci(prevStep, currentStep);
+        } else {
+          nextStep = this.#getNextStepProgressive(prevStep, currentStep);
+        }
 
-    let spentTotal = 0.0;
+        overlapRange += nextStep;
+        prevStep = currentStep;
+        currentStep = nextStep;
 
-    let sell = this.data['field-orderSize'];
-
-    for (let i = 0; this.data['field-deposit'] > this.data['field-orderSize']; ++i) {
-      if (i != 0) {
-        overlapRange += coverage;
-        coverage += this.data['field-fibonachiStep'];
-
-        sell = sell * ((100 + this.data['field-martingail']) / 100);
+        currentOrderSell = currentOrderSell * ((100 + this.data['field-martingail']) / 100);
       }
 
-      this.data['field-deposit'] -= sell;
+      // Checking for remaining coins
+      if (currentBalance < currentOrderSell) break;
 
-      if (this.data['field-deposit'] < 0) break;
+      currentBalance -= currentOrderSell;
 
-      spentTotal += sell;
+      spentTotalMoney += currentOrderSell;
 
-      sellCurrency = this.data['field-currency'] * ((100 + overlapRange) / 100);
+      let sellPrice = this.data['field-currency'] * ((100 + overlapRange) / 100);
 
-      sellTotal += sell / sellCurrency;
+      sellTotalCoins += currentOrderSell / sellPrice;
 
-      buyCurrency = ((spentTotal / sellTotal) * (100 - (this.data['field-profit'] + 0.2))) / 100;
+      let buyPrice = ((spentTotalMoney / sellTotalCoins) * (100 - (this.data['field-profit'] + this.data['field-commission']))) / 100;
+
+      const spentSELL = (currentOrderSell * sellPrice).toFixed(2);
+      const spentBUY = currentOrderSell.toFixed(this.data['field-stepSize'])
 
       const modelDataRow = {
         overlapRange: overlapRange.toFixed(2),
-        buyCurrency: buyCurrency.toFixed(this.data['field-tickSize']),
-        buy: (balanceTotal - this.data['field-deposit']).toFixed(this.data['field-stepSize']),
-        totalSell: sell.toFixed(this.data['field-stepSize']),
-        sellCurrency: sellCurrency.toFixed(this.data['field-tickSize']),
-        didBuy: sell.toFixed(this.data['field-stepSize']), // information data
-        calcBalance: this.data['field-deposit'].toFixed(this.data['field-stepSize']), // information data
-        // "balanceTotal": balanceTotal - this.data["balance"] , // information data
+        buyCurrency: buyPrice.toFixed(this.data['field-tickSize']),
+        buy: (initialDeposit - currentBalance).toFixed(this.data['field-stepSize']),
+        totalSell: currentOrderSell.toFixed(this.data['field-stepSize']),
+        sellCurrency: sellPrice.toFixed(this.data['field-tickSize']),
+        didBuy: `${spentBUY} | ${spentSELL}`,
+        calcBalance: currentBalance.toFixed(this.data['field-stepSize']),
       };
 
       mainObj.push(modelDataRow);
-      // m_vec.append(modelDataRow);
+
+      if (i >= 99) break;
     }
 
-    // console.log(mainObj);
     return mainObj;
   };
 }
