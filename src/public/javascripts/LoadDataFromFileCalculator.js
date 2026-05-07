@@ -60,6 +60,7 @@ export class LoadDataFromFileCalculator {
   }
 
   async #fillInData(obj) {
+    console.log('LoadDataFromFile:', obj.param.strategyList)
     if (Object.keys(obj).length === 0) return;
 
     document.querySelectorAll('[id^="field-"]').forEach((el) => {

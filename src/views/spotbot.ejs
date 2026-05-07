@@ -46,8 +46,34 @@
                   max: 0 }); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Fibonachi step' , min: 0 , max: 0
-                  , step: 1 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-commission' , label:'Exchange commission' , min: 0.2 ,
+                  step: 2, max: 2 }); %>
+              </div>
+            </div>
+
+            <div class="line">
+              <div class="">Progression strategy
+                <div class="UIselect" id="strategyList" tabindex="0" role="listbox" aria-haspopup="listbox">
+                  <span class="UIselect-selected">Select</span>
+                  <span class="UIselect-arrow">
+                    <svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M7 12 1.4 5.6c-.7-.8-.1-2 1-2h11.5a1.2 1.2 0 0 1 .9 2L9 12.2q-.9.8-1.8 0" />
+                    </svg>
+                  </span>
+                  <input type="hidden" name="strategyList">
+                  <ul class="UIselect-options" hidden>
+                    <li class="UIselect-options__items" aria-hidden="true">
+                      <ul role="group">
+                        <li role="option" data-value='progressive'>Progressive</li>
+                        <li role="option" data-value='fibonacci'>Fibonacci</li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="">
+                <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0 , max:
+                  0 , step: 1 }); %>
               </div>
             </div>
 
@@ -116,7 +142,7 @@
               <th>BUY</th>
               <th>SELL</th>
               <th>Sell currency</th>
-              <th>Spent. did buy</th>
+              <th>Spent SELL | BUY</th>
               <th>Balance</th>
             </tr>
           </thead>

@@ -1,7 +1,7 @@
 export class LoadDataCalculator {
   constructor(notifications, colors = {}) {
     this.listenerStatus = true;
-
+    this.defaultData = {};
     this.notifications = notifications;
 
     // Change any button settings param
@@ -22,6 +22,24 @@ export class LoadDataCalculator {
 
     // Change claculate button
     document.querySelector('#settings-calculate').addEventListener('ui-button-change', () => {
+      if (this.getListenerStatus()) {
+        document.querySelector('#settings-table tbody').innerHTML = '';
+        this.getSettings();
+        this.strategy = document.getElementById('field-strategy').value;
+        this.calculator();
+      } else {
+        this.notifications.showNotification(
+          'Calculator is locked. <br>Press the "Stop" button.',
+          'warning',
+          10000
+        );
+      }
+    });
+
+    const select = document.getElementById('strategyList');
+    select?.addEventListener('ui-select-change', (e) => {
+      // const value = e.detail?.val;
+
       if (this.getListenerStatus()) {
         document.querySelector('#settings-table tbody').innerHTML = '';
         this.getSettings();
@@ -85,22 +103,18 @@ export class LoadDataCalculator {
   }
 
   getSettings() {
-    this.defaultData = {
-      'field-currency': null,
-      'field-deposit': null,
-      'field-orderSize': null,
-      'field-profit': null,
-      'field-fibonachiStep': null,
-      'field-martingail': null,
-      'field-indent': null,
-      'field-requestFrequency': null,
-      'field-stepSize': null,
-      'field-tickSize': null,
-    };
+    const strategyList = document.querySelector('[id^="strategyList"]');
 
-    const all = document.querySelectorAll('[id^="field-"]');
+    const all = [
+      ...document.querySelectorAll('[id^="field-"]'),
+      strategyList?.querySelector('[name="strategyList"]')
+    ].filter(Boolean); // Remove null if element is not found
+
     all.forEach((el) => {
-      this.defaultData[el.id] = document.getElementById(el.id).value;
+      const key = el.id || el.getAttribute('name');
+      if (key) {
+        this.defaultData[key] = el.value;
+      }
     });
   }
 
@@ -172,18 +186,8 @@ export class LoadDataCalculator {
     }
   }
 
-  #getParam() {
-    const obj = {};
-
-    document.querySelectorAll('[id^="field-"]').forEach((el) => {
-      obj[el.id] = el.value;
-    });
-
-    return obj;
-  }
-
   async settingsSave() {
-    orders.param = this.#getParam();
+    orders.param = this.defaultData;
 
     try {
       const res = await fetch(`/spotbot/calculator/save`, {
@@ -193,7 +197,6 @@ export class LoadDataCalculator {
       });
 
       const data = await res.json();
-      console.log('settingsSave():', data.message);
       this.notifications.showNotification(data.message, 'success', 10000);
     } catch (err) {
       console.error('❌ settingsSave():', err);
