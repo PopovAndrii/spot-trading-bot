@@ -1,5 +1,6 @@
 export class LoadDataFromFileCalculator {
-  constructor(notifications, loadDataCalculator, colors) {
+  constructor(select, notifications, loadDataCalculator, colors) {
+    this.selectObjectElement = select;
     this.notifications = notifications;
     this.loadDataCalculator = loadDataCalculator;
 
@@ -60,7 +61,10 @@ export class LoadDataFromFileCalculator {
   }
 
   async #fillInData(obj) {
-    console.log('LoadDataFromFile:', obj.param.strategyList)
+    const select = document.getElementById('strategyList');
+    // set default value on strategi list
+    this.selectObjectElement.setValue(select, obj.param.strategyList)
+
     if (Object.keys(obj).length === 0) return;
 
     document.querySelectorAll('[id^="field-"]').forEach((el) => {

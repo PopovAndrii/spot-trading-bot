@@ -36,9 +36,13 @@ export class LoadDataCalculator {
       }
     });
 
+    // set algoritm strategy
     const select = document.getElementById('strategyList');
     select?.addEventListener('ui-select-change', (e) => {
-      // const value = e.detail?.val;
+      // const ( id, value } = e.detail;
+
+      const hasStrategy = typeof this.strategy === 'string' && this.strategy.length > 0;
+      if (!hasStrategy) return;
 
       if (this.getListenerStatus()) {
         document.querySelector('#settings-table tbody').innerHTML = '';
@@ -90,7 +94,6 @@ export class LoadDataCalculator {
   restart() {
     document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {
       if (this.getListenerStatus()) {
-        console.log(e.detail)
         this.addRestartStatus(e.detail.value);
       } else {
         this.notifications.showNotification(
