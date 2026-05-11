@@ -7,7 +7,7 @@ new UiElements.Button();
 
 const select = document.getElementById('selectCurrency');
 select?.addEventListener('ui-select-change', (e) => {
-  const value = e.detail?.val;
+  const { id, value } = e?.detail;
 
   const [symbol, queryString] = value.split('?');
 
