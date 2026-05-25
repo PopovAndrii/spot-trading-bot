@@ -10,7 +10,7 @@ export class CancelAllOrders {
     orders?.addEventListener('ui-button-change', (e) => {
       if (this.getListenerStatus()) {
         e.target.disabled = false;
-        this.cancel(e.detail.val);
+        this.cancel(e.target.dataset.value);
       } else {
         e.target.disabled = true;
 
