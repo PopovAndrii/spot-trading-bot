@@ -216,9 +216,14 @@ router.post('/calculator/restart', async (req, res, next) => {
 });
 
 router.post('/cancel/allorders', async (req, res, next) => {
-  const symbol = req.body.message;
-  if (!symbol) {
+  const rawSymbol = req.body.message;
+  if (!rawSymbol) {
     return res.status(500).json({ success: false, message: 'Symbol is required in request body' });
+  }
+
+  const symbol = rawSymbol.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!symbol) {
+    return res.status(400).json({ success: false, message: 'Invalid symbol' });
   }
 
   const result = await API.cancelOpenOrders({ symbol });
