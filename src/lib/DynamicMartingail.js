@@ -67,9 +67,9 @@ class DynamicMartingail {
         priceBuy: Number(this.conf.price),
         quantity: Number(this.conf.quantity),
         quantitySell: Number(this.conf.quantity),
-        priceSell: Number(priceSell.toFixed(conf.stepSize)),
-        spent: Number(spent.toFixed(conf.stepSize)),
-        free: Number(free.toFixed(conf.stepSize)),
+        priceSell: Number(priceSell.toFixed(this.conf.tickSize)),
+        spent: Number(spent.toFixed(this.conf.tickSize)),
+        free: Number(free.toFixed(this.conf.tickSize)),
       };
     }
 
@@ -118,16 +118,16 @@ class DynamicMartingail {
 
     return {
       orderNumber: this.orderCnt - 1, // - 1 @FIX
-      averagePrice: Number(averagePrice.toFixed(conf.tickSize)),
-      price: Number(this.orderData.priceSell.toFixed(conf.tickSize)),
-      quantity: Number(this.orderData.quantitySell.toFixed(conf.stepSize)),
-      totalSpent: Number(this.totalSpent.toFixed(conf.tickSize)),
+      averagePrice: Number(averagePrice.toFixed(this.conf.tickSize)),
+      price: Number(this.orderData.priceSell.toFixed(this.conf.tickSize)),
+      quantity: Number(this.orderData.quantitySell.toFixed(this.conf.stepSize)),
+      totalSpent: Number(this.totalSpent.toFixed(this.conf.tickSize)),
       bidAmount: Number(this.orderData.quantitySell * this.orderData.priceSell).toFixed(
-        conf.tickSize
+        this.conf.tickSize
       ),
-      free: Number(free.toFixed(conf.tickSize)),
-      balance: Number(balance.toFixed(conf.tickSize)),
-      profit: Number(profit.toFixed(conf.tickSize)),
+      free: Number(free.toFixed(this.conf.tickSize)),
+      balance: Number(balance.toFixed(this.conf.tickSize)),
+      profit: Number(profit.toFixed(this.conf.tickSize)),
     };
   }
 
