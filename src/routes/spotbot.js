@@ -158,10 +158,20 @@ router.post('/calculator/save', async (req, res, next) => {
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const exchangeName = 'binance';
 
+    const msg = req.body.message;
+    if (
+      !Array.isArray(msg.BUY) ||
+      !Array.isArray(msg.SELL) ||
+      typeof msg.param !== 'object' ||
+      msg.param === null
+    ) {
+      return res.status(400).json({ message: 'Invalid data structure: BUY, SELL, param are required' });
+    }
+
     // JSON stringify with check
     let jsonString;
     try {
-      jsonString = JSON.stringify(req.body.message, null, 2);
+      jsonString = JSON.stringify(msg, null, 2);
     } catch (err) {
       console.error('🔴 JSON stringify error:', err);
       return res.status(400).json({ message: 'Invalid data for JSON' });
