@@ -56,19 +56,30 @@ export class SpotWS {
           case 'spotStatus':
             if (message.data === true) {
               this.#btnRule(true);
-
               this.notifications.showNotification('Table data loaded. Bot in progress.', 'success');
-
               this.isRunning = true;
+
+              if (!this.interval) {
+                this.loadDataFromFileCalculator.getStateCalculator();
+                this.interval = setInterval(() => {
+                  if (this.#isWebSocketOpen(this.ws)) {
+                    this.loadDataFromFileCalculator.getStateCalculator();
+                  }
+                }, 20000);
+              }
             }
             break;
           case 'updateTableData':
             if (message.data === 1) {
-              this.interval = setInterval(() => {
-                if (this.#isWebSocketOpen(this.ws)) {
-                  this.loadDataFromFileCalculator.getStateCalculator();
-                }
-              }, 20000);
+              this.#btnRule(true);
+              this.isRunning = true;
+              if (!this.interval) {
+                this.interval = setInterval(() => {
+                  if (this.#isWebSocketOpen(this.ws)) {
+                    this.loadDataFromFileCalculator.getStateCalculator();
+                  }
+                }, 20000);
+              }
             }
             if (message.data === 0) {
               if (this.interval) {
@@ -184,13 +195,13 @@ export class SpotWS {
     this.cancelAllOrders.setListenerStatus(status);
 
     const settingsCalculate = document.getElementById('settings-calculate');
-    settingsCalculate.classList.toggle('disabled');
+    settingsCalculate.classList.toggle('disabled', !status);
 
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
-    settingsCalculateSave.classList.toggle('disabled');
+    settingsCalculateSave.classList.toggle('disabled', !status);
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
-    cancelAllOrders.disabled = !cancelAllOrders.disabled;
+    cancelAllOrders.disabled = !status;
 
     const startBtn = document.getElementById('startBtn');
     if (status) {

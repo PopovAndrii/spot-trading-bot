@@ -18,12 +18,8 @@ export class LoadDataFromFileCalculator {
   }
 
   async getStateCalculator() {
-    const url = new URL(window.location.href);
-    const base = url.searchParams.get('base');
-    const quote = url.searchParams.get('quote');
-
     const res = await this.notifications.fetchWithHandling(
-      `/spotbot/table/${base}${quote}?symbol=${base + quote}&base=${base}&quote=${quote}`,
+      `/spotbot/table/${base + quote}?symbol=${base + quote}&base=${base}&quote=${quote}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
