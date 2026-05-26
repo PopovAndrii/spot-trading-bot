@@ -63,6 +63,7 @@ export class LoadDataFromFileCalculator {
   async #fillInData(obj) {
     const select = document.getElementById('strategyList');
     // set default value on strategi list
+    this.loadDataCalculator.ignoreNextSelectChange();
     this.selectObjectElement.setValue(select, obj.param.strategyList)
 
     if (Object.keys(obj).length === 0) return;

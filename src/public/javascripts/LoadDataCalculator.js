@@ -3,6 +3,7 @@ export class LoadDataCalculator {
     this.listenerStatus = true;
     this.defaultData = {};
     this.notifications = notifications;
+    this._ignoreSelectChange = false;
 
     // Change any button settings param
     document.querySelector('#group-spinbox').addEventListener('ui-spinbox-change', (e) => {
@@ -39,7 +40,10 @@ export class LoadDataCalculator {
     // set algoritm strategy
     const select = document.getElementById('strategyList');
     select?.addEventListener('ui-select-change', (e) => {
-      // const ( id, value } = e.detail;
+      if (this._ignoreSelectChange) {
+        this._ignoreSelectChange = false;
+        return;
+      }
 
       const hasStrategy = typeof this.strategy === 'string' && this.strategy.length > 0;
       if (!hasStrategy) return;
@@ -63,6 +67,10 @@ export class LoadDataCalculator {
 
   setListenerStatus(status = false) {
     this.listenerStatus = status == false ? true : false;
+  }
+
+  ignoreNextSelectChange() {
+    this._ignoreSelectChange = true;
   }
 
   getListenerStatus() {
