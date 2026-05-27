@@ -4,6 +4,7 @@ export class LoadDataCalculator {
     this.defaultData = {};
     this.notifications = notifications;
     this._ignoreSelectChange = false;
+    this.onRestartChange = null;
 
     // Change any button settings param
     document.querySelector('#group-spinbox').addEventListener('ui-spinbox-change', (e) => {
@@ -101,15 +102,7 @@ export class LoadDataCalculator {
   // Chenge button restart
   restart() {
     document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {
-      if (this.getListenerStatus()) {
-        this.addRestartStatus(e.detail.value);
-      } else {
-        this.notifications.showNotification(
-          'Save is locked. Press the "Pause" button.',
-          'warning',
-          10000
-        );
-      }
+      this.addRestartStatus(e.detail.value);
     });
   }
 
@@ -230,6 +223,7 @@ export class LoadDataCalculator {
 
       const data = await res.json();
       this.notifications.showNotification(data.message, 'success', 10000);
+      if (this.onRestartChange) this.onRestartChange(value);
     } catch (err) {
       console.error('❌ addRestartStatus(value):', err);
       return null;

@@ -18,6 +18,12 @@ export class SpotWS {
 
     this.setStrategy = setStrategy;
 
+    this.loadDataCalculator.onRestartChange = (value) => {
+      if (this.#isWebSocketOpen(this.ws)) {
+        this.ws.send(JSON.stringify({ type: 'restartSync', symbol: base + quote, value }));
+      }
+    };
+
     window.addEventListener('load', () => {
       this.connectWebSocket();
     });
@@ -89,6 +95,9 @@ export class SpotWS {
               this.#btnRule(false);
               this.isRunning = false;
             }
+            break;
+          case 'restartSync':
+            this.#updateRestartSwitch(message.data);
             break;
           case 'updatePrice':
             const text = document.querySelector('.stream-currency');
@@ -190,18 +199,33 @@ export class SpotWS {
     startBtn.addEventListener('ui-button-change', this.btnClickHandler);
   }
 
+  #updateRestartSwitch(value) {
+    const sw = document.getElementById('settings-calculate-restart');
+    if (!sw) return;
+    const input = sw.querySelector('input');
+    const isOn = String(value) === 'true';
+    input.checked = isOn;
+    if (isOn) {
+      input.setAttribute('checked', '');
+      sw.setAttribute('aria-checked', 'true');
+    } else {
+      input.removeAttribute('checked');
+      sw.setAttribute('aria-checked', 'false');
+    }
+  }
+
   #btnRule(status) {
     this.loadDataCalculator.setListenerStatus(status);
     this.cancelAllOrders.setListenerStatus(status);
 
     const settingsCalculate = document.getElementById('settings-calculate');
-    settingsCalculate.classList.toggle('disabled', !status);
+    settingsCalculate.classList.toggle('disabled', Boolean(status));
 
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
-    settingsCalculateSave.classList.toggle('disabled', !status);
+    settingsCalculateSave.classList.toggle('disabled', Boolean(status));
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
-    cancelAllOrders.disabled = !status;
+    cancelAllOrders.disabled = Boolean(status);
 
     const startBtn = document.getElementById('startBtn');
     if (status) {
