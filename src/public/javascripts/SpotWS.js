@@ -73,6 +73,14 @@ export class SpotWS {
                   }
                 }, 20000);
               }
+            } else {
+              // Бот не запущен (в т.ч. после падения/рестарта сервера) — снять блокировку
+              this.#btnRule(false);
+              this.isRunning = false;
+              if (this.interval) {
+                clearInterval(this.interval);
+                this.interval = null;
+              }
             }
             break;
           case 'updateTableData':
@@ -217,6 +225,13 @@ export class SpotWS {
   #btnRule(status) {
     this.loadDataCalculator.setListenerStatus(status);
     this.cancelAllOrders.setListenerStatus(status);
+
+    const lock = Boolean(status);
+
+    // Блокируем всю область параметров (стратегия + спинбоксы + select прогрессии).
+    // Start и переключатель Restart остаются доступными.
+    document.querySelector('.UIbg')?.classList.toggle('params-locked', lock);
+    document.getElementById('group-spinbox')?.classList.toggle('params-locked', lock);
 
     const settingsCalculate = document.getElementById('settings-calculate');
     settingsCalculate.classList.toggle('disabled', Boolean(status));

@@ -1,3 +1,5 @@
+import { syncSpinBoxButtons } from './ui/spinboxSync.js';
+
 export class SetStrategy {
   constructor(notifications) {
     this.notifications = notifications;
@@ -92,6 +94,8 @@ export class SetStrategy {
     all.forEach((el) => {
       document.getElementById(el.id).value = defaultData[el.id];
     });
+
+    syncSpinBoxButtons();
   }
 
   #getStaticText() {

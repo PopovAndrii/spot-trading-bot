@@ -38,6 +38,7 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    rolling: true, // продлевать сессию по активности (инактивити-таймаут)
     cookie: {
       secure: 'auto', // auto for HTTP/HTTPS
       httpOnly: true,
@@ -57,7 +58,17 @@ app.use(
 );
 // #@popovandrii/ui-elements
 
-app.use(logger('dev'));
+app.use(
+  logger('dev', {
+    skip: (req) => {
+      return [
+        '/api/ping',
+        '/login'
+      ].some(path => req.originalUrl.startsWith(path));
+    }
+  })
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

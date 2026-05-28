@@ -4,6 +4,7 @@
 
 @use 'button';
 @use 'currency';
+@use 'footer';
 @use 'icon';
 @use 'input-btn';
 @use 'line';
@@ -25,6 +26,11 @@ body {
   background-color: var.$c-g-50;
   color: var.$c-g-950;
   transition: background 0.3s ease;
+}
+
+.params-locked {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .color-primary {

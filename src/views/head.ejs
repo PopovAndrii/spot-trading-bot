@@ -1,4 +1,13 @@
 <head>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) { }
+    })();
+  </script>
   <title>
     <%= title %>
   </title>
@@ -7,4 +16,10 @@
   <link rel='stylesheet' href='/stylesheets/style.css' />
   <script src="/ui-elements/js/index.umd.js"></script>
   <link rel='stylesheet' href="/ui-elements/js/style.css" />
+  <script type="module">
+    import { SessionGuard } from '/javascripts/ui/SessionGuard.js';
+    import { FooterStatus } from '/javascripts/ui/FooterStatus.js';
+    new SessionGuard();
+    new FooterStatus();
+  </script>
 </head>

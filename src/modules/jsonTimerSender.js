@@ -197,6 +197,7 @@ class JsonTimerSender extends EventEmitter {
       // });
 
       const streamAPI = api.getPublicStream(symbol);
+      streamAPI.removeAllListeners('message'); // не дублировать слушатель при повторном start на singleton-инстансе
       streamAPI.start();
       streamAPI.on('message', (data) => {
         this.emit('price', data);

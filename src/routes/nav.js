@@ -12,4 +12,21 @@ router.get('/symbols', (req, res) => {
   }
 });
 
+// Condition session
+router.get('/session', (req, res) => {
+  const enabled = process.env.STATUS_LOGIN !== 'false';
+  res.json({ enabled, maxAge: req.session?.cookie?.maxAge ?? null });
+});
+
+// ping for session
+router.get('/session/ping', (req, res) => {
+  res.json({ ok: true, maxAge: req.session?.cookie?.maxAge ?? null });
+});
+
+// online status, time server and network (testnet/real)
+router.get('/ping', (req, res) => {
+  const network = process.env.NODE_ENV === 'development' ? 'testnet' : 'real';
+  res.json({ time: Date.now(), network });
+});
+
 module.exports = router;

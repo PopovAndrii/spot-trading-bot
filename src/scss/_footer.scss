@@ -1,0 +1,60 @@
+@use './var' as *;
+
+.footer {
+  padding: 0.5rem 1rem;
+}
+
+.footer-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: $c-g-700;
+}
+
+.ping-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background-color: $c-g-500;
+
+  &--on {
+    background-color: $c-s-500;
+  }
+
+  &--off {
+    background-color: $c-p-500;
+  }
+}
+
+.session-timer {
+  margin-left: auto;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+  color: $c-g-700;
+  background-color: $c-g-100;
+
+  &--warn {
+    color: $c-w-500;
+    background-color: $c-w-100;
+  }
+}
+
+.net-label {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+
+  &--testnet {
+    color: $c-g-700;
+    background-color: $c-g-100;
+  }
+
+  &--real {
+    color: $c-w-500;
+    background-color: $c-w-100;
+  }
+}

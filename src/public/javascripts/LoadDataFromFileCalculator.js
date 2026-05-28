@@ -1,3 +1,5 @@
+import { syncSpinBoxButtons } from './ui/spinboxSync.js';
+
 export class LoadDataFromFileCalculator {
   constructor(select, notifications, loadDataCalculator, colors) {
     this.selectObjectElement = select;
@@ -67,6 +69,8 @@ export class LoadDataFromFileCalculator {
     document.querySelectorAll('[id^="field-"]').forEach((el) => {
       document.getElementById(el.id).value = obj.param[el.id] ? obj.param[el.id] : null;
     });
+
+    syncSpinBoxButtons();
 
     // table
     obj['BUY'].forEach((el, index) => {
