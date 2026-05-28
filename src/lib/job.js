@@ -182,6 +182,7 @@ class Job {
         side: 'BUY',
         id: i,
         data: {
+          id: i,
           symbol: el.symbol,
           orderId: obj['BUY'][i].orderId,
         },
@@ -213,6 +214,7 @@ class Job {
               side: 'BUY',
               id: i,
               data: {
+                id: i,
                 symbol: el.symbol,
                 side: 'BUY',
                 type: 'LIMIT',
@@ -231,6 +233,7 @@ class Job {
               side: 'BUY',
               id: i,
               data: {
+                id: i,
                 symbol: el.symbol,
                 orderId: obj['BUY'][i].orderId,
               },
@@ -246,6 +249,7 @@ class Job {
             side: 'SELL',
             id: i,
             data: {
+              id: i,
               symbol: el.symbol,
               orderId: el.orderId,
             },
@@ -258,6 +262,7 @@ class Job {
             side: 'SELL',
             id: i,
             data: {
+              id: i,
               symbol: el.symbol,
               orderId: el.orderId,
             },
@@ -270,6 +275,7 @@ class Job {
             side: 'SELL',
             id: i,
             data: {
+              id: i,
               symbol: el.symbol,
               side: 'SELL',
               type: 'LIMIT',
@@ -287,6 +293,7 @@ class Job {
           side: 'BUY',
           id: i,
           data: {
+            id: i,
             symbol: el.symbol,
             orderId: obj['BUY'][i].orderId,
           },
