@@ -24,7 +24,9 @@ export class SetStrategy {
   }
 
   getStrategy() {
-    return this.strategyName ? this.strategyName : null;
+    if (this.strategyName) return this.strategyName;
+    const checked = document.querySelector('input[name="strategy"]:checked');
+    return checked ? checked.value : null;
   }
 
   #indentFromPrice() {

@@ -42,19 +42,57 @@
   overflow: hidden;
   background-color: #1e2027;
   transition: height 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .console--open .console__body {
   height: 300px;
 }
 
+.console__filters {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.console__filter {
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-family: monospace;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  color: #aaa;
+  border: none;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+  }
+
+  &--active {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    font-weight: bold;
+  }
+}
+
 .console__content {
-  height: 100%;
-  padding: 0.5rem 1rem;
+  flex: 1;
+  padding: 0.25rem 0.75rem;
   overflow-y: auto;
   font-family: monospace;
   font-size: 0.85rem;
   color: #ccc;
+}
+
+.console__line {
+  padding: 0.1rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  word-break: break-all;
 }
 
 .footer-status {

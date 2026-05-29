@@ -63,6 +63,7 @@ app.use(
     skip: (req) => {
       return [
         '/api/ping',
+        '/api/logs',
         '/login',
         '/spotbot'
       ].some(path => req.originalUrl.startsWith(path));

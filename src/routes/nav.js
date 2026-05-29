@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { pair } = require('../lib/pair');
+const logBus = require('../lib/logBus');
 
 router.get('/symbols', (req, res) => {
   try {
@@ -27,6 +28,24 @@ router.get('/session/ping', (req, res) => {
 router.get('/ping', (req, res) => {
   const network = process.env.NODE_ENV === 'development' ? 'testnet' : 'real';
   res.json({ time: Date.now(), network });
+});
+
+// SSE log stream
+router.get('/logs', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (e) => {
+    if (res.writableEnded) return;
+    try { res.write(`data: ${JSON.stringify(e)}\n\n`); } catch {}
+  };
+
+  logBus.history().forEach(send);
+
+  const unsub = logBus.subscribe(send);
+  req.on('close', unsub);
 });
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const { Spot } = require('@binance/connector');
 const { UserStreamAPI } = require('../lib/UserStreamApi');
 const { StreamAPI } = require('../lib/streamAPI');
+const logBus = require('./logBus');
 
 class InvokeApi {
   static instance = null;
@@ -49,7 +50,9 @@ class InvokeApi {
     const parts = d.toUTCString().split(' ');
     const formatted = `${parts[0].replace(',', '')} ${parts[2]} ${parts[1]} ${parts[4]}`;
 
-    return console.log(`${formatted} ${icon} ${err}`);
+    const msg = `${formatted} ${icon} ${err}`;
+    console.log(msg);
+    logBus.log(msg);
   }
 
   getPublicStream(symbol) {
