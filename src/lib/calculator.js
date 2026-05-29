@@ -39,7 +39,6 @@ export class Calculator {
   long = () => {
     let mainObj = [];
     let balanceTotal = this.data['field-deposit'];
-    let overlapRange = 0.0;
 
     let prevStep = 0;
     let currentStep = this.data['field-fibonachiStep'];
@@ -47,14 +46,14 @@ export class Calculator {
     let totalSell = 0.0;
     let spentTotal = 0.0;
 
-    // Variable for mathematical (ideal) order volume
     let targetOrderAmount = this.data['field-orderSize'] * this.data['field-currency'];
+    const precision = Math.pow(10, this.data['field-stepSize']);
 
-    // Limit the cycle (eg max 100 knees) to avoid freezing
+    // first knee price at indent% below current price
+    let buyPrice = this.data['field-currency'] * ((100 - this.data['field-indent']) / 100);
+
     for (let i = 0; i < 100; ++i) {
-      if (i === 0) {
-        overlapRange = this.data['field-indent'];
-      } else {
+      if (i > 0) {
         let nextStep;
 
         if (this.data['strategyList'] === 'fibonacci') {
@@ -63,33 +62,32 @@ export class Calculator {
           nextStep = this.#getNextStepProgressive(prevStep, currentStep);
         }
 
-        overlapRange += nextStep;
-
-        // Updated the status of the steps for the next iteration
         prevStep = currentStep;
         currentStep = nextStep;
 
+        // geometric decay: each knee is nextStep% below the previous knee price
+        buyPrice = buyPrice * ((100 - nextStep) / 100);
         targetOrderAmount = targetOrderAmount * ((100 + this.data['field-martingail']) / 100);
       }
 
-      let buyPrice = this.data['field-currency'] * ((100 - overlapRange) / 100);
-      if (buyPrice <= 0) break;
+      const minPrice = Math.pow(0.1, this.data['field-tickSize']);
+      if (buyPrice <= minPrice) break;
+
+      const overlapRange = (1 - buyPrice / this.data['field-currency']) * 100;
 
       let buy = targetOrderAmount / buyPrice;
-      const precision = Math.pow(10, this.data['field-stepSize']);
-      buy = Math.floor(buy * precision) / precision; // Round down to stay on balance
+      buy = Math.floor(buy * precision) / precision;
 
-      // Actual funds spent (may differ from targetOrderAmount)
+      if (buy === 0) break;
+
       let actualSpent = buy * buyPrice;
 
-      // Check: is the remaining deposit sufficient for this particular order?
       if (balanceTotal < actualSpent) break;
 
       spentTotal += actualSpent;
       totalSell += buy;
       balanceTotal -= actualSpent;
 
-      // Calculating the selling price taking into account profit and commission (0.2%)
       let sellCurrency = ((spentTotal / totalSell) * (100 + this.data['field-profit'] + this.data['field-commission'])) / 100;
 
       mainObj.push({
@@ -99,7 +97,7 @@ export class Calculator {
         totalSell: totalSell.toFixed(this.data['field-stepSize']),
         sellCurrency: sellCurrency.toFixed(this.data['field-tickSize']),
         didBuy: actualSpent.toFixed(2),
-        calcBalance: balanceTotal.toFixed(2),
+        calcBalance: balanceTotal.toFixed(this.data['field-tickSize']),
       });
     }
     return mainObj;
@@ -122,7 +120,6 @@ export class Calculator {
     let currentBalance = this.data['field-deposit'];
     const initialDeposit = this.data['field-deposit'];
 
-    let overlapRange = 0.0;
     let prevStep = 0;
     let currentStep = this.data['field-fibonachiStep'];
 
@@ -130,11 +127,13 @@ export class Calculator {
     let spentTotalMoney = 0.0;
 
     let currentOrderSell = this.data['field-orderSize'];
+    const precision = Math.pow(10, this.data['field-stepSize']);
 
-    for (let i = 0; currentBalance >= currentOrderSell; ++i) {
-      if (i === 0) {
-        overlapRange = this.data['field-indent'];
-      } else {
+    // first knee sell price at indent% above current price
+    let sellPrice = this.data['field-currency'] * ((100 + this.data['field-indent']) / 100);
+
+    for (let i = 0; i < 100; ++i) {
+      if (i > 0) {
         let nextStep;
 
         if (this.data['strategyList'] === 'fibonacci') {
@@ -143,30 +142,31 @@ export class Calculator {
           nextStep = this.#getNextStepProgressive(prevStep, currentStep);
         }
 
-        overlapRange += nextStep;
         prevStep = currentStep;
         currentStep = nextStep;
 
+        // geometric growth: each knee is nextStep% above the previous knee price
+        sellPrice = sellPrice * ((100 + nextStep) / 100);
         currentOrderSell = currentOrderSell * ((100 + this.data['field-martingail']) / 100);
+        currentOrderSell = Math.floor(currentOrderSell * precision) / precision;
       }
 
-      // Checking for remaining coins
+      if (currentOrderSell === 0) break;
       if (currentBalance < currentOrderSell) break;
 
       currentBalance -= currentOrderSell;
-
       spentTotalMoney += currentOrderSell;
 
-      let sellPrice = this.data['field-currency'] * ((100 + overlapRange) / 100);
+      const overlapRange = (sellPrice / this.data['field-currency'] - 1) * 100;
 
       sellTotalCoins += currentOrderSell / sellPrice;
 
       let buyPrice = ((spentTotalMoney / sellTotalCoins) * (100 - (this.data['field-profit'] + this.data['field-commission']))) / 100;
 
       const spentSELL = (currentOrderSell * sellPrice).toFixed(2);
-      const spentBUY = currentOrderSell.toFixed(this.data['field-stepSize'])
+      const spentBUY = currentOrderSell.toFixed(this.data['field-stepSize']);
 
-      const modelDataRow = {
+      mainObj.push({
         overlapRange: overlapRange.toFixed(2),
         buyCurrency: buyPrice.toFixed(this.data['field-tickSize']),
         buy: (initialDeposit - currentBalance).toFixed(this.data['field-stepSize']),
@@ -174,11 +174,7 @@ export class Calculator {
         sellCurrency: sellPrice.toFixed(this.data['field-tickSize']),
         didBuy: `${spentBUY} | ${spentSELL}`,
         calcBalance: currentBalance.toFixed(this.data['field-stepSize']),
-      };
-
-      mainObj.push(modelDataRow);
-
-      if (i >= 99) break;
+      });
     }
 
     return mainObj;
