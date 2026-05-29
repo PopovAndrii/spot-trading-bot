@@ -1,15 +1,35 @@
+const LS_OPEN = 'console_open';
+const LS_FILTER = 'console_filter';
+
 export class ConsoleLog {
   constructor() {
     this.content = document.getElementById('console-content');
     this.filtersEl = document.getElementById('console-filters');
-    if (!this.content) return;
+    this.consoleEl = document.getElementById('console');
+    this.toggleEl = document.getElementById('console-toggle');
+    if (!this.content || !this.consoleEl) return;
 
     this.entries = [];
-    this.filter = null;
+    this.filter = localStorage.getItem(LS_FILTER) ?? null;
     this.symbols = new Set();
 
+    this.#restoreOpen();
+    this.#setupToggle();
     this.#renderFilters();
     this.#connect();
+  }
+
+  #restoreOpen() {
+    if (localStorage.getItem(LS_OPEN) === 'true') {
+      this.consoleEl.classList.add('console--open');
+    }
+  }
+
+  #setupToggle() {
+    this.toggleEl?.addEventListener('click', () => {
+      const isOpen = this.consoleEl.classList.toggle('console--open');
+      localStorage.setItem(LS_OPEN, isOpen);
+    });
   }
 
   #connect() {
@@ -30,9 +50,11 @@ export class ConsoleLog {
       this.#renderFilters();
     }
 
-    if (!this.filter || this.filter === entry.symbol) {
-      this.#appendEl(entry);
-    }
+    const show = this.filter === null ||
+      this.filter === entry.symbol ||
+      (this.filter === '__sys__' && entry.symbol === null);
+
+    if (show) this.#appendEl(entry);
   }
 
   #parseSymbol(msg) {
@@ -42,6 +64,7 @@ export class ConsoleLog {
 
   #setFilter(symbol) {
     this.filter = symbol;
+    localStorage.setItem(LS_FILTER, symbol ?? '');
     this.#renderFilters();
     this.content.innerHTML = '';
     let list;
@@ -65,8 +88,7 @@ export class ConsoleLog {
 
   #addFilterBtn(label, value) {
     const btn = document.createElement('button');
-    const isActive = this.filter === value || (value === '__sys__' && this.filter === '__sys__');
-    btn.className = 'console__filter' + (isActive ? ' console__filter--active' : '');
+    btn.className = 'console__filter' + (this.filter === value ? ' console__filter--active' : '');
     btn.textContent = label;
     btn.addEventListener('click', () => this.#setFilter(value));
     this.filtersEl.appendChild(btn);
@@ -86,6 +108,6 @@ export class ConsoleLog {
 
   #fmt(ts) {
     const d = new Date(ts);
-    return `[${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}]`;
+    return `[${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}]`;
   }
 }
