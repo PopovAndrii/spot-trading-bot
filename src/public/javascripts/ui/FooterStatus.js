@@ -4,10 +4,15 @@ export class FooterStatus {
     this.dot = document.getElementById('ping-dot');
     this.timeEl = document.getElementById('ping-time');
     this.netEl = document.getElementById('net-label');
+    this.noInternetEl = document.getElementById('no-internet');
     if (!this.dot || !this.timeEl) return;
 
-    this.offset = 0; // серверное время минус клиентское
+    this.offset = 0;
     this.online = false;
+
+    this.#setInternet(navigator.onLine);
+    window.addEventListener('online', () => this.#setInternet(true));
+    window.addEventListener('offline', () => this.#setInternet(false));
 
     setInterval(() => this.#tickClock(), 1000);
     setInterval(() => this.#ping(), 5000);
@@ -44,6 +49,11 @@ export class FooterStatus {
     this.dot.classList.toggle('ping-dot--on', state);
     this.dot.classList.toggle('ping-dot--off', !state);
     this.dot.title = state ? 'Сервер онлайн' : 'Сервер офлайн';
+  }
+
+  #setInternet(state) {
+    if (!this.noInternetEl) return;
+    this.noInternetEl.hidden = state;
   }
 
   #setNetwork(network) {

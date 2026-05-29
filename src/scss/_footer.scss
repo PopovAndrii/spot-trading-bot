@@ -42,6 +42,20 @@
   }
 }
 
+.no-internet {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: $c-p-500;
+  background-color: $c-p-100;
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
 .net-label {
   padding: 0.1rem 0.4rem;
   border-radius: 0.4rem;
