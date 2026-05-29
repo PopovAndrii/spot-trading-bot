@@ -1,9 +1,22 @@
-<footer class="footer">
-  <div class="footer-status">
-    <span id="ping-dot" class="ping-dot ping-dot--off" title="Статус сервера"></span>
-    <span id="ping-time" class="ping-time">--:--:--</span>
-    <span id="net-label" class="net-label"></span>
-    <span id="no-internet" class="no-internet" hidden>NO INTERNET</span>
-    <span id="session-timer" class="session-timer" title="Автовыход по бездействию" hidden></span>
+<div class="console" id="console">
+  <div class="console__body" id="console-body">
+    <div class="console__content" id="console-content"></div>
   </div>
-</footer>
+  <div class="console__header" id="console-toggle">
+    <div class="footer-status">
+      <span id="ping-dot" class="ping-dot ping-dot--off" title="Статус сервера"></span>
+      <span id="ping-time" class="ping-time">--:--:--</span>
+      <span id="net-label" class="net-label"></span>
+      <span id="no-internet" class="no-internet" hidden>NO INTERNET</span>
+      <span id="session-timer" class="session-timer" title="Автовыход по бездействию" hidden></span>
+    </div>
+    <svg class="console__arrow" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M7 12 1.4 5.6c-.7-.8-.1-2 1-2h11.5a1.2 1.2 0 0 1 .9 2L9 12.2q-.9.8-1.8 0"/>
+    </svg>
+  </div>
+</div>
+<script>
+  document.getElementById('console-toggle').addEventListener('click', () => {
+    document.getElementById('console').classList.toggle('console--open');
+  });
+</script>
