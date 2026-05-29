@@ -35,7 +35,7 @@
             <div class="line">
               <div class="">
                 <%- include('../views/ui/SpinBox', { id:'field-deposit' , label:'Available balance' , min: 0 , max: 0 ,
-                  step: formatInfo.depositStep || 0 }); %>
+                  step: formatInfo.tickSize || 0 }); %>
               </div>
               <div class="">
                 <%- include('../views/ui/SpinBox', { id:'field-orderSize' , label:'Order Size' , min: 0 , max: 0 , step:

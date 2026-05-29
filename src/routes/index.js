@@ -6,10 +6,10 @@ const { InvokeApi } = require('../lib/invokeAPI');
 const apiMethod = new InvokeApi();
 
 router.get('/', async function (req, res, next) {
-  const result = await apiMethod.exchangeInfo({ symbols: ['BTCUSDT', 'BNBUSDT'] });
+  const result = await apiMethod.getSpotSymbols();
   res.render('index', {
     title: 'Main Page',
-    info: result.message,
+    info: result.success ? result.message : { symbols: [] },
   });
 });
 
