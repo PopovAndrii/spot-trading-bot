@@ -44,7 +44,14 @@ export class ConsoleLog {
     this.filter = symbol;
     this.#renderFilters();
     this.content.innerHTML = '';
-    const list = symbol ? this.entries.filter(e => e.symbol === symbol) : this.entries;
+    let list;
+    if (symbol === '__sys__') {
+      list = this.entries.filter(e => e.symbol === null);
+    } else if (symbol) {
+      list = this.entries.filter(e => e.symbol === symbol);
+    } else {
+      list = this.entries;
+    }
     list.forEach(e => this.#appendEl(e));
   }
 
@@ -52,12 +59,14 @@ export class ConsoleLog {
     if (!this.filtersEl) return;
     this.filtersEl.innerHTML = '';
     this.#addFilterBtn('ALL', null);
+    this.#addFilterBtn('SYS', '__sys__');
     this.symbols.forEach(sym => this.#addFilterBtn(sym, sym));
   }
 
   #addFilterBtn(label, value) {
     const btn = document.createElement('button');
-    btn.className = 'console__filter' + (this.filter === value ? ' console__filter--active' : '');
+    const isActive = this.filter === value || (value === '__sys__' && this.filter === '__sys__');
+    btn.className = 'console__filter' + (isActive ? ' console__filter--active' : '');
     btn.textContent = label;
     btn.addEventListener('click', () => this.#setFilter(value));
     this.filtersEl.appendChild(btn);
