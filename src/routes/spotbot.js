@@ -36,6 +36,7 @@ router.get('/:currency', async function (req, res, next) {
   formatInfo = {
     tickSize: decimalCount(priceFilter?.tickSize),
     stepSize: decimalCount(lotSizeFilter?.stepSize),
+    depositStep: Math.max(decimalCount(priceFilter?.tickSize), decimalCount(lotSizeFilter?.stepSize)),
   };
 
   res.render('spotbot', {
@@ -139,7 +140,7 @@ router.post('/:symbol', async function (req, res, next) {
       quoteAsset: symbolData.quoteAsset || '',
       tickSize: decimalCount(tickSize), // price accuracy
       stepSize: decimalCount(stepSize), // accuracy of quantity
-      balance: roundToStep(balance, tickSize), // free balance
+      balance: roundToStep(balance, message === 'short' ? stepSize : tickSize), // free balance
       minQuoteAsset: roundToStep(minNotional, tickSize), // min. rate quote currency
       minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize) : 0, // min. base currency rate
       price: ticker,
