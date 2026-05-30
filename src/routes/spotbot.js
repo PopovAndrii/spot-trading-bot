@@ -125,11 +125,13 @@ router.post('/:symbol', async function (req, res, next) {
     return Math.max(0, fractional - Number(exp));
   };
 
-  // Rounding to the nearest step
-  const roundToStep = (value, step) => {
+  // Rounding to the nearest step. mode='floor' (default) для остатков,
+  // 'ceil' для минимумов (чтобы не упасть ниже биржевого порога).
+  const roundToStep = (value, step, mode = 'floor') => {
     if (typeof value !== 'number' || isNaN(value) || !step) return 0;
-    const precision = Math.floor(-Math.log10(step));
-    return Number((Math.floor(value / step) * step).toFixed(precision));
+    const precision = Math.max(0, Math.floor(-Math.log10(step)));
+    const round = mode === 'ceil' ? Math.ceil : Math.floor;
+    return Number((round(value / step) * step).toFixed(precision));
   };
 
   // Get your balance safely
@@ -150,9 +152,9 @@ router.post('/:symbol', async function (req, res, next) {
       stepSize: decimalCount(stepSize), // accuracy of quantity
       // Balance precision for SpinBox: long → balance in quote (tickSize), short → in base (stepSize)
       balanceFormat: decimalCount(strategy === 'long' ? tickSize : stepSize),
-      balance: roundToStep(balance, tickSize), // free balance
-      minQuoteAsset: roundToStep(minNotional, tickSize), // min. rate quote currency
-      minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize) : 0, // min. base currency rate
+      balance: roundToStep(balance, tickSize), // free balance (округляем вниз)
+      minQuoteAsset: roundToStep(minNotional, tickSize, 'ceil'), // min. rate quote currency
+      minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize, 'ceil') : 0, // min. base currency rate
       price: ticker,
     },
   });
