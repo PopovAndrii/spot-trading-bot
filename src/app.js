@@ -65,7 +65,7 @@ app.use(
         '/api/ping',
         '/api/logs',
         '/login',
-        '/spotbot'
+        // '/spotbot'
       ].some(path => req.originalUrl.startsWith(path));
     }
   })

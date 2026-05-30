@@ -1,8 +1,9 @@
 import { syncSpinBoxButtons } from './ui/spinboxSync.js';
 
 export class SetStrategy {
-  constructor(notifications) {
+  constructor(notifications, onFormatChange) {
     this.notifications = notifications;
+    this.onFormatChange = onFormatChange; // recreates the SpinBox after changing the precision
 
     this.#getStaticText();
 
@@ -96,6 +97,14 @@ export class SetStrategy {
     all.forEach((el) => {
       document.getElementById(el.id).value = defaultData[el.id];
     });
+
+    // The accuracy of the balance depends on the strategy (long → tickSize, short → stepSize).
+    // Since the strategy is known only here, we set the SpinBox balance step on the client side.
+    const depositSpin = document.querySelector('#field-deposit')?.closest('.UIsp');
+    if (depositSpin) depositSpin.setAttribute('data-step', data['balanceFormat']);
+
+    // Reload the SpinBox, otherwise the modified data-step won't take effect.
+    this.onFormatChange?.();
 
     syncSpinBoxButtons();
   }

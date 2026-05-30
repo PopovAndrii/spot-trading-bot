@@ -17,10 +17,14 @@ router.get('/:currency', async function (req, res, next) {
   let quote = '';
   let formatInfo = {};
 
-  const decimalCount = (e, s = '.') => {
-    if (!e) return 0;
-    const str = parseFloat(e).toString().split(s)[1] || '';
-    return str.length;
+  const decimalCount = (value) => {
+    const n = Number(value);
+    if (!n || !isFinite(n)) return 0;
+    // toExponential is robust against small numbers (0.0000001 → “1e-7”), 
+    // which break the naive split(‘.’) due to exponential notation.
+    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
+    const fractional = (mantissa.split('.')[1] || '').length;
+    return Math.max(0, fractional - Number(exp));
   };
 
   const exchangeInfo = await API.exchangeInfo({ symbol: currency });
@@ -92,7 +96,8 @@ router.post('/:symbol', async function (req, res, next) {
     return res.status(400).json({ success: false, message: 'base and quote are required' });
   }
 
-  const asset = message === 'short' ? base : quote;
+  const strategy = message; // 'short' | 'long'
+  const asset = strategy === 'short' ? base : quote;
 
   // We receive data from Binance in parallel
   const [account, tickerPrice, exchangeInfo] = await Promise.all([
@@ -110,10 +115,14 @@ router.post('/:symbol', async function (req, res, next) {
   const minNotionalFilter = filters.find((f) => f.filterType === 'NOTIONAL');
 
   // Function for counting decimal places
-  const decimalCount = (value, separator = '.') => {
-    if (!value) return 0;
-    const str = parseFloat(value).toString().split(separator)[1] || '';
-    return str.length;
+  const decimalCount = (value) => {
+    const n = Number(value);
+    if (!n || !isFinite(n)) return 0;
+    // toExponential устойчив к малым числам (0.0000001 → "1e-7"), которые
+    // ломают наивный split('.') из-за экспоненциальной записи.
+    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
+    const fractional = (mantissa.split('.')[1] || '').length;
+    return Math.max(0, fractional - Number(exp));
   };
 
   // Rounding to the nearest step
@@ -139,6 +148,8 @@ router.post('/:symbol', async function (req, res, next) {
       quoteAsset: symbolData.quoteAsset || '',
       tickSize: decimalCount(tickSize), // price accuracy
       stepSize: decimalCount(stepSize), // accuracy of quantity
+      // Balance precision for SpinBox: long → balance in quote (tickSize), short → in base (stepSize)
+      balanceFormat: decimalCount(strategy === 'long' ? tickSize : stepSize),
       balance: roundToStep(balance, tickSize), // free balance
       minQuoteAsset: roundToStep(minNotional, tickSize), // min. rate quote currency
       minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize) : 0, // min. base currency rate
