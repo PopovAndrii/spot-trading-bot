@@ -90,13 +90,16 @@ export class Calculator {
 
       let sellCurrency = ((spentTotal / totalSell) * (100 + this.data['field-profit'] + this.data['field-commission'])) / 100;
 
+      // Потрачено в quote-валюте (деньги = price × qty)
+      const spentQuote = actualSpent.toFixed(2);
+
       mainObj.push({
         overlapRange: overlapRange.toFixed(2),
         buyCurrency: buyPrice.toFixed(this.data['field-tickSize']),
         buy: buy.toFixed(this.data['field-stepSize']),
         totalSell: totalSell.toFixed(this.data['field-stepSize']),
         sellCurrency: sellCurrency.toFixed(this.data['field-tickSize']),
-        didBuy: actualSpent.toFixed(2),
+        didBuy: spentQuote,
         calcBalance: balanceTotal.toFixed(this.data['field-tickSize']),
       });
     }
@@ -163,8 +166,8 @@ export class Calculator {
 
       let buyPrice = ((spentTotalMoney / sellTotalCoins) * (100 - (this.data['field-profit'] + this.data['field-commission']))) / 100;
 
-      const spentSELL = (currentOrderSell * sellPrice).toFixed(2);
-      const spentBUY = currentOrderSell.toFixed(this.data['field-stepSize']);
+      // Потрачено в quote-валюте (деньги = qty × price)
+      const spentQuote = (currentOrderSell * sellPrice).toFixed(2);
 
       mainObj.push({
         overlapRange: overlapRange.toFixed(2),
@@ -172,7 +175,7 @@ export class Calculator {
         buy: (initialDeposit - currentBalance).toFixed(this.data['field-stepSize']),
         totalSell: currentOrderSell.toFixed(this.data['field-stepSize']),
         sellCurrency: sellPrice.toFixed(this.data['field-tickSize']),
-        didBuy: `${spentBUY} | ${spentSELL}`,
+        didBuy: spentQuote,
         calcBalance: currentBalance.toFixed(this.data['field-stepSize']),
       });
     }
