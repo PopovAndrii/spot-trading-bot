@@ -57,6 +57,21 @@ API_SECRET_TEST='you_testnet_secret_form_binance'
 ```
 After that, run ./int and follow the instructions.
 
+### Bootstrap a fresh setup (no .env yet)
+
+`.env` is git-ignored, so a fresh clone has none. The container still starts
+because `env_file` is marked `required: false` — and `npm run setup-user`
+creates `src/.env` for you:
+
+```sh
+./init                                            # create the .env symlink (+ tmp/) → answer y
+docker compose run --rm app npm run setup-user    # creates & fills src/.env
+docker compose up -d                              # run
+```
+
+No manual file creation needed. As a reference / manual alternative, copy the
+template: `cp src/.env.example src/.env` and fill it in.
+
 > **Note:** the dev container no longer mounts host SSH keys / git config
 > (`SSH_PATH`, `GITCONFIG_PATH`, `USER` were removed — git is not used inside it).
 >

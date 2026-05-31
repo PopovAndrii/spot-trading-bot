@@ -19,7 +19,9 @@ services:
         ports:
             - ${PORT:-3002}:${PORT:-3002}
         env_file:
-            - .env
+            # required:false — контейнер стартует даже без .env (его создаст setup-user)
+            - path: .env
+              required: false
         environment:
             NODE_ENV: ${NODE_ENV:-production}
             STATUS_APP: ${STATUS_APP:-false}
