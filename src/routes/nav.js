@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { pair } = require('../lib/pair');
 const logBus = require('../lib/logBus');
+const { isTestnet, requestedTestnet } = require('../lib/runMode');
 
 router.get('/symbols', (req, res) => {
   try {
@@ -26,8 +27,10 @@ router.get('/session/ping', (req, res) => {
 
 // online status, time server and network (testnet/real)
 router.get('/ping', (req, res) => {
-  const network = process.env.NODE_ENV === 'development' ? 'testnet' : 'real';
-  res.json({ time: Date.now(), network });
+  const testnet = isTestnet();
+  // fallback=true: real, but due to the lack of real keys, it runs on testnet
+  const fallback = !requestedTestnet() && testnet;
+  res.json({ time: Date.now(), network: testnet ? 'testnet' : 'real', fallback });
 });
 
 // SSE log stream
@@ -39,7 +42,7 @@ router.get('/logs', (req, res) => {
 
   const send = (e) => {
     if (res.writableEnded) return;
-    try { res.write(`data: ${JSON.stringify(e)}\n\n`); } catch {}
+    try { res.write(`data: ${JSON.stringify(e)}\n\n`); } catch { }
   };
 
   logBus.history().forEach(send);

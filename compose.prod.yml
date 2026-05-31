@@ -20,7 +20,16 @@ services:
         networks:
             - proxy-network
         env_file:
-            - .env
+            # required:false — container starts even without .env (setup-user creates it)
+            - path: .env
+              required: false
+        # Non-secret defaults (can be overridden in .env). NODE_ENV=production
+        # Important for production: otherwise the dev server (browser-sync) will start.
+        environment:
+            NODE_ENV: ${NODE_ENV:-production}
+            STATUS_APP: ${STATUS_APP:-false}
+            STATUS_LOGIN: ${STATUS_LOGIN:-true}
+            PORT: ${PORT:-3002}
 
 networks:
     proxy-network:

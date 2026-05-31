@@ -1,6 +1,7 @@
 const { Spot } = require('@binance/connector');
 const { UserStreamAPI } = require('../lib/UserStreamApi');
 const { StreamAPI } = require('../lib/streamAPI');
+const { isTestnet } = require('./runMode');
 const logBus = require('./logBus');
 
 class InvokeApi {
@@ -12,25 +13,25 @@ class InvokeApi {
       return InvokeApi.instance;
     }
 
-    let api_key = process.env.API_KEY;
-    let api_secret = process.env.API_SECRET;
-    let baseURL = 'https://api.binance.com';
+    // isTestnet() already accounts for a safe fallback (real without keys → testnet).
+    const testnet = isTestnet();
 
-    this.wssUserURL = 'wss://stream.binance.com:9443/ws/';
+    const api_key = testnet ? process.env.API_KEY_TEST : process.env.API_KEY;
+    const api_secret = testnet ? process.env.API_SECRET_TEST : process.env.API_SECRET;
+    const baseURL = testnet ? 'https://testnet.binance.vision/' : 'https://api.binance.com';
 
-    if (!api_key || !api_secret) {
-      throw new Error('Binance API keys are not set');
+    this.wssUserURL = testnet
+      ? 'wss://stream.testnet.binance.vision:9443/ws/'
+      : 'wss://stream.binance.com:9443/ws/';
+
+    // Do not throw an exception so the container does not crash: public endpoints (symbols, prices)
+    // work without keys, and signed ones will return an error via the methods' try/catch blocks.
+    this.configured = Boolean(api_key && api_secret);
+    if (!this.configured) {
+      console.warn(`🟡 Binance ${testnet ? 'testnet' : 'real'} keys are not set — signed requests will fail, public ones work`);
     }
 
-    if (process.env.NODE_ENV == 'development') {
-      api_key = process.env.API_KEY_TEST;
-      api_secret = process.env.API_SECRET_TEST;
-      baseURL = 'https://testnet.binance.vision/';
-
-      this.wssUserURL = 'wss://stream.testnet.binance.vision:9443/ws/';
-    }
-
-    this.client = new Spot(api_key, api_secret, { baseURL: baseURL });
+    this.client = new Spot(api_key || '', api_secret || '', { baseURL: baseURL });
     this.data = null;
     this.stateErrors = true;
 

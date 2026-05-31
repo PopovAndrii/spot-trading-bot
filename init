@@ -41,3 +41,29 @@ if [[ ! -L .env ]]; then
 else
 	echo 'OK .env'
 fi
+
+#######################################
+# Check Docker Compose version.
+# env_file "required: false" needs Compose >= 2.24, so the container can start
+# without a .env (setup-user creates it). Older versions need an empty .env first.
+#######################################
+compose_ver=$(docker compose version --short 2>/dev/null | sed 's/^v//')
+if [[ -z $compose_ver ]]; then
+	echo '⚠️  docker compose not found — skipping version check.'
+	echo '    If "env_file" fails on start, run: touch ./src/.env'
+else
+	ver_major=${compose_ver%%.*}
+	ver_rest=${compose_ver#*.}
+	ver_minor=${ver_rest%%.*}
+	if (( ver_major > 2 || (ver_major == 2 && ver_minor >= 24) )); then
+		echo "OK docker compose $compose_ver (env_file required:false supported)"
+	else
+		echo "⚠️  docker compose $compose_ver < 2.24 — env_file 'required: false' is not supported."
+		echo '    Without a .env the container will not start.'
+		read -p 'Create an empty ./src/.env now (so it can start)? [y/n]' mk_env
+		if [[ $mk_env = 'y' ]] && [[ -n $mk_env ]]; then
+			touch ./src/.env
+			echo 'Created empty ./src/.env'
+		fi
+	fi
+fi

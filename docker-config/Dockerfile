@@ -1,10 +1,8 @@
-FROM node:22-bookworm
+FROM node:24-bookworm-slim
 
-RUN apt-get update && apt-get install -y git curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www
-
-COPY . .
 
 USER node
