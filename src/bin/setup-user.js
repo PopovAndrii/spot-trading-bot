@@ -55,6 +55,9 @@ function getEnvValue(content, key) {
   return m ? m[1].trim() : '';
 }
 
+// quote for BCRTPT
+const quote = (v) => `'${v}'`;
+
 // Asks for a key+secret pair. required=true — keeps asking until entered;
 // otherwise, an empty key = skip (returns null).
 async function askKeyPair(title, { required = false } = {}) {
@@ -104,11 +107,11 @@ async function askKeyPair(title, { required = false } = {}) {
   }
 
   content = upsertEnv(content, 'ADMIN_LOGIN', login);
-  content = upsertEnv(content, 'ADMIN_PASSWORD_HASH', bcrypt.hashSync(password, SALT_ROUNDS));
+  content = upsertEnv(content, 'ADMIN_PASSWORD_HASH', quote(bcrypt.hashSync(password, SALT_ROUNDS)));
 
   // We generate SESSION_SECRET only if it is empty/missing, to avoid logging out.
   if (!getEnvValue(content, 'SESSION_SECRET')) {
-    content = upsertEnv(content, 'SESSION_SECRET', crypto.randomBytes(32).toString('hex'));
+    content = upsertEnv(content, 'SESSION_SECRET', quote(crypto.randomBytes(32).toString('hex')));
     console.log('🆕 SESSION_SECRET generated');
   }
 
@@ -122,18 +125,18 @@ async function askKeyPair(title, { required = false } = {}) {
   // Real — optional (without them, the application will fall back to testnet).
   const real = await askKeyPair('Real Binance keys');
   if (real) {
-    content = upsertEnv(content, 'API_KEY', real.key);
-    content = upsertEnv(content, 'API_SECRET', real.secret);
+    content = upsertEnv(content, 'API_KEY', quote(real.key));
+    content = upsertEnv(content, 'API_SECRET', quote(real.secret));
   }
 
   // Test values — required (they are used for fallback so the container doesn’t crash).
   // If already set in .env — no need to re-enter.
   const hasTestAlready =
     getEnvValue(content, 'API_KEY_TEST') && getEnvValue(content, 'API_SECRET_TEST');
-  const test = await askKeyPair('Тестовые ключи Binance (testnet)', { required: !hasTestAlready });
+  const test = await askKeyPair('Binance test keys (testnet)', { required: !hasTestAlready });
   if (test) {
-    content = upsertEnv(content, 'API_KEY_TEST', test.key);
-    content = upsertEnv(content, 'API_SECRET_TEST', test.secret);
+    content = upsertEnv(content, 'API_KEY_TEST', quote(test.key));
+    content = upsertEnv(content, 'API_SECRET_TEST', quote(test.secret));
   }
 
   fs.writeFileSync(ENV_PATH, content, 'utf8');
@@ -141,9 +144,9 @@ async function askKeyPair(title, { required = false } = {}) {
     fs.chmodSync(ENV_PATH, 0o600); // secrets — for the owner only
   } catch { /* in some containers, chmod may be prohibited */ }
 
-  console.log(`\n✅ Сохранено в ${ENV_PATH}`);
+  console.log(`\n✅ Saved in ${ENV_PATH}`);
   console.log(`   ADMIN_LOGIN=${login}`);
-  console.log('   ADMIN_PASSWORD_HASH=<bcrypt-хеш установлен>');
+  console.log('   ADMIN_PASSWORD_HASH=<bcrypt-hash is set>');
 
   // No more crashes: if no real keys are present, the application automatically switches to testnet.
   const hasReal = getEnvValue(content, 'API_KEY') && getEnvValue(content, 'API_SECRET');
