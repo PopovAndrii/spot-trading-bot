@@ -1,4 +1,4 @@
-// Футер: живые часы + онлайн/офлайн статус сервера + индикация сети (testnet/real).
+// Footer: live clock + server online/offline status + network indicator (testnet/real).
 export class FooterStatus {
   constructor() {
     this.dot = document.getElementById('ping-dot');
@@ -30,7 +30,7 @@ export class FooterStatus {
       const data = await res.json();
       this.offset = data.time - Date.now();
       this.#setOnline(true);
-      this.#setNetwork(data.network);
+      this.#setNetwork(data.network, data.fallback);
     } catch {
       this.#setOnline(false);
     }
@@ -48,7 +48,7 @@ export class FooterStatus {
     this.online = state;
     this.dot.classList.toggle('ping-dot--on', state);
     this.dot.classList.toggle('ping-dot--off', !state);
-    this.dot.title = state ? 'Сервер онлайн' : 'Сервер офлайн';
+    this.dot.title = state ? 'Server online' : 'Server offline';
   }
 
   #setInternet(state) {
@@ -56,10 +56,17 @@ export class FooterStatus {
     this.noInternetEl.hidden = state;
   }
 
-  #setNetwork(network) {
+  #setNetwork(network, fallback = false) {
     if (!this.netEl || !network) return;
-    this.netEl.textContent = network === 'real' ? 'REAL' : 'TESTNET';
-    this.netEl.classList.toggle('net-label--real', network === 'real');
+    // fallback: REAL, but we’re running on TESTNET without keys — explicitly showing
+    this.netEl.textContent = fallback
+      ? 'REAL → TESTNET (no keys)'
+      : network === 'real' ? 'REAL' : 'TESTNET';
+    this.netEl.title = fallback
+      ? 'REAL is selected, but REAL keys are not specified — running on TESTNET'
+      : '';
+    this.netEl.classList.toggle('net-label--real', network === 'real' && !fallback);
     this.netEl.classList.toggle('net-label--testnet', network !== 'real');
+    this.netEl.classList.toggle('net-label--fallback', fallback);
   }
 }

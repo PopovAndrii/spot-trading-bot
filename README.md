@@ -34,10 +34,11 @@ APP_NAME=Exchange 💰 Cryptocurrencies
 NODE_ENV=production
 
 ADMIN_LOGIN=admin
-# Generate password
-# node -e "console.log(require('bcrypt').hashSync('you-password-hash', 10))"
+# Generate login / password / secret with:  npm run setup-user
+# or manually: node -e "console.log(require('bcrypt').hashSync('your-password', 10))"
 ADMIN_PASSWORD_HASH='$2b$10$duSulJ1o08aAsw8xOCg/4eAu.vasc6kdim.1G.i/IwfMcWlCVDzQ2'
 SESSION_SECRET='1o08aAsw8xOCg'
+# STATUS_LOGIN=false # optional: disable login completely
 
 # SSH_PATH=/c/Users/YourUsername/.ssh # for Windows users
 SSH_PATH=~/.ssh # for Linux users 
@@ -50,8 +51,16 @@ PREFIX_CONTAINER_NAME=dev # or prod | If 2 containers are required to operate si
  
 STATUS_APP=false # false === dev mode. Without a request on Binance 
 
+# Which Binance to use: test | real (independent of NODE_ENV)
+BINANCE_MODE=test
+
+# Real keys — optional. If missing, the app falls back to testnet.
 API_KEY='you_key_form_binance_api'
 API_SECRET='you_secret_key_form_binance_api'
+
+# Test keys — required (used in testnet and as the safe fallback).
+API_KEY_TEST='you_testnet_key_form_binance'
+API_SECRET_TEST='you_testnet_secret_form_binance'
 
 TIMER=1000
 
@@ -103,6 +112,51 @@ docker compose exec app sh -c "npm exec pm2 save"
 # Stop
 docker compose exec app sh -c "npm exec pm2 stop id|name|namespace"
 ```
+
+## Account & API keys setup
+
+Interactive script that writes the login, password and Binance keys into `src/.env`:
+
+```sh
+# locally
+npm run setup-user
+# inside the container
+docker compose exec app bash -c "npm run setup-user"
+```
+
+It asks for:
+- **Login** and **password** (min 8 chars) → stored as `ADMIN_LOGIN` + bcrypt `ADMIN_PASSWORD_HASH`; also generates `SESSION_SECRET` if it is empty.
+- **Mode** — `test` / `real` → `BINANCE_MODE`.
+- **Real keys** — optional (`API_KEY` / `API_SECRET`).
+- **Test keys** — required (`API_KEY_TEST` / `API_SECRET_TEST`).
+
+Restart the app afterwards so it re-reads `.env`.
+
+`BINANCE_MODE` selects which Binance to talk to, independent of `NODE_ENV` (which only controls dev tooling / browser-sync):
+- `BINANCE_MODE=test` → Binance testnet.
+- `BINANCE_MODE=real` → real Binance.
+- not set → falls back to `NODE_ENV=development` → testnet.
+
+**Safe fallback:** if `real` is selected but the real keys are missing, the app automatically runs on **testnet** instead of crashing. That is why the test keys are required.
+
+Manual one-liners (instead of the script):
+
+```sh
+# bcrypt password hash → ADMIN_PASSWORD_HASH
+node -e "console.log(require('bcrypt').hashSync(process.argv[1],10))" 'your-password'
+# random session secret → SESSION_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+## Footer — network mode indicator
+
+The footer shows which Binance environment is actually used:
+
+| Label | Meaning |
+|-------|---------|
+| `TESTNET` | test mode (`BINANCE_MODE=test`) |
+| `REAL` | real mode with real keys |
+| `REAL → TESTNET (no keys)` | `real` selected, but real keys are missing → running on testnet (fallback) |
 
 ## Formating ESLint (inside Docker)
 - ESlint and Pretier work automatically. (spaces and tabs are formatted only by VScode) But if necessary, you can run it manually.
