@@ -35,7 +35,7 @@ export class ConsoleLog {
   #connect() {
     const es = new EventSource('/api/logs');
     es.onmessage = (e) => {
-      try { this.#add(JSON.parse(e.data)); } catch {}
+      try { this.#add(JSON.parse(e.data)); } catch { }
     };
   }
 
@@ -84,6 +84,28 @@ export class ConsoleLog {
     this.#addFilterBtn('ALL', null);
     this.#addFilterBtn('SYS', '__sys__');
     this.symbols.forEach(sym => this.#addFilterBtn(sym, sym));
+    this.#addClearBtn();
+  }
+
+  #addClearBtn() {
+    const btn = document.createElement('button');
+    btn.className = 'console__filter console__clear';
+    btn.textContent = 'Clear';
+    btn.title = 'Очистить логи текущего фильтра';
+    btn.addEventListener('click', () => this.#clearCurrent());
+    this.filtersEl.appendChild(btn);
+  }
+
+  // Deletes only entries that match the active filter; the rest are preserved.
+  #clearCurrent() {
+    if (this.filter === '__sys__') {
+      this.entries = this.entries.filter(e => e.symbol !== null);
+    } else if (this.filter) {
+      this.entries = this.entries.filter(e => e.symbol !== this.filter);
+    } else {
+      this.entries = []; // ALL — The current filter covers everything
+    }
+    this.content.innerHTML = '';
   }
 
   #addFilterBtn(label, value) {
