@@ -12,8 +12,6 @@ services:
             - ./.bash_history:/home/node/.bash_history:rw
             - ./tmp/app/:/home/node/.npm/
             - /etc/localtime:/etc/localtime:ro
-        depends_on:
-            - nginx
         networks:
             - exchange-crypto
         ports:
@@ -29,18 +27,24 @@ services:
             PORT: ${PORT:-3002}
         command: ["sleep", "infinity"]
 
-    nginx:
-        image: nginx:latest
-        container_name: exchange-crypto-nginx-${PREFIX_CONTAINER_NAME:-dev}
-        restart: unless-stopped
-        ports:
-            - ${NGINX_PORT:-8002}:80
-            - ${NGINX_PORT_SSL:-445}:443
-        volumes:
-            - .:/var/www
-            - ./docker-config/nginx/conf.d/:/etc/nginx/conf.d/
-        networks:
-            - exchange-crypto
+    # --- nginx ОТКЛЮЧЁН (не нужен) ---
+    # Это PHP-прокси (fastcgi_pass → :9000, root src/php/) от старой PHP-версии,
+    # к Node-приложению не относится — оно отдаётся напрямую через app.ports (${PORT}).
+    # Чтобы вернуть: раскомментировать блок ниже и добавить в сервис app:
+    #     depends_on:
+    #         - nginx
+    # nginx:
+    #     image: nginx:latest
+    #     container_name: exchange-crypto-nginx-${PREFIX_CONTAINER_NAME:-dev}
+    #     restart: unless-stopped
+    #     ports:
+    #         - ${NGINX_PORT:-8002}:80
+    #         - ${NGINX_PORT_SSL:-445}:443
+    #     volumes:
+    #         - .:/var/www
+    #         - ./docker-config/nginx/conf.d/:/etc/nginx/conf.d/
+    #     networks:
+    #         - exchange-crypto
 
 networks:
     exchange-crypto:
