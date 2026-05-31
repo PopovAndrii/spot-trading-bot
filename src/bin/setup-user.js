@@ -121,6 +121,14 @@ async function askKeyPair(title, { required = false } = {}) {
   content = upsertEnv(content, 'BINANCE_MODE', mode);
   console.log(`   BINANCE_MODE=${mode}`);
 
+  // --- runtime ---
+  // NODE_ENV: production for defaul (development up browser-sync).
+  const envAns = (await question('\nNODE_ENV — [p]roduction / [d]evelopment (default production): '))
+    .trim().toLowerCase();
+  const nodeEnv = envAns.startsWith('d') ? 'development' : 'production';
+  content = upsertEnv(content, 'NODE_ENV', nodeEnv);
+  console.log(`   NODE_ENV=${nodeEnv}`);
+
   // --- kys ---
   // Real — optional (without them, the application will fall back to testnet).
   const real = await askKeyPair('Real Binance keys');

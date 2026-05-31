@@ -4,16 +4,12 @@ services:
             context: .
             dockerfile: docker-config/Dockerfile
         image: exchange-crypto
-        container_name: exchange-crypto-${PREFIX_CONTAINER_NAME}
+        container_name: exchange-crypto-${PREFIX_CONTAINER_NAME:-dev}
         restart: unless-stopped
         working_dir: /var/www/src
         volumes:
             - .:/var/www
-            # - ./.bash_history:/home/${USER}/.bash_history
-            # - ${SSH_PATH}:/home/${USER}/.ssh:ro
             - ./.bash_history:/home/node/.bash_history:rw
-            - ${SSH_PATH}:/home/node/.ssh:ro
-            - ${GITCONFIG_PATH}:/home/${USER}/.gitconfig:ro
             - ./tmp/app/:/home/node/.npm/
             - /etc/localtime:/etc/localtime:ro
         depends_on:
@@ -21,18 +17,23 @@ services:
         networks:
             - exchange-crypto
         ports:
-            - ${PORT}:${PORT}
+            - ${PORT:-3002}:${PORT:-3002}
         env_file:
             - .env
+        environment:
+            NODE_ENV: ${NODE_ENV:-production}
+            STATUS_APP: ${STATUS_APP:-false}
+            STATUS_LOGIN: ${STATUS_LOGIN:-true}
+            PORT: ${PORT:-3002}
         command: ["sleep", "infinity"]
 
     nginx:
         image: nginx:latest
-        container_name: exchange-crypto-nginx-${PREFIX_CONTAINER_NAME}
+        container_name: exchange-crypto-nginx-${PREFIX_CONTAINER_NAME:-dev}
         restart: unless-stopped
         ports:
-            - ${NGINX_PORT}:80
-            - ${NGINX_PORT_SSL}:443
+            - ${NGINX_PORT:-8002}:80
+            - ${NGINX_PORT_SSL:-445}:443
         volumes:
             - .:/var/www
             - ./docker-config/nginx/conf.d/:/etc/nginx/conf.d/
@@ -42,4 +43,4 @@ services:
 networks:
     exchange-crypto:
         driver: bridge
-        name: exchange-crypto-${PREFIX_CONTAINER_NAME}
+        name: exchange-crypto-${PREFIX_CONTAINER_NAME:-dev}
