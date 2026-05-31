@@ -18,6 +18,12 @@ export class SpotWS {
 
     this.setStrategy = setStrategy;
 
+    this.loadDataCalculator.onRestartChange = (value) => {
+      if (this.#isWebSocketOpen(this.ws)) {
+        this.ws.send(JSON.stringify({ type: 'restartSync', symbol: base + quote, value }));
+      }
+    };
+
     window.addEventListener('load', () => {
       this.connectWebSocket();
     });
@@ -56,19 +62,38 @@ export class SpotWS {
           case 'spotStatus':
             if (message.data === true) {
               this.#btnRule(true);
-
               this.notifications.showNotification('Table data loaded. Bot in progress.', 'success');
-
               this.isRunning = true;
+
+              if (!this.interval) {
+                this.loadDataFromFileCalculator.getStateCalculator();
+                this.interval = setInterval(() => {
+                  if (this.#isWebSocketOpen(this.ws)) {
+                    this.loadDataFromFileCalculator.getStateCalculator();
+                  }
+                }, 20000);
+              }
+            } else {
+              // Бот не запущен (в т.ч. после падения/рестарта сервера) — снять блокировку
+              this.#btnRule(false);
+              this.isRunning = false;
+              if (this.interval) {
+                clearInterval(this.interval);
+                this.interval = null;
+              }
             }
             break;
           case 'updateTableData':
             if (message.data === 1) {
-              this.interval = setInterval(() => {
-                if (this.#isWebSocketOpen(this.ws)) {
-                  this.loadDataFromFileCalculator.getStateCalculator();
-                }
-              }, 20000);
+              this.#btnRule(true);
+              this.isRunning = true;
+              if (!this.interval) {
+                this.interval = setInterval(() => {
+                  if (this.#isWebSocketOpen(this.ws)) {
+                    this.loadDataFromFileCalculator.getStateCalculator();
+                  }
+                }, 20000);
+              }
             }
             if (message.data === 0) {
               if (this.interval) {
@@ -78,6 +103,9 @@ export class SpotWS {
               this.#btnRule(false);
               this.isRunning = false;
             }
+            break;
+          case 'restartSync':
+            this.#updateRestartSwitch(message.data);
             break;
           case 'updatePrice':
             const text = document.querySelector('.stream-currency');
@@ -179,18 +207,40 @@ export class SpotWS {
     startBtn.addEventListener('ui-button-change', this.btnClickHandler);
   }
 
+  #updateRestartSwitch(value) {
+    const sw = document.getElementById('settings-calculate-restart');
+    if (!sw) return;
+    const input = sw.querySelector('input');
+    const isOn = String(value) === 'true';
+    input.checked = isOn;
+    if (isOn) {
+      input.setAttribute('checked', '');
+      sw.setAttribute('aria-checked', 'true');
+    } else {
+      input.removeAttribute('checked');
+      sw.setAttribute('aria-checked', 'false');
+    }
+  }
+
   #btnRule(status) {
     this.loadDataCalculator.setListenerStatus(status);
     this.cancelAllOrders.setListenerStatus(status);
 
+    const lock = Boolean(status);
+
+    // Блокируем всю область параметров (стратегия + спинбоксы + select прогрессии).
+    // Start и переключатель Restart остаются доступными.
+    document.querySelector('.UIbg')?.classList.toggle('params-locked', lock);
+    document.getElementById('group-spinbox')?.classList.toggle('params-locked', lock);
+
     const settingsCalculate = document.getElementById('settings-calculate');
-    settingsCalculate.classList.toggle('disabled');
+    settingsCalculate.classList.toggle('disabled', Boolean(status));
 
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
-    settingsCalculateSave.classList.toggle('disabled');
+    settingsCalculateSave.classList.toggle('disabled', Boolean(status));
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
-    cancelAllOrders.disabled = !cancelAllOrders.disabled;
+    cancelAllOrders.disabled = Boolean(status);
 
     const startBtn = document.getElementById('startBtn');
     if (status) {

@@ -17,10 +17,14 @@ router.get('/:currency', async function (req, res, next) {
   let quote = '';
   let formatInfo = {};
 
-  const decimalCount = (e, s = '.') => {
-    if (!e) return 0;
-    const str = parseFloat(e).toString().split(s)[1] || '';
-    return str.length;
+  const decimalCount = (value) => {
+    const n = Number(value);
+    if (!n || !isFinite(n)) return 0;
+    // toExponential is robust against small numbers (0.0000001 → “1e-7”), 
+    // which break the naive split(‘.’) due to exponential notation.
+    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
+    const fractional = (mantissa.split('.')[1] || '').length;
+    return Math.max(0, fractional - Number(exp));
   };
 
   const exchangeInfo = await API.exchangeInfo({ symbol: currency });
@@ -92,7 +96,8 @@ router.post('/:symbol', async function (req, res, next) {
     return res.status(400).json({ success: false, message: 'base and quote are required' });
   }
 
-  const asset = message === 'short' ? base : quote;
+  const strategy = message; // 'short' | 'long'
+  const asset = strategy === 'short' ? base : quote;
 
   // We receive data from Binance in parallel
   const [account, tickerPrice, exchangeInfo] = await Promise.all([
@@ -110,17 +115,23 @@ router.post('/:symbol', async function (req, res, next) {
   const minNotionalFilter = filters.find((f) => f.filterType === 'NOTIONAL');
 
   // Function for counting decimal places
-  const decimalCount = (value, separator = '.') => {
-    if (!value) return 0;
-    const str = parseFloat(value).toString().split(separator)[1] || '';
-    return str.length;
+  const decimalCount = (value) => {
+    const n = Number(value);
+    if (!n || !isFinite(n)) return 0;
+    // toExponential устойчив к малым числам (0.0000001 → "1e-7"), которые
+    // ломают наивный split('.') из-за экспоненциальной записи.
+    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
+    const fractional = (mantissa.split('.')[1] || '').length;
+    return Math.max(0, fractional - Number(exp));
   };
 
-  // Rounding to the nearest step
-  const roundToStep = (value, step) => {
+  // Rounding to the nearest step. mode='floor' (default) для остатков,
+  // 'ceil' для минимумов (чтобы не упасть ниже биржевого порога).
+  const roundToStep = (value, step, mode = 'floor') => {
     if (typeof value !== 'number' || isNaN(value) || !step) return 0;
-    const precision = Math.floor(-Math.log10(step));
-    return Number((Math.floor(value / step) * step).toFixed(precision));
+    const precision = Math.max(0, Math.floor(-Math.log10(step)));
+    const round = mode === 'ceil' ? Math.ceil : Math.floor;
+    return Number((round(value / step) * step).toFixed(precision));
   };
 
   // Get your balance safely
@@ -139,9 +150,11 @@ router.post('/:symbol', async function (req, res, next) {
       quoteAsset: symbolData.quoteAsset || '',
       tickSize: decimalCount(tickSize), // price accuracy
       stepSize: decimalCount(stepSize), // accuracy of quantity
-      balance: roundToStep(balance, tickSize), // free balance
-      minQuoteAsset: roundToStep(minNotional, tickSize), // min. rate quote currency
-      minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize) : 0, // min. base currency rate
+      // Balance precision for SpinBox: long → balance in quote (tickSize), short → in base (stepSize)
+      balanceFormat: decimalCount(strategy === 'long' ? tickSize : stepSize),
+      balance: roundToStep(balance, tickSize), // free balance (округляем вниз)
+      minQuoteAsset: roundToStep(minNotional, tickSize, 'ceil'), // min. rate quote currency
+      minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize, 'ceil') : 0, // min. base currency rate
       price: ticker,
     },
   });
@@ -158,17 +171,27 @@ router.post('/calculator/save', async (req, res, next) => {
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const exchangeName = 'binance';
 
+    const msg = req.body.message;
+    if (
+      !Array.isArray(msg.BUY) ||
+      !Array.isArray(msg.SELL) ||
+      typeof msg.param !== 'object' ||
+      msg.param === null
+    ) {
+      return res.status(400).json({ message: 'Invalid data structure: BUY, SELL, param are required' });
+    }
+
     // JSON stringify with check
     let jsonString;
     try {
-      jsonString = JSON.stringify(req.body.message, null, 2);
+      jsonString = JSON.stringify(msg, null, 2);
     } catch (err) {
       console.error('🔴 JSON stringify error:', err);
       return res.status(400).json({ message: 'Invalid data for JSON' });
     }
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
-    console.log(jsonString)
+
     await fs.writeFile(filePath, jsonString, 'utf8');
 
     res.json({ message: 'Order settings table saved' });
@@ -216,9 +239,14 @@ router.post('/calculator/restart', async (req, res, next) => {
 });
 
 router.post('/cancel/allorders', async (req, res, next) => {
-  const symbol = req.body.message;
-  if (!symbol) {
+  const rawSymbol = req.body.message;
+  if (!rawSymbol) {
     return res.status(500).json({ success: false, message: 'Symbol is required in request body' });
+  }
+
+  const symbol = rawSymbol.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!symbol) {
+    return res.status(400).json({ success: false, message: 'Invalid symbol' });
   }
 
   const result = await API.cancelOpenOrders({ symbol });

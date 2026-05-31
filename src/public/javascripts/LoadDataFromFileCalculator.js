@@ -1,3 +1,5 @@
+import { syncSpinBoxButtons } from './ui/spinboxSync.js';
+
 export class LoadDataFromFileCalculator {
   constructor(select, notifications, loadDataCalculator, colors) {
     this.selectObjectElement = select;
@@ -18,12 +20,8 @@ export class LoadDataFromFileCalculator {
   }
 
   async getStateCalculator() {
-    const url = new URL(window.location.href);
-    const base = url.searchParams.get('base');
-    const quote = url.searchParams.get('quote');
-
     const res = await this.notifications.fetchWithHandling(
-      `/spotbot/table/${base}${quote}?symbol=${base + quote}&base=${base}&quote=${quote}`,
+      `/spotbot/table/${base + quote}?symbol=${base + quote}&base=${base}&quote=${quote}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,6 +61,7 @@ export class LoadDataFromFileCalculator {
   async #fillInData(obj) {
     const select = document.getElementById('strategyList');
     // set default value on strategi list
+    this.loadDataCalculator.ignoreNextSelectChange();
     this.selectObjectElement.setValue(select, obj.param.strategyList)
 
     if (Object.keys(obj).length === 0) return;
@@ -70,6 +69,8 @@ export class LoadDataFromFileCalculator {
     document.querySelectorAll('[id^="field-"]').forEach((el) => {
       document.getElementById(el.id).value = obj.param[el.id] ? obj.param[el.id] : null;
     });
+
+    syncSpinBoxButtons();
 
     // table
     obj['BUY'].forEach((el, index) => {

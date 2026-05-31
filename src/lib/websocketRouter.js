@@ -102,6 +102,14 @@ class WebSocketRouter {
           }
         }
 
+        if (data.type === 'restartSync' && currentSymbol) {
+          for (const client of this.clients.get(currentSymbol) || []) {
+            if (client !== ws) {
+              this.safeSend(client, { event: 'restartSync', data: data.value });
+            }
+          }
+        }
+
         if (data.type === 'stop' && currentSymbol) {
           const ts = this.timerSenders.get(currentSymbol);
           ts.stop();

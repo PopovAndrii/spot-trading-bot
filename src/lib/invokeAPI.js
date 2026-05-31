@@ -1,6 +1,7 @@
 const { Spot } = require('@binance/connector');
 const { UserStreamAPI } = require('../lib/UserStreamApi');
 const { StreamAPI } = require('../lib/streamAPI');
+const logBus = require('./logBus');
 
 class InvokeApi {
   static instance = null;
@@ -49,7 +50,9 @@ class InvokeApi {
     const parts = d.toUTCString().split(' ');
     const formatted = `${parts[0].replace(',', '')} ${parts[2]} ${parts[1]} ${parts[4]}`;
 
-    return console.log(`${formatted} ${icon} ${err}`);
+    const msg = `${formatted} ${icon} ${err}`;
+    console.log(msg);
+    logBus.log(msg);
   }
 
   getPublicStream(symbol) {
@@ -318,6 +321,33 @@ class InvokeApi {
     } catch (err) {
       const message = this.#getCatchMsg(err);
 
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
+    }
+  }
+
+  async getSpotSymbols() {
+    try {
+      const res = await this.client.exchangeInfo();
+
+      if (res.data?.code < 0) {
+        this.getConsoleMsg(res.data.msg, false);
+        return { success: false, message: res.data.msg };
+      }
+
+      if (!res.data?.symbols || !Array.isArray(res.data.symbols)) {
+        console.warn('No symbols array in exchangeInfo response');
+        return { success: true, message: { symbols: [] } };
+      }
+
+      const symbols = res.data.symbols
+        .filter(s => s.status === 'TRADING' && /^[A-Z0-9]+$/.test(s.symbol))
+        .map(s => ({ symbol: s.symbol, baseAsset: s.baseAsset, quoteAsset: s.quoteAsset }));
+
+      this.getConsoleMsg(`getSpotSymbols() ${symbols.length} symbols`);
+      return { success: true, message: { symbols } };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
       this.getConsoleMsg(message, false);
       return { success: false, message };
     }

@@ -3,6 +3,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const { Job, Status } = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
+const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
 const { Calculator } = require('../lib/calculator');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
@@ -108,7 +109,7 @@ class JsonTimerSender extends EventEmitter {
         }
 
         if (currentOrder.status === 'pass') {
-          console.log(currentOrder);
+          logBus.log(`${this.symbol} ${JSON.stringify(currentOrder)}`);
           await this.#sleep(100);
           continue;
         } // processed order (api request not needed) or test loop
@@ -181,7 +182,6 @@ class JsonTimerSender extends EventEmitter {
     if (!this.running[symbol]) {
       // this.strategy = (this.strategy == null) ? strategy : this.strategy;
       this.strategy = strategy == 'short' ? 'short' : 'long';
-      console.log(strategy, "Strategy:", this.strategy)
 
       this.autoRestart = options.autoRestart || false;
 
@@ -197,6 +197,7 @@ class JsonTimerSender extends EventEmitter {
       // });
 
       const streamAPI = api.getPublicStream(symbol);
+      streamAPI.removeAllListeners('message'); // не дублировать слушатель при повторном start на singleton-инстансе
       streamAPI.start();
       streamAPI.on('message', (data) => {
         this.emit('price', data);
@@ -208,7 +209,9 @@ class JsonTimerSender extends EventEmitter {
 
       this.readLoop();
 
-      console.log('🟢 Button Start:', this.symbol, this.strategy, 'Auto restart:', this.autoRestart);
+      const startMsg = `🟢 Start: ${this.symbol} | ${this.strategy} | restart: ${this.autoRestart}`;
+      console.log(startMsg);
+      logBus.log(startMsg);
     }
   }
 
@@ -225,13 +228,17 @@ class JsonTimerSender extends EventEmitter {
     this.timer = null;
     this.running[this.symbol] = false;
 
-    console.log('🛑 Button Stop:', this.symbol);
+    const stopMsg = `🛑 Stop: ${this.symbol}`;
+    console.log(stopMsg);
+    logBus.log(stopMsg);
     this.emit('stopped', this.symbol);
   }
 
   async restartCycle(obj = {}) {
     try {
-      console.log(`🔄 Restarting cycle for ${this.symbol}`);
+      const restartMsg = `🔄 Restarting cycle: ${this.symbol}`;
+      console.log(restartMsg);
+      logBus.log(restartMsg);
 
       // Get current price (and param ??)
       const data = await this.API.bookTicker({ symbol: this.symbol });

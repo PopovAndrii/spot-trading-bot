@@ -1,4 +1,4 @@
-<div class="nav info -nav-condenced">
+<div class="nav warning">
   <div class="nav-container">
     <div class="logo">
       <a class="" href="/">
@@ -17,7 +17,7 @@
       </li>
     </ul>
 
-    <a href="/login/logout" class="nav-container__logout UIb sm r-round ">
+    <a href="/login/logout" data-value="logout" class="nav-container__logout UIb sm r-round">
       Logout
     </a>
 
@@ -53,4 +53,8 @@
   }
 
   fetchActiveSymbols();
+
+  document.querySelector('.nav-container__logout')?.addEventListener('ui-button-change', () => {
+    window.location.href = '/login/logout';
+  });
 </script>

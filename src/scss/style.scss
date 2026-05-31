@@ -4,6 +4,7 @@
 
 @use 'button';
 @use 'currency';
+@use 'footer';
 @use 'icon';
 @use 'input-btn';
 @use 'line';
@@ -22,9 +23,15 @@ html {
 
 body {
   padding: 0px;
+  padding-bottom: 2.5rem;
   background-color: var.$c-g-50;
   color: var.$c-g-950;
   transition: background 0.3s ease;
+}
+
+.params-locked {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .color-primary {
@@ -45,4 +52,35 @@ body {
 .color-warning {
   color: var.$c-w-500;
   background-color: var.$c-w-100;
+}
+
+.server-address {
+  padding: 1rem 0;
+  // text-align: center;
+  font-size: 1.5rem;
+
+  &>span {
+    color: var.$c-p-700;
+  }
+}
+
+.api-keys {
+  display: grid;
+  gap: 2.5rem;
+
+  & a {
+    text-decoration: underline;
+    color: var.$c-w-700;
+  }
+
+  &__group {
+    display: grid;
+    // width: 100%;
+    gap: 0.5rem;
+  }
+
+  &__title {
+    font-size: 1.5rem;
+  }
+
 }

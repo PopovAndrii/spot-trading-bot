@@ -4,14 +4,6 @@
   display: grid;
   height: 3.5rem;
 
-  &-condenced {
-    height: auto;
-
-    &>.nav-container .active {
-      border-bottom: 1px solid $c-g-950;
-    }
-  }
-
   &-container {
     display: grid;
     gap: 1.0rem;

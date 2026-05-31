@@ -100,7 +100,12 @@ class StreamAPI extends EventEmitter {
 
     if (this.ws) {
       this.ws.removeAllListeners();
-      this.ws.close();
+      this.ws.on('error', () => {}); // noop — подавить unhandled error при закрытии
+      if (this.ws.readyState === 0 /* CONNECTING */) {
+        this.ws.terminate();
+      } else {
+        this.ws.close();
+      }
       this.ws = null;
     }
   }

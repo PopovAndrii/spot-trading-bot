@@ -6,7 +6,7 @@ import { SetStrategy } from './SetStrategy.js';
 import { SpotWS } from './SpotWS.js';
 import { Theme } from './ui/Theme.js';
 
-new UiElements.SpinBox();
+let spinBox = new UiElements.SpinBox();
 new UiElements.Switch();
 new UiElements.ButtonGroup();
 const sl = new UiElements.Select();
@@ -34,7 +34,12 @@ const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
   colors
 );
 
-const setStrategy = new SetStrategy(notifications);
+const setStrategy = new SetStrategy(notifications, () => {
+  // Recreate the SpinBox so that it re-reads the data-step 
+  // (the balance accuracy depends on the strategy, and the package locks the step during initialization).
+  spinBox.destroy();
+  spinBox = new UiElements.SpinBox();
+});
 
 new SpotWS(
   notifications,
