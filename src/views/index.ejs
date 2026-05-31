@@ -11,7 +11,7 @@
         <div class="line justify-start align-end">
 
           <div class="self-stretch">
-            <div class="UIselect lg expand info" id="selectCurrency" tabindex="0" role="listbox"
+            <div class="UIselect lg expand warning" id="selectCurrency" tabindex="0" role="listbox"
               aria-haspopup="listbox">
               <span class="UIselect-selected">Select Symbol</span>
               <span class="UIselect-arrow">
@@ -38,13 +38,40 @@
             </div>
           </div>
 
-          <a href="#" id="sendCurrency" data-value="" class="UIb lg g-1 success" aria-disabled="true">
+          <a href="#" id="sendCurrency" data-value="" class="UIb lg g-1 warning" aria-disabled="true">
             <span class="btn-label">Select currency!</span>
           </a>
         </div>
 
         <div class="server-address">
-          Server address: <%= serverIp || 'unavailable' %>
+          Server address: <span>
+            <%= serverIp || 'unavailable' %>
+          </span>
+        </div>
+
+        <div class="api-keys">
+          <% [['real', 'Real' ], ['test', 'Test' ]].forEach(([env, label])=> { const k = keys[env]; %>
+            <div class="api-keys__group" data-env="<%= env %>">
+              <div class="api-keys__title">
+                <%= label %> keys in .env file:
+                  <strong>
+                    <%= k.present ? 'present' : 'missing' %>
+                  </strong>
+              </div>
+              <div>key: <code><%= k.key ? k.key + '…' : '—' %></code></div>
+              <div>secret: <code><%= k.secret ? k.secret + '…' : '—' %></code></div>
+              <span>
+                <button type="button" class="UIb -sm g-1" data-value="<%= env %>" data-check="<%= env %>" <%=k.present
+                  ? '' : 'disabled' %>>
+                  Check <%= label %>
+                </button>
+              </span>
+              <span class="api-keys__status" aria-live="polite"></span>
+            </div>
+            <% }) %>
+              <span>
+                Get test keys <a href="https://testnet.binance.vision/" target="_blank">Binance Test keys</a>
+              </span>
         </div>
       </main>
       <%- include('../views/footer'); %>
