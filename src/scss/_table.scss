@@ -72,3 +72,15 @@
   white-space: nowrap;
   text-align: center;
 }
+
+// Responsive collapse: on tablet/phone (<=768px) hide the first two columns
+// (#, %) and the last two (Spent, Balance), keeping the 4 trading columns
+// (Buy currency, BUY, SELL, Sell currency). tr > * targets both th and td.
+@media (max-width: 768px) {
+  #settings-table tr > *:nth-child(1),
+  #settings-table tr > *:nth-child(2),
+  #settings-table tr > *:nth-last-child(1),
+  #settings-table tr > *:nth-last-child(2) {
+    display: none;
+  }
+}
