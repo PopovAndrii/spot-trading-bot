@@ -11,25 +11,21 @@
 //
 // entries  — реально исполненные ордера набора позиции:
 //            [{ executedQty, cummulativeQuoteQty }]  (BUY для long / SELL для short)
-// partial  — частично исполненный закрывающий ордер (его отменяем) или null:
-//            { executedQty, cummulativeQuoteQty }
+// closes   — частично исполненные закрывающие ордера (которые отменили) за цикл:
+//            массив [{ executedQty, cummulativeQuoteQty }] | один объект | null.
+//            За цикл их может быть несколько (SELL[0], SELL[1]…), вычитаем сумму.
 // strategy — 'long' | 'short'
 // feesPct  — profit% + commission% (например 0.45)
 //
 // Возвращает { quantity, avgEntryPrice, price } — сырые числа без округления
 // (округление по stepSize/tickSize делается на этапе применения), либо null,
 // если позиция уже полностью закрыта (остаток base <= 0).
-function rebalanceClose(entries, partial, strategy, feesPct) {
-  const sum = (key) => (entries || []).reduce((s, e) => s + (Number(e[key]) || 0), 0);
+function rebalanceClose(entries, closes, strategy, feesPct) {
+  const closeArr = Array.isArray(closes) ? closes : closes ? [closes] : [];
+  const sum = (arr, key) => (arr || []).reduce((s, e) => s + (Number(e[key]) || 0), 0);
 
-  const entryBase = sum('executedQty');
-  const entryQuote = sum('cummulativeQuoteQty');
-
-  const soldBase = Number(partial?.executedQty) || 0;
-  const soldQuote = Number(partial?.cummulativeQuoteQty) || 0;
-
-  const remainingBase = entryBase - soldBase;
-  const remainingQuote = entryQuote - soldQuote;
+  const remainingBase = sum(entries, 'executedQty') - sum(closeArr, 'executedQty');
+  const remainingQuote = sum(entries, 'cummulativeQuoteQty') - sum(closeArr, 'cummulativeQuoteQty');
 
   if (remainingBase <= 0) return null; // позиция уже закрыта целиком
 

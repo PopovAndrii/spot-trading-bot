@@ -131,6 +131,14 @@ class JsonTimerSender extends EventEmitter {
           orderId: result.message.orderId,
         };
 
+        // Этап 3a: фиксируем РЕАЛЬНОЕ исполнение в конфиг (cost basis для пересчёта).
+        // getOrder/cancelOrder возвращают полный ордер с этими полями; для cancel
+        // это финальные значения отменённого частичного ордера.
+        if (result.message.executedQty !== undefined) {
+          toObj.executedQty = parseFloat(result.message.executedQty) || 0;
+          toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
+        }
+
         // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
