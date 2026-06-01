@@ -129,6 +129,17 @@ async function askKeyPair(title, { required = false } = {}) {
   content = upsertEnv(content, 'NODE_ENV', nodeEnv);
   console.log(`   NODE_ENV=${nodeEnv}`);
 
+  // --- HTTP request logging level ---
+  // off — no request logs; app — app routes only (hides the static asset flood); all — everything.
+  const logAns = (await question('\nHTTP_LOG — [o]ff / [a]pp / a[l]l (default app): '))
+    .trim().toLowerCase();
+  const httpLog =
+    logAns.startsWith('o') ? 'off'
+      : (logAns === 'all' || logAns.startsWith('l')) ? 'all'
+        : 'app';
+  content = upsertEnv(content, 'HTTP_LOG', httpLog);
+  console.log(`   HTTP_LOG=${httpLog}`);
+
   // --- kys ---
   // Real — optional (without them, the application will fall back to testnet).
   const real = await askKeyPair('Real Binance keys');
