@@ -31,12 +31,52 @@
     font-weight: bold;
   }
 
+  // компактный адаптивный хедер: меньше паддинг, мельче текст,
+  // многословные заголовки переносятся на 2-ю строку (<br> в разметке)
+  & > thead th {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.8rem;
+    line-height: 1.1;
+    white-space: normal;
+    vertical-align: bottom;
+  }
+
   &.t-hover tbody tr:hover {
     z-index: 1;
+    background-color: $c-g-300;
+  }
+
+  // цветные статус-ячейки (color-*) имеют свой фон и перекрывают ховер строки —
+  // на ховере даём им тот же фон, что и обычным ячейкам (цветной текст остаётся)
+  &.t-hover tbody tr:hover td[class*="color-"] {
     background-color: $c-g-300;
   }
 
   & .center {
     text-align: center;
   }
+}
+
+// Контент ячейки: число + бейдж по центру по вертикали (flex вместо baseline,
+// иначе бейдж «ложится на дно»). inline-flex сохраняет ячейку как table-cell.
+.fill-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+// Реальное исполнение ордера — чип точно как фильтры в консоли (.console__filter):
+// без рамки, мягкая полупрозрачная заливка, текст по центру.
+.fill-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #aaa;
+  font-family: monospace;
+  font-size: 0.7rem;
+  font-weight: normal;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
 }

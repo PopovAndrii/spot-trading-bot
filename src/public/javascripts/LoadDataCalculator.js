@@ -128,6 +128,31 @@ export class LoadDataCalculator {
     return this.orderType[obj[type][index]['status']];
   }
 
+  // Бейдж с РЕАЛЬНЫМ исполнением ордера по смыслу колонки:
+  //   kind 'price' → реальная средняя цена (cummulativeQuoteQty / executedQty)
+  //   kind 'qty'   → реально исполненный объём (executedQty)
+  // Показываем только если ордер реально что-то исполнил (executedQty > 0).
+  #fillBadge(obj, type, index, kind) {
+    if (!obj || Object.keys(obj).length === 0) return '';
+    const o = obj[type]?.[index];
+    if (!o) return '';
+    const exec = Number(o.executedQty) || 0;
+    if (exec <= 0) return '';
+    const quote = Number(o.cummulativeQuoteQty) || 0;
+    const p = obj.param || {};
+
+    let out;
+    if (kind === 'price') {
+      const tick = parseInt(p['field-tickSize'], 10);
+      const price = quote / exec;
+      out = Number.isFinite(tick) ? price.toFixed(tick) : String(price);
+    } else {
+      const step = parseInt(p['field-stepSize'], 10);
+      out = Number.isFinite(step) ? exec.toFixed(step) : String(exec);
+    }
+    return `<span class="fill-badge" title="real ${kind}">${out}</span>`;
+  }
+
   async calculator(obj = {}) {
     try {
       const res = await fetch(`/spotbot/calculator/result`, {
@@ -153,10 +178,10 @@ export class LoadDataCalculator {
         const row = `<tr>
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
-              <td>${el.buyCurrency}</td>
-              <td class="${this.#backlight(obj, 'BUY', index)}">${el.buy}</td>
-              <td class="${this.#backlight(obj, 'SELL', index)}">${el.totalSell}</td>
-              <td>${el.sellCurrency}</td>
+              <td><span class="fill-cell">${el.buyCurrency}${this.#fillBadge(obj, 'BUY', index, 'price')}</span></td>
+              <td class="${this.#backlight(obj, 'BUY', index)}"><span class="fill-cell">${el.buy}${this.#fillBadge(obj, 'BUY', index, 'qty')}</span></td>
+              <td class="${this.#backlight(obj, 'SELL', index)}"><span class="fill-cell">${el.totalSell}${this.#fillBadge(obj, 'SELL', index, 'qty')}</span></td>
+              <td><span class="fill-cell">${el.sellCurrency}${this.#fillBadge(obj, 'SELL', index, 'price')}</span></td>
               <td>${el.didBuy}</td>
               <td>${el.calcBalance}</td>
           </tr>`;
