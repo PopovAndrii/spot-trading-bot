@@ -102,6 +102,9 @@ export class SpotWS {
               }
               this.#btnRule(false);
               this.isRunning = false;
+              // финальное обновление таблицы — показать итоговые статусы/цвета
+              // (синий на закрытом SELL) без перезагрузки страницы
+              this.loadDataFromFileCalculator.getStateCalculator();
             }
             break;
           case 'restartSync':

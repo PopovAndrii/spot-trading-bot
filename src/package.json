@@ -7,6 +7,7 @@
     "dev": "concurrently \"npm:watch-css\" \"npm:start\"",
     "start": "nodemon ./bin/www",
     "setup-user": "node ./bin/setup-user.js",
+    "test": "node --test",
     "prod-start": "pm2 start ./bin/www --name 'my-app' --env production",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",

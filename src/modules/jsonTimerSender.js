@@ -21,6 +21,8 @@ class JsonTimerSender extends EventEmitter {
     this.running = [];
     this.exchangeName = 'binance';
 
+    this.busy = false; // идёт ли проход #jobItaretor (защита от наслаивания)
+
     this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
   }
@@ -70,6 +72,9 @@ class JsonTimerSender extends EventEmitter {
       // never started 0
       for (const [key, val] of obj[strategy.side].entries()) {
 
+        // стоп нажат во время прохода — прерываем итератор, не дёргаем API дальше
+        if (!this.running[this.symbol]) return;
+
         if (obj[strategy.side][key]['status'] === "NEW" || obj[strategy.side][key]['status'] === null) {
           if (i === parseFloat(obj['param']['field-activeOrders'])) {
             return;
@@ -100,9 +105,11 @@ class JsonTimerSender extends EventEmitter {
 
             return;
           } else {
-            // final write
+            // сначала пишем ОСНОВНОЙ файл (статус DONE + date_modified + итоговые
+            // цвета), и только потом stop() → 'stopped'. Иначе клиент дёрнет
+            // финальный фетч таблицы раньше записи и снова покажет старое состояние.
+            await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
             this.stop();
-            await fs.writeFile(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
             return;
           }
 
@@ -131,6 +138,14 @@ class JsonTimerSender extends EventEmitter {
           orderId: result.message.orderId,
         };
 
+        // Этап 3a: фиксируем РЕАЛЬНОЕ исполнение в конфиг (cost basis для пересчёта).
+        // getOrder/cancelOrder возвращают полный ордер с этими полями; для cancel
+        // это финальные значения отменённого частичного ордера.
+        if (result.message.executedQty !== undefined) {
+          toObj.executedQty = parseFloat(result.message.executedQty) || 0;
+          toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
+        }
+
         // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
@@ -158,7 +173,15 @@ class JsonTimerSender extends EventEmitter {
       const content = await fs.readFile(this.#filePath(), 'utf8');
       const data = JSON.parse(content);
 
-      this.#jobItaretor(data);
+      // один проход за раз: если предыдущий ещё идёт — пропускаем тик, но
+      // планировщик не блокируем (устойчиво к медленным/зависшим запросам).
+      // stop() реагирует через guard внутри #jobItaretor (this.running).
+      if (!this.busy) {
+        this.busy = true;
+        this.#jobItaretor(data)
+          .catch((err) => console.error('jobItaretor:', err))
+          .finally(() => { this.busy = false; });
+      }
 
       this.interval = data['BUY'].length * data['param']['field-requestFrequency'];
 
@@ -174,6 +197,7 @@ class JsonTimerSender extends EventEmitter {
       console.error(this.#filePath(), 'Error reading file:', err);
     }
 
+    if (!this.running[this.symbol]) return; // остановлены во время прохода — не планируем следующий тик
     this.timer = setTimeout(() => this.readLoop(), this.interval);
   }
 

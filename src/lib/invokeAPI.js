@@ -47,11 +47,8 @@ class InvokeApi {
 
     const icon = status ? '✅' : '❌';
 
-    const d = new Date()
-    const parts = d.toUTCString().split(' ');
-    const formatted = `${parts[0].replace(',', '')} ${parts[2]} ${parts[1]} ${parts[4]}`;
-
-    const msg = `${formatted} ${icon} ${err}`;
+    // local time to web terminal ([HH:MM:SS] в ConsoleLog).
+    const msg = `${icon} ${err}`;
     console.log(msg);
     logBus.log(msg);
   }
@@ -164,6 +161,42 @@ class InvokeApi {
 
       this.getConsoleMsg(`getOrder(${data.id}) ${msg.join(' | ')}`);
       return { success: true, message: res.data };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
+
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
+    }
+  }
+
+  // Реальное исполнение ордера — точка проверки для частичных fill'ов.
+  // Возвращает распарсенные факты: сколько base исполнено, на сколько quote,
+  // и среднюю цену сделки (cummulativeQuoteQty / executedQty).
+  async getOrderFill(data) {
+    try {
+      const res = await this.client.getOrder(data.symbol, {
+        orderId: data.orderId,
+      });
+
+      const o = res.data || {};
+      const executedQty = parseFloat(o.executedQty) || 0;
+      const cummulativeQuoteQty = parseFloat(o.cummulativeQuoteQty) || 0;
+
+      const fill = {
+        status: o.status,
+        orderId: o.orderId,
+        side: o.side,
+        price: parseFloat(o.price) || 0, // лимитная цена ордера
+        origQty: parseFloat(o.origQty) || 0, // сколько запрашивали (base)
+        executedQty, // сколько РЕАЛЬНО исполнено (base)
+        cummulativeQuoteQty, // реально получено/потрачено (quote)
+        avgPrice: executedQty > 0 ? cummulativeQuoteQty / executedQty : 0, // средняя цена сделки
+      };
+
+      this.getConsoleMsg(
+        `getOrderFill(${data.id}) ${o.status} | exec ${executedQty} | quote ${cummulativeQuoteQty}`
+      );
+      return { success: true, message: fill };
     } catch (err) {
       const message = this.#getCatchMsg(err);
 

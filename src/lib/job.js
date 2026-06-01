@@ -1,3 +1,5 @@
+const { rebalanceClose } = require('./rebalanceClose');
+
 const Status = Object.freeze({
   REDY: 0, // 0 - can deletad. never started
   STARTED: 1, // 1 - in process. some order done
@@ -14,6 +16,46 @@ const state = Object.freeze({
   REJECTED: 'REJECTED', // Ордер был отклонён системой Binance (например, из-за ошибок)
   EXPIRED: 'EXPIRED', // Ордер истёк по времени (например, LIMIT GTC может быть отменён по тайм-ауту или из-за сетевых сбоев)
 });
+
+// Этап 3c: объём/цена закрывающего ордера с учётом реально проданного/выкупленного
+// в частично исполненных и отменённых закрытиях за цикл.
+// Возвращает { quantity, price } (строки, округлённые по step/tick) либо null —
+// тогда вызывающий использует предрасчётные значения из конфига.
+function rebalancedClose(obj, i, strategy) {
+  const entrySide = strategy === 'long' ? 'BUY' : 'SELL'; // чем набирали позицию
+  const closeSide = strategy === 'long' ? 'SELL' : 'BUY'; // чем закрываем
+
+  // Набор позиции: реально исполненные ордера 0..i.
+  const entries = [];
+  for (let k = 0; k <= i; k++) {
+    const e = obj[entrySide][k];
+    if (!e || e.status !== state.FILLED) continue;
+    if (e.executedQty === undefined || e.cummulativeQuoteQty === undefined) {
+      return null; // неполные данные (старый конфиг) → фолбэк на предрасчёт
+    }
+    entries.push(e);
+  }
+
+  // Закрытия, реально что-то закрывшие (частичные/отменённые с исполнением).
+  const closes = (obj[closeSide] || []).filter((c) => (Number(c.executedQty) || 0) > 0);
+  if (closes.length === 0) return null; // партиалов не было → предрасчёт
+
+  const profit = parseFloat(obj['param']['field-profit']) || 0;
+  const commission = parseFloat(obj['param']['field-commission']) || 0;
+
+  const res = rebalanceClose(entries, closes, strategy, profit + commission);
+  if (!res) return null; // позиция уже закрыта целиком
+
+  const stepSize = parseInt(obj['param']['field-stepSize'], 10) || 0;
+  const tickSize = parseInt(obj['param']['field-tickSize'], 10) || 0;
+  const stepPow = 10 ** stepSize;
+
+  return {
+    // floor по объёму — чтобы не пытаться закрыть больше, чем реально держим
+    quantity: (Math.floor(res.quantity * stepPow) / stepPow).toFixed(stepSize),
+    price: res.price.toFixed(tickSize),
+  };
+}
 
 class Job {
   constructor(test = false) {
@@ -61,6 +103,7 @@ class Job {
           }
 
           if (obj['SELL'][i].status === null) {
+            const reb = rebalancedClose(obj, i, 'long'); // null → предрасчёт
             return {
               status: null,
               method: 'newOrder',
@@ -72,8 +115,8 @@ class Job {
                 side: 'SELL',
                 type: 'LIMIT',
                 timeInForce: 'GTC',
-                quantity: obj['SELL'][i].quantity,
-                price: obj['SELL'][i].price,
+                quantity: reb ? reb.quantity : obj['SELL'][i].quantity,
+                price: reb ? reb.price : obj['SELL'][i].price,
               },
             };
           } else if (
@@ -208,6 +251,7 @@ class Job {
           }
 
           if (obj['BUY'][i].status === null) {
+            const reb = rebalancedClose(obj, i, 'short'); // null → предрасчёт
             return {
               status: null,
               method: 'newOrder',
@@ -219,8 +263,8 @@ class Job {
                 side: 'BUY',
                 type: 'LIMIT',
                 timeInForce: 'GTC',
-                quantity: obj['BUY'][i].quantity,
-                price: obj['BUY'][i].price,
+                quantity: reb ? reb.quantity : obj['BUY'][i].quantity,
+                price: reb ? reb.price : obj['BUY'][i].price,
               },
             };
           } else if (
