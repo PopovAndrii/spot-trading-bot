@@ -38,7 +38,11 @@ router.get('/logs', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // don't buffer SSE on a proxy (if one is added)
   res.flushHeaders();
+
+  // long-lived stream — drop the idle timeout on this response's socket
+  req.socket.setTimeout(0);
 
   const send = (e) => {
     if (res.writableEnded) return;
@@ -48,7 +52,19 @@ router.get('/logs', (req, res) => {
   logBus.history().forEach(send);
 
   const unsub = logBus.subscribe(send);
-  req.on('close', unsub);
+
+  // heartbeat: an SSE comment every 15s. Keeps the connection alive so an idle
+  // timeout (NAT/proxy/browser) won't drop it. If the socket is dead anyway,
+  // write throws / 'close' fires, and the client's EventSource reconnects.
+  const heartbeat = setInterval(() => {
+    if (res.writableEnded) return;
+    try { res.write(`: ping\n\n`); } catch { }
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsub();
+  });
 });
 
 module.exports = router;
