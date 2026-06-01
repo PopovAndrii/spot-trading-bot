@@ -47,11 +47,8 @@ class InvokeApi {
 
     const icon = status ? '✅' : '❌';
 
-    const d = new Date()
-    const parts = d.toUTCString().split(' ');
-    const formatted = `${parts[0].replace(',', '')} ${parts[2]} ${parts[1]} ${parts[4]}`;
-
-    const msg = `${formatted} ${icon} ${err}`;
+    // local time to web terminal ([HH:MM:SS] в ConsoleLog).
+    const msg = `${icon} ${err}`;
     console.log(msg);
     logBus.log(msg);
   }
