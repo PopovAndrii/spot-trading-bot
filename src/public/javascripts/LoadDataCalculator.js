@@ -128,10 +128,10 @@ export class LoadDataCalculator {
     return this.orderType[obj[type][index]['status']];
   }
 
-  // Бейдж с РЕАЛЬНЫМ исполнением ордера по смыслу колонки:
-  //   kind 'price' → реальная средняя цена (cummulativeQuoteQty / executedQty)
-  //   kind 'qty'   → реально исполненный объём (executedQty)
-  // Показываем только если ордер реально что-то исполнил (executedQty > 0).
+  // Badge showing the ACTUAL order execution based on the column value:
+  //   kind „price“ → actual average price (cummulativeQuoteQty / executedQty)
+  //   kind „qty“   → actual executed volume (executedQty)
+  // Show only if the order has actually executed (executedQty > 0).
   #fillBadge(obj, type, index, kind) {
     if (!obj || Object.keys(obj).length === 0) return '';
     const o = obj[type]?.[index];
