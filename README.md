@@ -34,6 +34,10 @@ On a Linux system, you need to create a file /src/.env with the following conten
 # production | development (development also starts the browser-sync dev server)
 NODE_ENV=production
 
+# HTTP request logging in the dev console: off | app | all  (default: app)
+#   off — no request logs;  app — app routes only (hides static asset flood);  all — everything
+HTTP_LOG=app
+
 ADMIN_LOGIN=admin
 # Generate login / password / secret with:  npm run setup-user
 # or manually: node -e "console.log(require('bcrypt').hashSync('your-password', 10))"
@@ -145,10 +149,17 @@ docker compose exec app bash -c "npm run setup-user"
 It asks for:
 - **Login** and **password** (min 8 chars) → stored as `ADMIN_LOGIN` + bcrypt `ADMIN_PASSWORD_HASH`; also generates `SESSION_SECRET` if it is empty.
 - **Mode** — `test` / `real` → `BINANCE_MODE`.
+- **NODE_ENV** — `production` / `development`.
+- **HTTP_LOG** — `off` / `app` / `all` → request logging level (see below).
 - **Real keys** — optional (`API_KEY` / `API_SECRET`).
 - **Test keys** — required (`API_KEY_TEST` / `API_SECRET_TEST`).
 
 Restart the app afterwards so it re-reads `.env`.
+
+`HTTP_LOG` controls request logging (morgan) in the dev console:
+- `off` → no request logs at all.
+- `app` (default) → log app routes, but skip static assets — hides the `GET /javascripts/...` flood.
+- `all` → log everything, including static assets.
 
 `BINANCE_MODE` selects which Binance to talk to, independent of `NODE_ENV` (which only controls dev tooling / browser-sync):
 - `BINANCE_MODE=test` → Binance testnet.

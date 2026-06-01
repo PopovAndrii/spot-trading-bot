@@ -58,18 +58,28 @@ app.use(
 );
 // #@popovandrii/ui-elements
 
-app.use(
-  logger('dev', {
-    skip: (req) => {
-      return [
-        '/api/ping',
-        '/api/logs',
-        '/login',
-        // '/spotbot'
-      ].some(path => req.originalUrl.startsWith(path));
-    }
-  })
-);
+// HTTP request logging level via env HTTP_LOG: off | app | all  (default: app)
+//   off — no request logs at all
+//   app — log app routes but skip static assets (js/css/images) — hides the GET /javascripts flood
+//   all — log everything, including static assets
+const HTTP_LOG = (process.env.HTTP_LOG || 'app').toLowerCase();
+
+if (HTTP_LOG !== 'off') {
+  const QUIET_PATHS = ['/api/ping', '/api/logs', '/login'];
+  const STATIC_EXT = /\.(?:js|mjs|css|map|svg|png|jpe?g|gif|ico|woff2?|ttf)$/i;
+
+  app.use(
+    logger('dev', {
+      skip: (req) => {
+        // always skip noisy polling / auth endpoints
+        if (QUIET_PATHS.some((p) => req.originalUrl.startsWith(p))) return true;
+        // in 'app' mode also skip static assets (the GET /javascripts flood)
+        if (HTTP_LOG === 'app' && STATIC_EXT.test(req.path)) return true;
+        return false;
+      },
+    })
+  );
+}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
