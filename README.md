@@ -172,6 +172,31 @@ docker compose -f compose.prod.yml exec app npx pm2 monit    # live CPU / RAM
 > The prod compose starts the app automatically via the entrypoint (`pm2-runtime`).
 > To run it by hand inside the container: `npm run prod-runtime`.
 
+## Release / versioning
+
+Releases live on `main` as semver tags (`vMAJOR.MINOR.PATCH`); `src/package.json`
+mirrors the tag. `main` = released line, `dev` = integration. Bump rule:
+**patch** = fixes, **minor** = features (backward-compatible), **major** = breaking.
+
+1. On `dev` (tested), bump the version — edits `package.json`, no tag yet:
+   ```sh
+   cd src && npm version <patch|minor|major> --no-git-tag-version
+   git commit -am "Release vX.Y.Z"
+   git push origin dev
+   ```
+2. Merge `dev → main` via a GitLab Merge Request (keep `main` protected: merge only via MR).
+3. Tag `main` and push the tag:
+   ```sh
+   git checkout main && git pull
+   git tag -a vX.Y.Z -m "Release vX.Y.Z — <one-line summary>"
+   git push origin vX.Y.Z
+   ```
+4. GitLab → **Deploy → Releases**: create a Release from tag `vX.Y.Z` and paste the
+   changelog (features / fixes) — that becomes the release page.
+
+> Keep the version in `package.json` equal to the tag. Never move or reuse a tag —
+> each version is a permanent snapshot.
+
 ## Account & API keys setup
 
 Interactive script that writes the login, password and Binance keys into `src/.env`:
