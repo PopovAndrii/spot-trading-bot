@@ -105,35 +105,21 @@ In Windows, create two identical files (the contents of the file above):
 ## Usage
 
 ```sh
-docker compouse up -d --build # Upload image and run. First start or update images
-docker compouse up -d # Only run. Typical work
-docker compouse down # Stop everything
-docker compouse ps # See the state of all containers in the project
-docker stats # Check container loads
-docker compouse exec app bush # Access the application
-npm start # Run a project
-npm run dev # Run a project with sass watching
-npm run build-css # Build only sass file
+docker compose up -d --build   # build image + start (first run / after image changes)
+docker compose up -d           # start (everyday)
+docker compose down            # stop everything
+docker compose ps              # container status
+docker stats                   # resource usage
+docker compose exec app bash   # shell into the container
 
-# If production mod (For install devdevDependencies)
-NODE_ENV=development npm install # for generete css style etc... 
-
-# start script pm2
-chmod +x docker-config/entrypoint.sh
-
-# Launch the application (production)
-docker compose exec app sh -c "npm run prod-start"
-# Application status information (cpu logs mem) 
-docker compose exec app sh -c "npm exec pm2 monit"
-# Logs
-docker compose exec app sh -c "npm exec pm2 logs my-app --lines 20"
-# Quick logs
-docker compose exec app sh -c "npm exec pm2 list"
-# For restart app after reboot server
-docker compose exec app sh -c "npm exec pm2 save"
-# Stop
-docker compose exec app sh -c "npm exec pm2 stop id|name|namespace"
+# inside the container (dev compose idles via `sleep infinity`):
+npm run dev                    # run with sass watch
+npm start                      # run without sass watch
+npm run build-css              # build CSS once
 ```
+
+> Production launch (compose.prod.yml, pm2-runtime, certs via proxy) is covered
+> in its own section below.
 
 ## Production launch (`compose.prod.yml`)
 
@@ -153,8 +139,15 @@ docker network create nginxproxymanager_proxy-network
 # 3. Create src/.env (login, keys, mode, region, HTTP_LOG):
 docker compose -f compose.prod.yml run --rm app npm run setup-user
 
-# 4. Install deps and build CSS (image has none — bind-mounted from host):
-docker compose -f compose.prod.yml run --rm app sh -c "npm ci && npm run build-css"
+# 4. Install dependencies (image has none — bind-mounted from host).
+#    NODE_ENV=production → installs prod deps only (incl. pm2-runtime).
+docker compose -f compose.prod.yml run --rm app npm ci
+
+# CSS: compiled public/stylesheets/style.css is committed — no build needed here.
+# (sass is a devDependency and is NOT installed under NODE_ENV=production.)
+# If you changed SCSS, rebuild on a dev machine and commit style.css. To build
+# once on the server, temporarily pull dev deps for that run only:
+#   docker compose -f compose.prod.yml run --rm -e NODE_ENV=development app sh -c "npm ci && npm run build-css"
 
 # entrypoint must be executable:
 chmod +x docker-config/entrypoint.sh
@@ -172,9 +165,8 @@ docker compose -f compose.prod.yml down            # stop
 **PM2 inside the running container** (optional — logs already go to `docker logs`):
 
 ```sh
-docker compose -f compose.prod.yml exec app npx pm2 list
-docker compose -f compose.prod.yml exec app npx pm2 monit
-docker compose -f compose.prod.yml exec app npx pm2 logs my-app --lines 20
+docker compose -f compose.prod.yml exec app npx pm2 list     # status, uptime, restarts
+docker compose -f compose.prod.yml exec app npx pm2 monit    # live CPU / RAM
 ```
 
 > The `npm run prod-start` commands above (daemon mode) are for the **dev** compose

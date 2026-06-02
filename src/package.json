@@ -27,7 +27,6 @@
     "express-session": "^1.19.0",
     "http-errors": "~2.0.1",
     "morgan": "^1.10.1",
-    "node-fetch": "^3.3.2",
     "pm2": "^7.0.1",
     "ws": "^8.21.0"
   },
