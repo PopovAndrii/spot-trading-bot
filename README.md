@@ -169,9 +169,8 @@ docker compose -f compose.prod.yml exec app npx pm2 list     # status, uptime, r
 docker compose -f compose.prod.yml exec app npx pm2 monit    # live CPU / RAM
 ```
 
-> The `npm run prod-start` commands above (daemon mode) are for the **dev** compose
-> (`command: sleep infinity`), where you start PM2 manually. The prod compose starts
-> it automatically via the entrypoint — don't run `prod-start` there.
+> The prod compose starts the app automatically via the entrypoint (`pm2-runtime`).
+> To run it by hand inside the container: `npm run prod-runtime`.
 
 ## Account & API keys setup
 
