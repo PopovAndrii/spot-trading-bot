@@ -135,6 +135,52 @@ docker compose exec app sh -c "npm exec pm2 save"
 docker compose exec app sh -c "npm exec pm2 stop id|name|namespace"
 ```
 
+## Production launch (`compose.prod.yml`)
+
+Production runs behind **nginx-proxy-manager** (external network, no published
+ports) and starts the app with **`pm2-runtime`** as PID 1 via
+`docker-config/entrypoint.sh` (foreground, graceful SIGTERM, logs to `docker logs`).
+
+**Prerequisites (one-time):**
+
+```sh
+# 1. The external proxy network must exist (created by your NPM stack, or):
+docker network create nginxproxymanager_proxy-network
+
+# 2. Create ./tmp, .bash_history and the ./.env → ./src/.env symlink:
+./init
+
+# 3. Create src/.env (login, keys, mode, region, HTTP_LOG):
+docker compose -f compose.prod.yml run --rm app npm run setup-user
+
+# 4. Install deps and build CSS (image has none — bind-mounted from host):
+docker compose -f compose.prod.yml run --rm app sh -c "npm ci && npm run build-css"
+
+# entrypoint must be executable:
+chmod +x docker-config/entrypoint.sh
+```
+
+**Launch / update:**
+
+```sh
+docker compose -f compose.prod.yml up -d --build   # build image + start
+docker compose -f compose.prod.yml ps              # status
+docker logs -f exchange-crypto-app                 # live app logs (pm2-runtime → stdout)
+docker compose -f compose.prod.yml down            # stop
+```
+
+**PM2 inside the running container** (optional — logs already go to `docker logs`):
+
+```sh
+docker compose -f compose.prod.yml exec app npx pm2 list
+docker compose -f compose.prod.yml exec app npx pm2 monit
+docker compose -f compose.prod.yml exec app npx pm2 logs my-app --lines 20
+```
+
+> The `npm run prod-start` commands above (daemon mode) are for the **dev** compose
+> (`command: sleep infinity`), where you start PM2 manually. The prod compose starts
+> it automatically via the entrypoint — don't run `prod-start` there.
+
 ## Account & API keys setup
 
 Interactive script that writes the login, password and Binance keys into `src/.env`:

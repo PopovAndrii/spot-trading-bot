@@ -9,6 +9,7 @@
     "setup-user": "node ./bin/setup-user.js",
     "test": "node --test",
     "prod-start": "pm2 start ./bin/www --name 'my-app' --env production",
+    "prod-runtime": "pm2-runtime start ./bin/www --name my-app",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "watch-css": "sass --style=compressed --no-source-map --watch scss/:public/stylesheets/"
