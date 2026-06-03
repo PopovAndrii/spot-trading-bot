@@ -105,35 +105,97 @@ In Windows, create two identical files (the contents of the file above):
 ## Usage
 
 ```sh
-docker compouse up -d --build # Upload image and run. First start or update images
-docker compouse up -d # Only run. Typical work
-docker compouse down # Stop everything
-docker compouse ps # See the state of all containers in the project
-docker stats # Check container loads
-docker compouse exec app bush # Access the application
-npm start # Run a project
-npm run dev # Run a project with sass watching
-npm run build-css # Build only sass file
+docker compose up -d --build   # build image + start (first run / after image changes)
+docker compose up -d           # start (everyday)
+docker compose down            # stop everything
+docker compose ps              # container status
+docker stats                   # resource usage
+docker compose exec app bash   # shell into the container
 
-# If production mod (For install devdevDependencies)
-NODE_ENV=development npm install # for generete css style etc... 
-
-# start script pm2
-chmod +x docker-config/entrypoint.sh
-
-# Launch the application (production)
-docker compose exec app sh -c "npm run prod-start"
-# Application status information (cpu logs mem) 
-docker compose exec app sh -c "npm exec pm2 monit"
-# Logs
-docker compose exec app sh -c "npm exec pm2 logs my-app --lines 20"
-# Quick logs
-docker compose exec app sh -c "npm exec pm2 list"
-# For restart app after reboot server
-docker compose exec app sh -c "npm exec pm2 save"
-# Stop
-docker compose exec app sh -c "npm exec pm2 stop id|name|namespace"
+# inside the container (dev compose idles via `sleep infinity`):
+npm run dev                    # run with sass watch
+npm start                      # run without sass watch
+npm run build-css              # build CSS once
 ```
+
+> Production launch (compose.prod.yml, pm2-runtime, certs via proxy) is covered
+> in its own section below.
+
+## Production launch (`compose.prod.yml`)
+
+Production runs behind **nginx-proxy-manager** (external network, no published
+ports) and starts the app with **`pm2-runtime`** as PID 1 via
+`docker-config/entrypoint.sh` (foreground, graceful SIGTERM, logs to `docker logs`).
+
+**Prerequisites (one-time):**
+
+```sh
+# 1. The external proxy network must exist (created by your NPM stack, or):
+docker network create nginxproxymanager_proxy-network
+
+# 2. Create ./tmp, .bash_history and the ./.env → ./src/.env symlink:
+./init
+
+# 3. Create src/.env (login, keys, mode, region, HTTP_LOG):
+docker compose -f compose.prod.yml run --rm app npm run setup-user
+
+# 4. Install dependencies (image has none — bind-mounted from host).
+#    NODE_ENV=production → installs prod deps only (incl. pm2-runtime).
+docker compose -f compose.prod.yml run --rm app npm ci
+
+# CSS: compiled public/stylesheets/style.css is committed — no build needed here.
+# (sass is a devDependency and is NOT installed under NODE_ENV=production.)
+# If you changed SCSS, rebuild on a dev machine and commit style.css. To build
+# once on the server, temporarily pull dev deps for that run only:
+#   docker compose -f compose.prod.yml run --rm -e NODE_ENV=development app sh -c "npm ci && npm run build-css"
+
+# entrypoint must be executable:
+chmod +x docker-config/entrypoint.sh
+```
+
+**Launch / update:**
+
+```sh
+docker compose -f compose.prod.yml up -d --build   # build image + start
+docker compose -f compose.prod.yml ps              # status
+docker logs -f exchange-crypto-app                 # live app logs (pm2-runtime → stdout)
+docker compose -f compose.prod.yml down            # stop
+```
+
+**PM2 inside the running container** (optional — logs already go to `docker logs`):
+
+```sh
+docker compose -f compose.prod.yml exec app npx pm2 list     # status, uptime, restarts
+docker compose -f compose.prod.yml exec app npx pm2 monit    # live CPU / RAM
+```
+
+> The prod compose starts the app automatically via the entrypoint (`pm2-runtime`).
+> To run it by hand inside the container: `npm run prod-runtime`.
+
+## Release / versioning
+
+Releases live on `main` as semver tags (`vMAJOR.MINOR.PATCH`); `src/package.json`
+mirrors the tag. `main` = released line, `dev` = integration. Bump rule:
+**patch** = fixes, **minor** = features (backward-compatible), **major** = breaking.
+
+1. On `dev` (tested), bump the version — edits `package.json`, no tag yet:
+   ```sh
+   cd src && npm version <patch|minor|major> --no-git-tag-version
+   git commit -am "Release vX.Y.Z"
+   git push origin dev
+   ```
+2. Merge `dev → main` via a GitLab Merge Request (keep `main` protected: merge only via MR).
+3. Tag `main` and push the tag:
+   ```sh
+   git checkout main && git pull
+   git tag -a vX.Y.Z -m "Release vX.Y.Z — <one-line summary>"
+   git push origin vX.Y.Z
+   ```
+4. GitLab → **Deploy → Releases**: create a Release from tag `vX.Y.Z` and paste the
+   changelog (features / fixes) — that becomes the release page.
+
+> Keep the version in `package.json` equal to the tag. Never move or reuse a tag —
+> each version is a permanent snapshot.
 
 ## Account & API keys setup
 

@@ -5,11 +5,11 @@ export class LoadDataCalculator {
     this.notifications = notifications;
     this._ignoreSelectChange = false;
     this.onRestartChange = null;
+    this._calcSeq = 0; // sequence token: drop stale async calculator() renders
 
     // Change any button settings param
     document.querySelector('#group-spinbox').addEventListener('ui-spinbox-change', (e) => {
       if (this.getListenerStatus()) {
-        document.querySelector('#settings-table tbody').innerHTML = '';
         this.getSettings();
         this.strategy = document.getElementById('field-strategy').value;
         this.calculator();
@@ -25,7 +25,6 @@ export class LoadDataCalculator {
     // Change claculate button
     document.querySelector('#settings-calculate').addEventListener('ui-button-change', () => {
       if (this.getListenerStatus()) {
-        document.querySelector('#settings-table tbody').innerHTML = '';
         this.getSettings();
         this.strategy = document.getElementById('field-strategy').value;
         this.calculator();
@@ -50,7 +49,6 @@ export class LoadDataCalculator {
       if (!hasStrategy) return;
 
       if (this.getListenerStatus()) {
-        document.querySelector('#settings-table tbody').innerHTML = '';
         this.getSettings();
         this.strategy = document.getElementById('field-strategy').value;
         this.calculator();
@@ -79,7 +77,6 @@ export class LoadDataCalculator {
   }
 
   calculate(obj) {
-    document.querySelector('#settings-table tbody').innerHTML = '';
     this.getSettings();
     this.strategy = document.getElementById('field-strategy').value;
     this.calculator(obj);
@@ -154,6 +151,10 @@ export class LoadDataCalculator {
   }
 
   async calculator(obj = {}) {
+    // Bump the token for this call. If a newer call starts while we await the
+    // fetch, ours becomes stale and must not touch the DOM (prevents the
+    // duplicated/“double” table from overlapping rapid recalcs).
+    const seq = ++this._calcSeq;
     try {
       const res = await fetch(`/spotbot/calculator/result`, {
         method: 'POST',
@@ -162,6 +163,8 @@ export class LoadDataCalculator {
       });
 
       const data = await res.json();
+
+      if (seq !== this._calcSeq) return; // superseded by a newer recalc → drop
 
       orders = {
         id: 'hash-hash',
@@ -174,8 +177,12 @@ export class LoadDataCalculator {
         SELL: [],
       };
 
+      // Build the whole tbody as one string, then write it once. `innerHTML += row`
+      // per iteration re-parses the entire tbody every time (O(n²)) and is the cause
+      // of the lag. One assignment also atomically replaces the old rows (no flash).
+      let html = '';
       data['calculator'].forEach((el, index) => {
-        const row = `<tr>
+        html += `<tr>
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
               <td><span class="fill-cell">${el.buyCurrency}${this.#fillBadge(obj, 'BUY', index, 'price')}</span></td>
@@ -185,7 +192,6 @@ export class LoadDataCalculator {
               <td>${el.didBuy}</td>
               <td>${el.calcBalance}</td>
           </tr>`;
-        document.querySelector('#settings-table tbody').innerHTML += row;
 
         orders['BUY'][index] = {
           status: null,
@@ -209,6 +215,8 @@ export class LoadDataCalculator {
           orderId: null,
         };
       });
+
+      document.querySelector('#settings-table tbody').innerHTML = html; // single DOM write
     } catch (err) {
       console.error('❌ calculator():', err);
       return null;

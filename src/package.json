@@ -1,6 +1,6 @@
 {
   "name": "www",
-  "version": "0.0.0",
+  "version": "1.0.2",
   "private": true,
   "scripts": {
     "build-css": "sass scss/:public/stylesheets/ --no-source-map",
@@ -8,7 +8,7 @@
     "start": "nodemon ./bin/www",
     "setup-user": "node ./bin/setup-user.js",
     "test": "node --test",
-    "prod-start": "pm2 start ./bin/www --name 'my-app' --env production",
+    "prod-runtime": "pm2-runtime start ./bin/www --name my-app",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "watch-css": "sass --style=compressed --no-source-map --watch scss/:public/stylesheets/"
@@ -25,15 +25,14 @@
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
     "http-errors": "~2.0.1",
-    "morgan": "^1.10.1",
-    "node-fetch": "^3.3.2",
+    "morgan": "^1.11.0",
     "pm2": "^7.0.1",
     "ws": "^8.21.0"
   },
   "devDependencies": {
     "browser-sync": "^3.0.4",
-    "concurrently": "^10.0.0",
-    "eslint": "^10.4.0",
+    "concurrently": "^10.0.3",
+    "eslint": "^10.4.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
     "nodemon": "^3.1.14",
