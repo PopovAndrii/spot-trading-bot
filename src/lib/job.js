@@ -124,7 +124,7 @@ class Job {
             obj['SELL'][i].status === state.PARTIALLY_FILLED
           ) {
             return {
-              status: state.NEW ? state.NEW : state.PARTIALLY_FILLED,
+              status: obj['SELL'][i].status,
               method: 'getOrder',
               side: 'SELL',
               id: i,
@@ -272,7 +272,7 @@ class Job {
             obj['BUY'][i].status === state.PARTIALLY_FILLED
           ) {
             return {
-              status: state.NEW ? state.NEW : state.PARTIALLY_FILLED,
+              status: obj['BUY'][i].status,
               method: 'getOrder',
               side: 'BUY',
               id: i,
