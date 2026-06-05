@@ -65,7 +65,14 @@ class Job {
   long = (obj, i, el) => {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-    if (el.status === state.FILLED && obj['SELL'][i].status === state.CANCELED) {
+    // Закрытие всей позиции висит на ОДНОМ sell верхнего исполненного buy-индекса;
+    // нижние sell отменяются как устаревшие — для них pass правилен. Но если sell
+    // верхнего индекса оказался CANCELED (отмена вручную; либо отмену поставил
+    // buy[i+1], который потом не исполнился), позиция остаётся без закрытия.
+    // Поэтому pass допустим ТОЛЬКО когда закрытие реально делегировано вверх,
+    // т.е. buy[i+1] тоже FILLED; иначе CANCELED трактуем как null и переставляем.
+    const higherFilled = obj['BUY'][i + 1]?.status === state.FILLED;
+    if (el.status === state.FILLED && obj['SELL'][i].status === state.CANCELED && higherFilled) {
       return { status: 'pass', method: false, side: null, id: i, data: {} };
     }
 
@@ -102,7 +109,7 @@ class Job {
             }
           }
 
-          if (obj['SELL'][i].status === null) {
+          if (obj['SELL'][i].status === null || obj['SELL'][i].status === state.CANCELED) {
             const reb = rebalancedClose(obj, i, 'long'); // null → предрасчёт
             return {
               status: null,
@@ -214,7 +221,11 @@ class Job {
   short = (obj, i, el) => {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-    if (el.status === state.FILLED && obj['BUY'][i].status === state.CANCELED) {
+    // Зеркально long: закрытие short висит на ОДНОМ buy верхнего исполненного
+    // sell-индекса. pass по отменённому buy допустим только когда закрытие
+    // делегировано вверх (sell[i+1] тоже FILLED); иначе переставляем.
+    const higherFilled = obj['SELL'][i + 1]?.status === state.FILLED;
+    if (el.status === state.FILLED && obj['BUY'][i].status === state.CANCELED && higherFilled) {
       return { status: 'pass', method: false, side: null, id: i, data: {} };
     }
 
@@ -250,7 +261,7 @@ class Job {
             }
           }
 
-          if (obj['BUY'][i].status === null) {
+          if (obj['BUY'][i].status === null || obj['BUY'][i].status === state.CANCELED) {
             const reb = rebalancedClose(obj, i, 'short'); // null → предрасчёт
             return {
               status: null,
