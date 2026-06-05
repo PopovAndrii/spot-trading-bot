@@ -181,18 +181,47 @@ mirrors the tag. `main` = released line, `dev` = integration. Bump rule:
 1. On `dev` (tested), bump the version — edits `package.json`, no tag yet:
    ```sh
    cd src && npm version <patch|minor|major> --no-git-tag-version
+   cd ..
    git commit -am "Release vX.Y.Z"
    git push origin dev
    ```
-2. Merge `dev → main` via a GitLab Merge Request (keep `main` protected: merge only via MR).
-3. Tag `main` and push the tag:
+2. Merge `dev → main` via a GitLab Merge Request (keep `main` protected: merge only via MR):
+   - GitLab → **Merge requests** → **New merge request**, source `dev` → target `main`.
+   - Title `Release vX.Y.Z`, paste the changelog (below) into the description, then merge.
+3. Tag `main` **after** the MR is merged, so the tag points at the release merge commit:
    ```sh
    git checkout main && git pull
    git tag -a vX.Y.Z -m "Release vX.Y.Z — <one-line summary>"
    git push origin vX.Y.Z
    ```
-4. GitLab → **Deploy → Releases**: create a Release from tag `vX.Y.Z` and paste the
-   changelog (features / fixes) — that becomes the release page.
+   The tag message is a single summary line; the full changelog goes on the Release page.
+4. GitLab → **Deploy → Releases** → **New release**:
+   - **Tag name**: pick the existing `vX.Y.Z` (do not create a new one).
+   - **Release title**: `vX.Y.Z`.
+   - **Release notes / description**: paste the changelog markdown (rendered on the page).
+
+### Changelog template
+
+Group changes by `Added` / `Changed` / `Fixed`; drop empty sections.
+
+```markdown
+## vX.Y.Z
+
+### Added
+- New features (backward-compatible).
+
+### Changed
+- Behaviour/UI/build tweaks.
+
+### Fixed
+- Bug fixes.
+```
+
+To list what shipped since the previous tag:
+
+```sh
+git log --oneline --no-merges <prev-tag>..HEAD
+```
 
 > Keep the version in `package.json` equal to the tag. Never move or reuse a tag —
 > each version is a permanent snapshot.
