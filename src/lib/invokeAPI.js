@@ -169,42 +169,6 @@ class InvokeApi {
     }
   }
 
-  // Реальное исполнение ордера — точка проверки для частичных fill'ов.
-  // Возвращает распарсенные факты: сколько base исполнено, на сколько quote,
-  // и среднюю цену сделки (cummulativeQuoteQty / executedQty).
-  async getOrderFill(data) {
-    try {
-      const res = await this.client.getOrder(data.symbol, {
-        orderId: data.orderId,
-      });
-
-      const o = res.data || {};
-      const executedQty = parseFloat(o.executedQty) || 0;
-      const cummulativeQuoteQty = parseFloat(o.cummulativeQuoteQty) || 0;
-
-      const fill = {
-        status: o.status,
-        orderId: o.orderId,
-        side: o.side,
-        price: parseFloat(o.price) || 0, // лимитная цена ордера
-        origQty: parseFloat(o.origQty) || 0, // сколько запрашивали (base)
-        executedQty, // сколько РЕАЛЬНО исполнено (base)
-        cummulativeQuoteQty, // реально получено/потрачено (quote)
-        avgPrice: executedQty > 0 ? cummulativeQuoteQty / executedQty : 0, // средняя цена сделки
-      };
-
-      this.getConsoleMsg(
-        `getOrderFill(${data.id}) ${o.status} | exec ${executedQty} | quote ${cummulativeQuoteQty}`
-      );
-      return { success: true, message: fill };
-    } catch (err) {
-      const message = this.#getCatchMsg(err);
-
-      this.getConsoleMsg(message, false);
-      return { success: false, message };
-    }
-  }
-
   async cancelOrder(data) {
     try {
       const res = await this.client.cancelOrder(data.symbol, {
