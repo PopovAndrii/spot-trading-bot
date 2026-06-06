@@ -1,8 +1,15 @@
 # Project guide for Claude
 
 Crypto trading bot for **Binance Spot** with an Express.js web UI. This file
-travels with the repo — it is the source of truth for project conventions
-(machine-local `~/.claude` memory is just a scratchpad and does not sync).
+travels with the repo — it is the source of truth for project conventions.
+Put durable conventions HERE, not in machine-local `~/.claude` memory: the host
+is treated as disposable (Docker provides isolation/consistency), so anything
+under `~/.claude` does not sync and won't exist on another machine.
+
+## Language
+
+- **Chat with the user in Russian.** Code, commits, comments, and docs stay in
+  English (see Git conventions).
 
 ## Runtime / environment
 
