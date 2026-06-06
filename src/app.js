@@ -17,17 +17,10 @@ const session = require('express-session');
 
 const app = express();
 
-if (process.env.NODE_ENV === 'development') {
-  const browserSync = require('browser-sync').create();
-  app.listen(3000, () => {
-    browserSync.init({
-      proxy: 'http://localhost:3000',
-      files: ['routes/*.js', 'views/*.ejs', 'public/**/*'],
-      open: false,
-      notify: false,
-    });
-  });
-}
+// NOTE: dev live-reload (browser-sync) lives in bin/www, where it proxies the
+// REAL server (the one with WebSocketRouter). Do NOT call app.listen() here —
+// it used to spawn a second, WS-less HTTP server and caused port confusion (req 23).
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
