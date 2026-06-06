@@ -72,19 +72,10 @@ export class LoadDataFromFileCalculator {
 
     syncSpinBoxButtons();
 
-    // table
-    obj['BUY'].forEach((el, index) => {
-      const row = `<tr>
-          <th scope="row">${index + 1}</th>
-          <td></td>
-          <td>${el.price}</td>
-          <td class="${this.orderType[el.status]}">${el.quantity}</td>
-          <td class="${this.orderType[obj['SELL'][index].status]}">${obj['SELL'][index].quantity}</td>
-          <td>${obj['SELL'][index].price}</td>
-          <td></td>
-          <td></td>
-      </tr>`;
-      document.querySelector('#settings-table tbody').innerHTML += row;
-    });
+    // Таблицу НЕ строим здесь: её авторитетно рендерит loadDataCalculator.calculate()
+    // (вызывается сразу после в getStateCalculator) одним `tbody.innerHTML = html` —
+    // со статус-цветами и бейджами реального исполнения. Дублирующий рендер тут
+    // дописывал строки `innerHTML += row` без очистки tbody → «двойная» таблица
+    // мелькала при каждом автоопросе робота (REQUIREMENTS.md п.26).
   }
 }
