@@ -26,19 +26,22 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
 app.set('trust proxy', 1); // for HTTPS secure: 'auto'
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    rolling: true, // продлевать сессию по активности (инактивити-таймаут)
-    cookie: {
-      secure: 'auto', // auto for HTTP/HTTPS
-      httpOnly: true,
-      maxAge: 2 * 60 * 60 * 1000,
-    },
-  })
-);
+
+// Single session middleware instance, reused for both HTTP routes and the
+// WebSocket upgrade handshake (req 24 — authorize WS, not only HTTP routes).
+const sessionMiddleware = session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  rolling: true, // продлевать сессию по активности (инактивити-таймаут)
+  cookie: {
+    secure: 'auto', // auto for HTTP/HTTPS
+    httpOnly: true,
+    maxAge: 2 * 60 * 60 * 1000,
+  },
+});
+app.use(sessionMiddleware);
+app.set('sessionMiddleware', sessionMiddleware); // bin/www reads it for WS upgrade
 
 // @popovandrii/ui-elements
 app.use(

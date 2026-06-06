@@ -18,7 +18,29 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
-new WebSocketRouter(server);
+const wsRouter = new WebSocketRouter();
+
+// Authorize the WebSocket handshake the same way HTTP routes are protected:
+// run the shared session middleware on the upgrade request and require a
+// logged-in session (unless STATUS_LOGIN=false). Without this, start/stop
+// trading and the price stream were reachable by any socket, bypassing
+// ensureAuthenticated (req 24 / 16).
+const sessionMiddleware = app.get('sessionMiddleware');
+
+server.on('upgrade', (req, socket, head) => {
+  sessionMiddleware(req, {}, () => {
+    const loginDisabled = process.env.STATUS_LOGIN === 'false';
+    const authed = req.session && req.session.user;
+
+    if (!loginDisabled && !authed) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    wsRouter.handleUpgrade(req, socket, head);
+  });
+});
 
 /**
  * Listen on provided port, on all network interfaces.
