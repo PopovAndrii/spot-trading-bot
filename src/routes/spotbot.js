@@ -5,6 +5,7 @@ const path = require('path');
 
 const { InvokeApi } = require('../lib/invokeAPI');
 const { Calculator } = require('../lib/calculator');
+const { writeFileAtomic } = require('../lib/atomicWrite');
 
 const API = new InvokeApi();
 
@@ -192,7 +193,7 @@ router.post('/calculator/save', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
 
-    await fs.writeFile(filePath, jsonString, 'utf8');
+    await writeFileAtomic(filePath, jsonString, 'utf8');
 
     res.json({ message: 'Order settings table saved' });
   } catch (err) {
@@ -227,7 +228,7 @@ router.post('/calculator/restart', async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid data for JSON' });
     }
 
-    await fs.writeFile(filePath, data, 'utf8');
+    await writeFileAtomic(filePath, data, 'utf8');
 
     const str = newData.restart == "true" ? "on" : "off";
 

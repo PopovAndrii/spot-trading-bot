@@ -6,6 +6,7 @@ const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
 const { Calculator } = require('../lib/calculator');
+const { writeFileAtomic } = require('../lib/atomicWrite');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
 
 const activeSymbols = new Set();
@@ -120,7 +121,7 @@ class JsonTimerSender extends EventEmitter {
 
           if (this.autoRestart) {
             // write old data
-            await fs.writeFile(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
+            await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
             await this.#sleep(500);
             this.restartCycle(obj);
@@ -131,7 +132,7 @@ class JsonTimerSender extends EventEmitter {
             // сначала пишем ОСНОВНОЙ файл (статус DONE + date_modified + итоговые
             // цвета), и только потом stop() → 'stopped'. Иначе клиент дёрнет
             // финальный фетч таблицы раньше записи и снова покажет старое состояние.
-            await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
+            await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
             this.stop();
             return;
           }
@@ -164,7 +165,7 @@ class JsonTimerSender extends EventEmitter {
 
           if (delta) {
             Object.assign(stored, delta);
-            await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
+            await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
           }
 
           await this.#sleep(100);
@@ -188,7 +189,7 @@ class JsonTimerSender extends EventEmitter {
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
 
-        await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
+        await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
 
         await this.#sleep(500);
       }
@@ -322,7 +323,7 @@ class JsonTimerSender extends EventEmitter {
 
       // Save to file
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
-      await fs.writeFile(filePath, JSON.stringify(tmp, null, 2), 'utf8');
+      await writeFileAtomic(filePath, JSON.stringify(tmp, null, 2), 'utf8');
 
       this.emit('restarted', { symbol: this.symbol, price });
 
