@@ -32,18 +32,12 @@ class InvokeApi {
     }
 
     this.client = new Spot(api_key || '', api_secret || '', { baseURL: baseURL });
-    this.data = null;
-    this.stateErrors = true;
 
     InvokeApi.instance = this;
   }
 
-  setData(obj = {}) {
-    this.data = obj;
-  }
-
   getConsoleMsg(err, status = true) {
-    if (!err || !this.stateErrors) return;
+    if (!err) return;
 
     const icon = status ? '✅' : '❌';
 
