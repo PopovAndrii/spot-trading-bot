@@ -29,6 +29,13 @@ class Pair {
   getActiveSymbols() {
     return Array.from(this.symbols.values());
   }
+
+  // Authoritative "is the bot running for this symbol" check, shared between the
+  // WS router (which sets START/STOP) and HTTP routes that must not overwrite a
+  // live order-state file (req 15). Unknown symbol → not running.
+  isRunning(symbol) {
+    return this.symbols.get(symbol)?.status === statusPair.START;
+  }
 }
 
 const pair = new Pair();

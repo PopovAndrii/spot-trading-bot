@@ -234,7 +234,9 @@ export class LoadDataCalculator {
       });
 
       const data = await res.json();
-      this.notifications.showNotification(data.message, 'success', 10000);
+      // 409 = server write lock: cycle is running (req 15). Surface as warning,
+      // not a green "success".
+      this.notifications.showNotification(data.message, res.ok ? 'success' : 'warning', 10000);
     } catch (err) {
       console.error('❌ settingsSave():', err);
       return null;
