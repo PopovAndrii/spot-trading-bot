@@ -215,6 +215,9 @@ Group changes by `Added` / `Changed` / `Fixed`; drop empty sections.
 
 ### Fixed
 - Bug fixes.
+
+### @TODO
+- High priority scheduled
 ```
 
 To list what shipped since the previous tag:
@@ -308,7 +311,6 @@ git pull origin main
 git tag -a v0.0.0 origin/main -m "Release 0.0.0"
 git push origin v0.0.0
 
-# 5 
 ```
 
 ## Config .vscode/settings.json in root dirrectory
