@@ -126,6 +126,17 @@ the singleton API/Stream patterns, and the `STATUS_APP` no-op flag when changing
   **Do NOT append a `Co-Copyright-By` / copyright trailer.**
 - **Timing:** don't `git commit` unprompted — the user batches related changes and
   says when to commit.
+- **Releases:** keep every release in the SAME style as the previous ones — do
+  not change the formatting from release to release. Rules:
+  - **English only**, never Russian.
+  - **No emoji** anywhere.
+  - **Don't change the markdown style** between releases — match how the prior
+    release was formatted.
+  - Single-line annotated tag message: `Release vX.Y.Z — <short summary>`, where
+    the summary is a concise comma/`+` separated list (e.g. `Release v1.0.3 —
+    fixes + rebalance closing logic, dynamic pairs, prod Docker`). Title is just
+    `vX.Y.Z`.
+  - Don't invent a new format or add/remove sections each time.
 
 ## Parked work
 
