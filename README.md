@@ -287,6 +287,30 @@ npx eslint /var/www/lib/job.js
 npx eslint /var/www/lib/job.js --fix
 ```
 
+### Releasing
+
+`dist/` is git-ignored, so always build before packing or publishing. Tags use the
+`vX.Y.Z` scheme and point at the merge commit on `main`.
+
+```sh
+# 1. Bump the version on dev (no auto-tag — we tag on main after the merge)
+npm version 0.0.0 --no-git-tag-version
+git commit -am "Version: 0.0.0"
+
+# 2. Push dev to GitLab
+git push origin dev
+
+# 3 Open a merge request dev -> main on GitLab, then merge it
+
+# 4. Tag the merged main (annotated) and push the tag
+git checkout main
+git pull origin main
+git tag -a v0.0.0 origin/main -m "Release 0.0.0"
+git push origin v0.0.0
+
+# 5 
+```
+
 ## Config .vscode/settings.json in root dirrectory
 VScode must have the ESlint plugin from Microsoft installed.
 ```json

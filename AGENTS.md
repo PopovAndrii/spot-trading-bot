@@ -1,10 +1,12 @@
-# Project guide for Claude
+# Project guide
 
-Crypto trading bot for **Binance Spot** with an Express.js web UI. This file
-travels with the repo — it is the source of truth for project conventions.
-Put durable conventions HERE, not in machine-local `~/.claude` memory: the host
-is treated as disposable (Docker provides isolation/consistency), so anything
-under `~/.claude` does not sync and won't exist on another machine.
+Crypto trading bot for **Binance Spot** with an Express.js web UI.
+
+## Environment Restrictions (Environment Boundaries)
+
+- You are not permitted to create hidden folders (e.g., `.my_agent_cache/`) in the root or within the project on the host machine.
+- Save all temporary build or test files exclusively to the standard system directory `/tmp` for this project.
+- Always clear your temporary files before ending your session.
 
 ## Language
 
@@ -61,8 +63,8 @@ the singleton API/Stream patterns, and the `STATUS_APP` no-op flag when changing
   Default new work to `dev` unless told otherwise; never merge to master or tag a
   version until the user confirms live testing passed.
 - **Commits:** write subject + bullet body in **English**, concise imperative
-  subject with a category prefix (`Fix:`, `Test:`, `Job:`) and a short bullet body.
-  **Do NOT append a `Co-Authored-By` / copyright trailer.**
+  subject with a category prefix (`Fix:`, `Test:`, `Job:`, `@TODO`) and a short bullet body.
+  **Do NOT append a `Co-Copyright-By` / copyright trailer.**
 - **Timing:** don't `git commit` unprompted — the user batches related changes and
   says when to commit.
 
