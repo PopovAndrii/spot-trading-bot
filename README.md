@@ -172,6 +172,21 @@ docker compose -f compose.prod.yml exec app npx pm2 monit    # live CPU / RAM
 > The prod compose starts the app automatically via the entrypoint (`pm2-runtime`).
 > To run it by hand inside the container: `npm run prod-runtime`.
 
+## Branching model
+
+- **`main`** — releases only. Every commit on it is a tested, tagged release.
+- **`dev`** — integration line for releases that are **not yet live-tested**.
+- **Topic branches are cut from a release** (`main` / a release tag). After their
+  commits are done they are **merged back into `dev`**, never straight into `main`.
+
+```
+release (main / tag) ──► topic branch ──commits──► merge into dev ──live test──► merge dev → main (new release)
+```
+
+So the lifecycle is: branch off a release → commit → merge into `dev` → live-test
+on `dev` → merge `dev` into `main` and tag the new version. Nothing reaches `main`
+until live testing on `dev` has passed.
+
 ## Release / versioning
 
 Releases live on `main` as semver tags (`vMAJOR.MINOR.PATCH`); `src/package.json`
