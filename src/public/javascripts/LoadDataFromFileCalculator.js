@@ -39,7 +39,7 @@ export class LoadDataFromFileCalculator {
       document.querySelector(`#${this.strategyName}`).checked = true
     }
 
-    if (res.data?.restart) {
+    if (res.data && 'restart' in res.data) {
       const sw = document.getElementById('settings-calculate-restart');
       const input = sw.querySelector('input');
 
