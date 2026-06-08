@@ -6,9 +6,33 @@ const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
 const { Calculator } = require('../lib/calculator');
+const { writeFileAtomic } = require('../lib/atomicWrite');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
 
 const activeSymbols = new Set();
+
+/**
+ * Решает, нужно ли персистить рост частичного исполнения ордера.
+ * Чистая функция — тестируется без биржи (REQUIREMENTS.md п.20).
+ *
+ * @param {Object} stored - сохранённый в конфиге ордер (obj[side][id]).
+ * @param {Object} message - ответ API (getOrder) по этому ордеру.
+ * @returns {{executedQty:number, cummulativeQuoteQty:number}|null}
+ *   поля для записи, либо null если писать нечего (статус не PARTIALLY_FILLED
+ *   или объём исполнения не вырос с прошлого опроса).
+ */
+function partialFillDelta(stored, message) {
+  if (!message || message.status !== 'PARTIALLY_FILLED') return null;
+  if (message.executedQty === undefined) return null;
+
+  const executedQty = parseFloat(message.executedQty) || 0;
+  const cummulativeQuoteQty = parseFloat(message.cummulativeQuoteQty) || 0;
+
+  // объём не изменился с прошлого опроса — лишняя запись в ФС не нужна
+  if (stored && stored.executedQty === executedQty) return null;
+
+  return { executedQty, cummulativeQuoteQty };
+}
 
 class JsonTimerSender extends EventEmitter {
   constructor(wss, strategy = null) {
@@ -97,7 +121,7 @@ class JsonTimerSender extends EventEmitter {
 
           if (this.autoRestart) {
             // write old data
-            await fs.writeFile(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
+            await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
             await this.#sleep(500);
             this.restartCycle(obj);
@@ -108,7 +132,7 @@ class JsonTimerSender extends EventEmitter {
             // сначала пишем ОСНОВНОЙ файл (статус DONE + date_modified + итоговые
             // цвета), и только потом stop() → 'stopped'. Иначе клиент дёрнет
             // финальный фетч таблицы раньше записи и снова покажет старое состояние.
-            await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
+            await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
             this.stop();
             return;
           }
@@ -128,9 +152,24 @@ class JsonTimerSender extends EventEmitter {
         }
 
         if (result.message.status === currentOrder.status) {
-          // ["PARTIALLY_FILLED"] or ["NEW"]
+          // Статус не сменился: ["NEW"] (писать нечего) или ["PARTIALLY_FILLED"].
+          // Для частичного исполнения реальный executedQty может расти между
+          // опросами, пока статус остаётся PARTIALLY_FILLED. Раньше мы делали
+          // continue до блока записи — фактический объём не попадал в файл, и
+          // (а) при рестарте сервера терялся, (б) пересчёт закрытия
+          // (rebalanceClose) не видел текущий партиал до его отмены/долива.
+          // Решение в чистой функции partialFillDelta (тестируется без биржи).
+          // См. REQUIREMENTS.md п.20.
+          const stored = obj[result.message.side]?.[currentOrder['id']];
+          const delta = partialFillDelta(stored, result.message);
+
+          if (delta) {
+            Object.assign(stored, delta);
+            await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
+          }
+
           await this.#sleep(100);
-          continue; /** no need to write to file */
+          continue;
         }
 
         const toObj = {
@@ -150,7 +189,7 @@ class JsonTimerSender extends EventEmitter {
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
 
-        await fs.writeFile(this.#filePath(), JSON.stringify(obj, null, 2));
+        await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
 
         await this.#sleep(500);
       }
@@ -284,7 +323,7 @@ class JsonTimerSender extends EventEmitter {
 
       // Save to file
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
-      await fs.writeFile(filePath, JSON.stringify(tmp, null, 2), 'utf8');
+      await writeFileAtomic(filePath, JSON.stringify(tmp, null, 2), 'utf8');
 
       this.emit('restarted', { symbol: this.symbol, price });
 
@@ -339,3 +378,4 @@ class JsonTimerSender extends EventEmitter {
 }
 
 module.exports = JsonTimerSender;
+module.exports.partialFillDelta = partialFillDelta;

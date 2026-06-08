@@ -3,12 +3,22 @@ const JsonTimerSender = require('../modules/jsonTimerSender.js');
 const { pair, statusPair } = require('./pair.js');
 
 class WebSocketRouter {
-  constructor(server) {
-    this.wss = new WebSocket.Server({ server });
+  constructor() {
+    // noServer: the HTTP server's 'upgrade' event is handled in bin/www, which
+    // authorizes the session BEFORE handing the socket to handleUpgrade() (req 24).
+    this.wss = new WebSocket.Server({ noServer: true });
     this.clients = new Map();
     this.timerSenders = new Map();
 
     this.setup();
+  }
+
+  // Called from bin/www after the session has been validated on the upgrade
+  // request. Completes the WS handshake and emits 'connection'.
+  handleUpgrade(req, socket, head) {
+    this.wss.handleUpgrade(req, socket, head, (ws) => {
+      this.wss.emit('connection', ws, req);
+    });
   }
 
   setup() {

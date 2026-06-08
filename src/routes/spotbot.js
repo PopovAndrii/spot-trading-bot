@@ -5,6 +5,8 @@ const path = require('path');
 
 const { InvokeApi } = require('../lib/invokeAPI');
 const { Calculator } = require('../lib/calculator');
+const { writeFileAtomic } = require('../lib/atomicWrite');
+const { pair } = require('../lib/pair');
 
 const API = new InvokeApi();
 
@@ -171,6 +173,14 @@ router.post('/calculator/save', async (req, res, next) => {
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const exchangeName = 'binance';
 
+    // Server-side write lock (req 15): refuse to overwrite a live order-state
+    // file while the bot is running for this symbol. The UI already locks the
+    // Save button (req 7), but a direct POST (stale tab, reload mid-tick) would
+    // bypass it and wipe orderId/status/executedQty. Stop the cycle first.
+    if (pair.isRunning(symbol)) {
+      return res.status(409).json({ message: 'Cycle is running — press "Stop" before saving' });
+    }
+
     const msg = req.body.message;
     if (
       !Array.isArray(msg.BUY) ||
@@ -192,7 +202,7 @@ router.post('/calculator/save', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
 
-    await fs.writeFile(filePath, jsonString, 'utf8');
+    await writeFileAtomic(filePath, jsonString, 'utf8');
 
     res.json({ message: 'Order settings table saved' });
   } catch (err) {
@@ -227,7 +237,7 @@ router.post('/calculator/restart', async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid data for JSON' });
     }
 
-    await fs.writeFile(filePath, data, 'utf8');
+    await writeFileAtomic(filePath, data, 'utf8');
 
     const str = newData.restart == "true" ? "on" : "off";
 

@@ -18,7 +18,29 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
-new WebSocketRouter(server);
+const wsRouter = new WebSocketRouter();
+
+// Authorize the WebSocket handshake the same way HTTP routes are protected:
+// run the shared session middleware on the upgrade request and require a
+// logged-in session (unless STATUS_LOGIN=false). Without this, start/stop
+// trading and the price stream were reachable by any socket, bypassing
+// ensureAuthenticated (req 24 / 16).
+const sessionMiddleware = app.get('sessionMiddleware');
+
+server.on('upgrade', (req, socket, head) => {
+  sessionMiddleware(req, {}, () => {
+    const loginDisabled = process.env.STATUS_LOGIN === 'false';
+    const authed = req.session && req.session.user;
+
+    if (!loginDisabled && !authed) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    wsRouter.handleUpgrade(req, socket, head);
+  });
+});
 
 /**
  * Listen on provided port, on all network interfaces.
@@ -26,6 +48,21 @@ new WebSocketRouter(server);
 
 server.listen(port, '0.0.0.0', () => {
   console.log('Server is running on port ' + port);
+
+  // Dev live-reload: browser-sync proxies the REAL server (this one, which has
+  // the WebSocketRouter) instead of a separate WS-less listener. `ws: true`
+  // forwards WebSocket upgrades to the target so trading start/stop works on the
+  // browser-sync port too. (req 23 — merged the two dev HTTP servers into one.)
+  if (process.env.NODE_ENV === 'development') {
+    const browserSync = require('browser-sync').create();
+    browserSync.init({
+      proxy: { target: 'http://localhost:' + port, ws: true },
+      port: 3000,
+      files: ['routes/*.js', 'views/*.ejs', 'public/**/*'],
+      open: false,
+      notify: false,
+    });
+  }
 });
 server.on('error', onError);
 server.on('listening', onListening);
