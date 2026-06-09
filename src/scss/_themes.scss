@@ -114,7 +114,11 @@
   --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
 
-[data-theme='dark'] {
+// NB: the selector is intentionally scoped to `html` to raise specificity to
+// (0,1,1). @popovandrii/ui-elements ships its own light `:root` palette inside
+// dist/style.css, which is loaded after this file; a plain `[data-theme=dark]`
+// (0,1,0) would be overridden by that later `:root` and break theme switching.
+html[data-theme='dark'] {
 
   /*color Danger*/
   --c-d-50: var(--d-950);
