@@ -103,6 +103,41 @@ export class LoadDataCalculator {
     });
   }
 
+  // Active orders / Request frequency: эти спинбоксы вынесены из #group-spinbox и
+  // НЕ блокируются во время работы. Любое изменение пишется в файл на лету —
+  // робот перечитывает конфиг на каждом проходе readLoop, поэтому новые значения
+  // подхватываются на следующем тике. На таблицу-расчёт они не влияют (см. calculator.js).
+  runtimeParams() {
+    const keys = ['field-activeOrders', 'field-requestFrequency'];
+    document.addEventListener('ui-spinbox-change', (e) => {
+      const key = e.detail?.id;
+      if (!keys.includes(key)) return;
+      this.saveRuntimeParam(key, e.detail.value);
+    });
+  }
+
+  async saveRuntimeParam(key, value) {
+    const obj = {
+      'pair': base + quote,
+      'key': key,
+      'value': value,
+    };
+
+    try {
+      const res = await fetch(`/spotbot/calculator/param`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: obj }),
+      });
+
+      const data = await res.json();
+      this.notifications.showNotification(data.message, res.ok ? 'success' : 'warning', 5000);
+    } catch (err) {
+      console.error('❌ saveRuntimeParam():', err);
+      return null;
+    }
+  }
+
   getSettings() {
     const strategyList = document.querySelector('[id^="strategyList"]');
 

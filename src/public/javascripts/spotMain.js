@@ -26,12 +26,14 @@ const colors = {
 const loadDataCalculator = new LoadDataCalculator(notifications, colors);
 loadDataCalculator.save();
 loadDataCalculator.restart();
+loadDataCalculator.runtimeParams();
 
 const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
   sl,
   notifications,
   loadDataCalculator,
-  colors
+  colors,
+  () => spinBox
 );
 
 const setStrategy = new SetStrategy(notifications, () => {

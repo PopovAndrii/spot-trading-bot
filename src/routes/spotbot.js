@@ -248,6 +248,52 @@ router.post('/calculator/restart', async (req, res, next) => {
   }
 });
 
+// Live-обновление параметров, не влияющих на расчётную таблицу: Active orders и
+// Request frequency. Эти спинбоксы НЕ блокируются на время работы (вынесены из
+// #group-spinbox), и их изменения должны попадать в файл прямо во время цикла —
+// робот перечитывает конфиг на каждом проходе readLoop. В отличие от /save, здесь
+// НЕТ guard isRunning: правка точечная (только param[key]), ордера не трогаются.
+router.post('/calculator/param', async (req, res, next) => {
+  try {
+    const msg = req.body.message || {};
+    const rawPair = msg.pair;
+    if (!rawPair) {
+      return res.status(400).json({ message: 'Pair is required' });
+    }
+
+    const ALLOWED = ['field-activeOrders', 'field-requestFrequency'];
+    if (!ALLOWED.includes(msg.key)) {
+      return res.status(400).json({ message: 'Invalid param key' });
+    }
+
+    const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
+    const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
+
+    const content = await fs.readFile(filePath, 'utf8');
+    const data = JSON.parse(content);
+
+    if (!data.param || typeof data.param !== 'object') {
+      data.param = {};
+    }
+    data.param[msg.key] = String(msg.value);
+
+    let jsonString;
+    try {
+      jsonString = JSON.stringify(data, null, 2);
+    } catch (err) {
+      console.error('Invalid data for JSON:', err);
+      return res.status(400).json({ message: 'Invalid data for JSON' });
+    }
+
+    await writeFileAtomic(filePath, jsonString, 'utf8');
+
+    res.json({ message: `${msg.key} = <b>${msg.value}</b> saved for ${symbol}` });
+  } catch (err) {
+    console.error('Error saving param:', err);
+    res.status(500).json({ message: 'Error saving param' });
+  }
+});
+
 router.post('/cancel/allorders', async (req, res, next) => {
   const rawSymbol = req.body.message;
   if (!rawSymbol) {

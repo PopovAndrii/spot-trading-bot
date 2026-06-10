@@ -236,11 +236,14 @@ export class SpotWS {
     document.querySelector('.UIbg')?.classList.toggle('params-locked', lock);
     document.getElementById('group-spinbox')?.classList.toggle('params-locked', lock);
 
+    // Блокируем Calculate и Save на время работы. Именно атрибут disabled, а не
+    // класс: пакет UIb гасит клик/события только по :disabled / [aria-disabled],
+    // CSS-правила для класса .disabled у UIb нет.
     const settingsCalculate = document.getElementById('settings-calculate');
-    settingsCalculate.classList.toggle('disabled', Boolean(status));
+    settingsCalculate.disabled = Boolean(status);
 
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
-    settingsCalculateSave.classList.toggle('disabled', Boolean(status));
+    settingsCalculateSave.disabled = Boolean(status);
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
     cancelAllOrders.disabled = Boolean(status);

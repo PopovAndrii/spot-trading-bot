@@ -86,14 +86,28 @@
                 <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step:
                   2 }); %>
               </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-activeOrders' , label:'Active orders' , min:2, max:50,
-                  step:0 }); %>
-              </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-requestFrequency' , label:'Request frequency' , min:1000,
-                  max:5000, step:0 }); %>
-              </div>
+            </div>
+          </div>
+
+          <!-- Эти параметры остаются доступными во время работы робота: Active orders /
+               Request frequency / Restart. Поэтому они вынесены ИЗ #group-spinbox, который
+               блокируется (.params-locked) на время цикла. Их изменения пишутся в файл
+               на лету (см. LoadDataCalculator.runtimeParams / Restart). -->
+          <div id="group-runtime" class="line">
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-activeOrders' , label:'Active orders' , min:2, max:50,
+                step:0 }); %>
+            </div>
+            <div class="">
+              <%- include('../views/ui/SpinBox', { id:'field-requestFrequency' , label:'Request frequency' , min:1000,
+                max:5000, step:0 }); %>
+            </div>
+            <div class="UIsw info -lg r-1 label-top" role="switch" tabindex="0" id="settings-calculate-restart">
+              <label class="UIsw-label" for="restart">Restart</label>
+              <input type="checkbox" id="restart" name="btn3" checked hidden>
+              <span class="UIsw-slider"></span>
+              <span class="UIsw-slider__on">on</span>
+              <span class="UIsw-slider__off">off</span>
             </div>
           </div>
 
@@ -120,15 +134,6 @@
                 </svg>
               </button>
             </div>
-            <div>
-              <div class="UIsw info lg r-1" role="switch" tabindex="0" id="settings-calculate-restart">
-                <label class="UIsw-label" for="restart">Restart</label>
-                <input type="checkbox" id="restart" name="btn3" checked hidden>
-                <span class="UIsw-slider"></span>
-                <span class="UIsw-slider__on">on</span>
-                <span class="UIsw-slider__off">off</span>
-              </div>
-            </div>
           </div>
 
         </form>
@@ -142,7 +147,9 @@
               <th>BUY</th>
               <th>SELL</th>
               <th>Sell<br>currency</th>
-              <th>Spent<br><%= quote %></th>
+              <th>Spent<br>
+                <%= quote %>
+              </th>
               <th>Balance</th>
             </tr>
           </thead>

@@ -1,10 +1,11 @@
-import { syncSpinBoxButtons } from './ui/spinboxSync.js';
-
 export class LoadDataFromFileCalculator {
-  constructor(select, notifications, loadDataCalculator, colors) {
+  constructor(select, notifications, loadDataCalculator, colors, getSpinBox) {
     this.selectObjectElement = select;
     this.notifications = notifications;
     this.loadDataCalculator = loadDataCalculator;
+    // Геттер текущего инстанса SpinBox: он пересоздаётся при смене стратегии
+    // (setStrategy → destroy + new), поэтому держим функцию, а не прямую ссылку.
+    this.getSpinBox = getSpinBox;
 
     this.orderType = colors;
 
@@ -66,11 +67,20 @@ export class LoadDataFromFileCalculator {
 
     if (Object.keys(obj).length === 0) return;
 
+    const spinBox = this.getSpinBox?.();
     document.querySelectorAll('[id^="field-"]').forEach((el) => {
-      document.getElementById(el.id).value = obj.param[el.id] ? obj.param[el.id] : null;
+      const value = obj.param[el.id] ?? '';
+      const spin = el.closest('.UIsp');
+      // Спинбоксы: setValue({ silent }) ставит значение И синхронизирует стрелки +/-
+      // БЕЗ эмита ui-spinbox-change (иначе на каждом авто-опросе шли бы лишние
+      // пересчёты и live-записи). flash:false — без анимации на фоновом обновлении.
+      // Скрытые поля (strategy/tickSize/stepSize) — обычным присваиванием.
+      if (spin && spinBox) {
+        spinBox.setValue(spin, value, { silent: true, flash: false });
+      } else {
+        el.value = value;
+      }
     });
-
-    syncSpinBoxButtons();
 
     // Таблицу НЕ строим здесь: её авторитетно рендерит loadDataCalculator.calculate()
     // (вызывается сразу после в getStateCalculator) одним `tbody.innerHTML = html` —

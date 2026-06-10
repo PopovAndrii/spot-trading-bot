@@ -1,5 +1,3 @@
-import { syncSpinBoxButtons } from './ui/spinboxSync.js';
-
 export class SetStrategy {
   constructor(notifications, onFormatChange) {
     this.notifications = notifications;
@@ -104,9 +102,9 @@ export class SetStrategy {
     if (depositSpin) depositSpin.setAttribute('data-step', data['balanceFormat']);
 
     // Reload the SpinBox, otherwise the modified data-step won't take effect.
+    // Пересоздание (destroy + new) заново сканирует все .UIsp и в scan() вызывает
+    // state() по каждому — стрелки +/- синхронизируются сами, ручной sync не нужен.
     this.onFormatChange?.();
-
-    syncSpinBoxButtons();
   }
 
   #getStaticText() {
