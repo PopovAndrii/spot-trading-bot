@@ -182,7 +182,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 ## 3. WebSockets
 
 ### Сервер ↔ браузер
-- **Мёртвый broadcast полного конфига каждый тик** —
+- ✅ РЕШЕНО (ветка `table-push`). **Мёртвый broadcast полного конфига каждый тик** —
   `jsonTimerSender.js:228-234` шлёт `{type:'data', data}` **всем** клиентам
   `wss.clients` (не только подписанным на символ), а фронт (`SpotWS.js`) матчит
   только `message.event` и это сообщение полностью игнорирует. Вместо этого
@@ -190,6 +190,13 @@ notification + логBus; лучше — бесконечный reconnect с cap
   полного JSON-конфига N раз в секунду впустую + утечка данных одного символа
   клиентам другого. Выбрать одно: либо убрать рассылку, либо (лучше) сделать её
   событием `event: 'tableData'` по комнате символа и убрать 20-секундный поллинг.
+
+  > Сделано (вариант push): `jsonTimerSender` эмитит `tableData`, роутер шлёт
+  > его только комнате символа. На фронте `applyState(data)` — единый путь
+  > применения конфига для fetch и push; 20-секундный поллинг удалён
+  > (единичный fetch остался на старте и после Stop — финальные цвета).
+  > Заодно: `disconnect()` снимал не тот listener ('click' вместо
+  > 'ui-button-change') — исправлено.
 - **Нет ping/pong к браузерным клиентам** — ws-сервер не пингует; зомби-сокеты
   (закрытый ноутбук, обрыв NAT) висят в `this.clients` Sets неопределённо долго.
   Стандартный паттерн `ws`: `isAlive`/`ping` интервалом 30 с + `terminate()`.
@@ -296,7 +303,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 6 | ✅ Server-side clamp runtime-параметров + 429-backoff | `spotbot.js`, `invokeAPI.js` | S |
 | 7 | ✅ Восстановление после рестарта (скан data/, лок Save) | `bin/www`, `pair.js` | M |
 | 8 | ✅ Юнит-тесты на `job.js` (state machine) | `src/test/` | M |
-| 9 | Убрать мёртвый broadcast `type:'data'` или сделать push-обновление таблицы | router + `SpotWS.js` | M |
+| 9 | ✅ Убрать мёртвый broadcast `type:'data'` или сделать push-обновление таблицы | router + `SpotWS.js` | M |
 | 10 | Включить `UserStreamAPI` (executionReport вместо опроса) | `jsonTimerSender.js` | L |
 | 11 | helmet + sameSite + file session store + fail-fast SECRET | `app.js` | S |
 | 12 | Graceful shutdown (SIGTERM) | `bin/www` | S |

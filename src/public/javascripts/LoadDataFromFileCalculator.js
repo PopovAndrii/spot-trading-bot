@@ -32,19 +32,29 @@ export class LoadDataFromFileCalculator {
     );
 
     if (Object.keys(res.data).length === 0) return;
-    // console.log(res.data.param['field-strategy']);
 
-    this.strategyName = res.data.param['field-strategy'];
+    this.applyState(res.data);
+  }
+
+  /**
+   * Применяет конфиг пары к UI (стратегия, свитч Restart, спинбоксы, таблица).
+   * Единый путь для начального fetch (getStateCalculator) и push-обновлений
+   * 'tableData' по WebSocket (SpotWS) — поллинг /spotbot/table больше не нужен.
+   */
+  applyState(data) {
+    if (!data || !data.param) return;
+
+    this.strategyName = data.param['field-strategy'];
 
     if (this.strategyName) {
       document.querySelector(`#${this.strategyName}`).checked = true
     }
 
-    if (res.data && 'restart' in res.data) {
+    if ('restart' in data) {
       const sw = document.getElementById('settings-calculate-restart');
       const input = sw.querySelector('input');
 
-      if (String(res.data.restart) === 'true') {
+      if (String(data.restart) === 'true') {
         input.checked = true
         input.setAttribute('checked', '')
         sw.setAttribute('aria-checked', 'true');
@@ -55,8 +65,8 @@ export class LoadDataFromFileCalculator {
       }
     }
 
-    this.#fillInData(res.data);
-    this.loadDataCalculator.calculate(res.data);
+    this.#fillInData(data);
+    this.loadDataCalculator.calculate(data);
   }
 
   async #fillInData(obj) {

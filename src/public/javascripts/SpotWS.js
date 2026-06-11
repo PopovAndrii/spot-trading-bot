@@ -64,46 +64,30 @@ export class SpotWS {
               this.#btnRule(true);
               this.notifications.showNotification('Table data loaded. Bot in progress.', 'success');
               this.isRunning = true;
-
-              if (!this.interval) {
-                this.loadDataFromFileCalculator.getStateCalculator();
-                this.interval = setInterval(() => {
-                  if (this.#isWebSocketOpen(this.ws)) {
-                    this.loadDataFromFileCalculator.getStateCalculator();
-                  }
-                }, 20000);
-              }
+              // начальная отрисовка; дальше таблица приходит push-событием
+              // 'tableData' на каждом тике робота — поллинг не нужен
+              this.loadDataFromFileCalculator.getStateCalculator();
             } else {
               // Бот не запущен (в т.ч. после падения/рестарта сервера) — снять блокировку
               this.#btnRule(false);
               this.isRunning = false;
-              if (this.interval) {
-                clearInterval(this.interval);
-                this.interval = null;
-              }
             }
+            break;
+          case 'tableData':
+            // push полного конфига от readLoop (только наша комната символа)
+            this.loadDataFromFileCalculator.applyState(message.data);
             break;
           case 'updateTableData':
             if (message.data === 1) {
               this.#btnRule(true);
               this.isRunning = true;
-              if (!this.interval) {
-                this.interval = setInterval(() => {
-                  if (this.#isWebSocketOpen(this.ws)) {
-                    this.loadDataFromFileCalculator.getStateCalculator();
-                  }
-                }, 20000);
-              }
             }
             if (message.data === 0) {
-              if (this.interval) {
-                clearInterval(this.interval);
-                this.interval = null;
-              }
               this.#btnRule(false);
               this.isRunning = false;
               // финальное обновление таблицы — показать итоговые статусы/цвета
-              // (синий на закрытом SELL) без перезагрузки страницы
+              // (синий на закрытом SELL) без перезагрузки страницы; push больше
+              // не придёт (цикл остановлен), поэтому единичный fetch
               this.loadDataFromFileCalculator.getStateCalculator();
             }
             break;
@@ -135,11 +119,6 @@ export class SpotWS {
         this.notifications.showNotification(`Web Socket Reconnecting...`, 'warning');
         this.connectWebSocket();
       }, 2000);
-
-      if (this.interval) {
-        clearInterval(this.interval);
-        this.interval = null;
-      }
     };
 
     this.ws.onerror = (err) => {
@@ -155,14 +134,9 @@ export class SpotWS {
       this.ws = null;
     }
 
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
-    }
-
     const startBtn = document.getElementById('startBtn');
     if (startBtn && this.btnClickHandler) {
-      startBtn.removeEventListener('click', this.btnClickHandler);
+      startBtn.removeEventListener('ui-button-change', this.btnClickHandler);
     }
   }
 

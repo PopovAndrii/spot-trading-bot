@@ -100,6 +100,13 @@ class WebSocketRouter {
                 }
               });
 
+              // полный конфиг каждый тик readLoop — только подписчикам символа
+              ts.on('tableData', (tableData) => {
+                for (const client of this.clients.get(currentSymbol) || []) {
+                  this.safeSend(client, { event: 'tableData', data: tableData });
+                }
+              });
+
               ts.on('streamState', (state) => {
                 for (const client of this.clients.get(state.symbol) || []) {
                   this.safeSend(client, {

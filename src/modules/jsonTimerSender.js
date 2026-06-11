@@ -252,14 +252,11 @@ class JsonTimerSender extends EventEmitter {
         Number(data['BUY'].length * data['param']['field-requestFrequency']) || 5000
       );
 
-      // needs for update teble on UI
-      const message = JSON.stringify({ type: 'data', data });
-
-      this.wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-          client.send(message);
-        }
-      });
+      // push-обновление таблицы (ANALYSIS п.9): раньше полный конфиг шёл ВСЕМ
+      // клиентам как {type:'data'} — фронт его игнорировал (матчит только
+      // event) и поллил /spotbot/table каждые 20 с. Теперь websocketRouter
+      // рассылает событие 'tableData' только комнате этого символа.
+      this.emit('tableData', data);
     } catch (err) {
       console.error(this.#filePath(), 'Error reading file:', err);
     }
