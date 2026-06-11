@@ -13,7 +13,7 @@ middleware, write-lock на Save во время цикла, sequence-токен
 
 ## 1. Критичное (может уронить процесс или деньги)
 
-### 1.1. Краш сервера от одного WS-сообщения без `symbol`
+### 1.1. ✅ РЕШЕНО (ждёт лайв-теста). Краш сервера от одного WS-сообщения без `symbol`
 `src/lib/websocketRouter.js:38` — `data.symbol.toUpperCase()` без проверки.
 Авторизованный клиент, отправивший `{"type":"subscribe"}` (без `symbol`), бросает
 TypeError внутри обработчика `ws.on('message')` → `uncaughtException` → падение
@@ -22,7 +22,12 @@ TypeError внутри обработчика `ws.on('message')` → `uncaughtEx
 (whitelist `type`, обязательный `symbol` по формату `/^[A-Z0-9]{3,20}$/`) и
 `try/catch` вокруг всего тела обработчика.
 
-### 1.2. Тугая петля `readLoop` при ошибке чтения конфига
+> Исправлено (коммит `d7f1807`): whitelist типов, формат символа, whitelist
+> стратегий (null допустим на subscribe — фронт шлёт его до загрузки конфига),
+> `start` без валидной стратегии отбивается (раньше молча запускал long),
+> весь обработчик в try/catch.
+
+### 1.2. ✅ РЕШЕНО (ждёт лайв-теста). Тугая петля `readLoop` при ошибке чтения конфига
 `src/modules/jsonTimerSender.js:225,240` — `this.interval` присваивается только при
 успешном чтении. Если первый тик упал (файла нет, битый JSON) или
 `data.param['field-requestFrequency']` отсутствует/NaN, то
@@ -30,7 +35,10 @@ TypeError внутри обработчика `ws.on('message')` → `uncaughtEx
 чтения ФС + спам в лог на полной скорости CPU. Нужен дефолт и нижний clamp:
 `this.interval = Math.max(1000, Number(...) || 5000)`.
 
-### 1.3. Гонка: `#jobItaretor` затирает live-правки параметров
+> Исправлено (коммит `d7f1807`): clamp на присвоении (мин. 1 с, дефолт 5 с) +
+> фоллбэк `|| 5000` в setTimeout на случай падения первого тика.
+
+### 1.3. ✅ РЕШЕНО (ветка `param-race`, не закоммичено). Гонка: `#jobItaretor` затирает live-правки параметров
 Робот читает файл в начале тика (`readLoop`), долго ходит по ордерам (sleep
 100–500 мс на ордер) и пишет **весь** устаревший `obj` целиком
 (`jsonTimerSender.js:168,192`). Если в этот момент пользователь сменил
@@ -40,6 +48,11 @@ TypeError внутри обработчика `ws.on('message')` → `uncaughtEx
 lost update. Варианты: перечитывать `param` непосредственно перед записью и
 мерджить; либо писать из итератора только изменённые ордера; либо однопроцессная
 очередь записи на файл (mutex по symbol).
+
+> Исправлено: `#mergeLiveEdits(obj)` перечитывает файл и подмешивает свежие
+> `param`/`restart` перед каждой записью итератора (3 точки) и перед решением
+> об autoRestart в DONE-ветке. Ордера не мерджатся — их единственный писатель
+> во время цикла сам итератор (Save закрыт write-lock'ом).
 
 ### 1.4. ✅ РЕШЕНО. Молчаливая смерть прайс-стрима
 `src/lib/streamAPI.js:147-151` — после 5 неудачных реконнектов эмитится
@@ -71,10 +84,10 @@ notification + логBus; лучше — бесконечный reconnect с cap
 ## 2. Бэкенд
 
 ### Баги
-- **`POST /calculator/restart` всегда отвечает «off»** —
+- ✅ РЕШЕНО (коммит `d7f1807`). **`POST /calculator/restart` всегда отвечает «off»** —
   `src/routes/spotbot.js:231,242`: сначала `newData.restart = String(...) === 'true'`
   (boolean), затем `newData.restart == "true"` — `true == "true"` это `false`,
-  поэтому `str` всегда `"off"`. Сравнивать надо с самим boolean.
+  поэтому `str` всегда `"off"`. Сравнивать надо с самим boolean. → теперь `=== true`.
 - **Нет проверки `result.success` в роутах** — `spotbot.js:33,111,140`:
   при ошибке API `message` — строка, и `exchangeInfo.message.symbols[0]` /
   `account.message.balances.find` бросают TypeError → 500-страница вместо
@@ -249,11 +262,11 @@ notification + логBus; лучше — бесконечный reconnect с cap
 
 | # | Что | Где | Усилие |
 |---|-----|-----|--------|
-| 1 | Валидация WS-сообщений + try/catch обработчика (краш) | `websocketRouter.js` | S |
-| 2 | Clamp/дефолт интервала `readLoop` (тугая петля) | `jsonTimerSender.js` | S |
-| 3 | Фикс «всегда off» в `/calculator/restart` | `spotbot.js:242` | S |
+| 1 | ✅ Валидация WS-сообщений + try/catch обработчика (краш) | `websocketRouter.js` | S |
+| 2 | ✅ Clamp/дефолт интервала `readLoop` (тугая петля) | `jsonTimerSender.js` | S |
+| 3 | ✅ Фикс «всегда off» в `/calculator/restart` | `spotbot.js:242` | S |
 | 4 | ✅ Реакция на `maxReconnectReached` / бесконечный backoff | `streamAPI.js` + router | S |
-| 5 | Гонка param: мердж перед записью итератора | `jsonTimerSender.js` | M |
+| 5 | ✅ Гонка param: мердж перед записью итератора | `jsonTimerSender.js` | M |
 | 6 | Server-side clamp runtime-параметров + 429-backoff | `spotbot.js`, `invokeAPI.js` | S |
 | 7 | Восстановление после рестарта (скан data/, лок Save) | `bin/www`, `pair.js` | M |
 | 8 | Юнит-тесты на `job.js` (state machine) | `src/test/` | M |

@@ -83,6 +83,24 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
+   * Подмешивает в obj свежие live-правки из файла перед записью итератора.
+   * Проход #jobItaretor долгий (sleep на каждый ордер) и пишет ВЕСЬ obj целиком:
+   * без мерджа правка param (/calculator/param) или restart (/calculator/restart),
+   * сделанная во время прохода, молча терялась — lost update (ANALYSIS.md п.1.3).
+   * Ордера (BUY/SELL) не трогаем: их единственный писатель во время цикла — сам
+   * итератор (Save заблокирован write-lock'ом, пока пара running).
+   */
+  async #mergeLiveEdits(obj) {
+    try {
+      const fresh = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
+      if (fresh.param) obj.param = fresh.param;
+      if ('restart' in fresh) obj.restart = fresh.restart;
+    } catch {
+      // файла нет/битый — пишем что есть; writeFileAtomic не даст битого JSON
+    }
+  }
+
+  /**
    * Iterates through the entire table of placed orders.
    * @param {Object} obj - Configuration of order data from file or database.
    * @returns {Stop()} - Stop the cycle.
@@ -116,6 +134,9 @@ class JsonTimerSender extends EventEmitter {
 
           obj.status = Status.DONE;
           obj.date_modified = new Date().toISOString();
+
+          // свежий restart: свитч могли переключить во время прохода
+          await this.#mergeLiveEdits(obj);
 
           this.autoRestart = obj.restart == true ? true : false;
 
@@ -165,6 +186,7 @@ class JsonTimerSender extends EventEmitter {
 
           if (delta) {
             Object.assign(stored, delta);
+            await this.#mergeLiveEdits(obj);
             await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
           }
 
@@ -189,6 +211,7 @@ class JsonTimerSender extends EventEmitter {
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
 
+        await this.#mergeLiveEdits(obj);
         await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
 
         await this.#sleep(500);
