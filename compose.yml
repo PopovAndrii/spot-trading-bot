@@ -16,6 +16,8 @@ services:
             - exchange-crypto
         ports:
             - ${PORT:-3002}:${PORT:-3002}
+            # browser-sync (live-reload) — чтобы работал и http://localhost:3000
+            - 3000:3000
         env_file:
             # required:false — контейнер стартует даже без .env (его создаст setup-user)
             - path: .env
@@ -25,7 +27,12 @@ services:
             STATUS_APP: ${STATUS_APP:-false}
             STATUS_LOGIN: ${STATUS_LOGIN:-true}
             PORT: ${PORT:-3002}
-        command: ["sleep", "infinity"]
+        # Автостарт dev-сервера (sass watch + nodemon + browser-sync): раньше был
+        # sleep infinity, и после рестарта контейнера приложение «не работало»,
+        # пока npm run dev не запустят руками. Фоллбэк в sleep — если dev-сервер
+        # не смог стартовать (нет node_modules и т.п.), контейнер остаётся живым,
+        # чтобы можно было зайти и починить.
+        command: ["bash", "-c", "npm run dev || sleep infinity"]
 
     # --- nginx ОТКЛЮЧЁН (не нужен) ---
     # Это PHP-прокси (fastcgi_pass → :9000, root src/php/) от старой PHP-версии,
