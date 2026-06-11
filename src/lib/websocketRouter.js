@@ -74,6 +74,18 @@ class WebSocketRouter {
               }
             });
 
+            ts.on('streamState', (state) => {
+              for (const client of this.clients.get(state.symbol) || []) {
+                this.safeSend(client, {
+                  event: 'notification',
+                  data: {
+                    message: state.message,
+                    type: state.up ? 'success' : 'warning',
+                  },
+                });
+              }
+            });
+
             ts.on('restarted', (data) => {
               console.log(`🔄 Cycle restarted for ${data.symbol} at price ${data.price}`);
 

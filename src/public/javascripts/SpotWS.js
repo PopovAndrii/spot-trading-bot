@@ -110,6 +110,10 @@ export class SpotWS {
           case 'restartSync':
             this.#updateRestartSwitch(message.data);
             break;
+          case 'notification':
+            // generic server-side notification (e.g. price stream lost/restored)
+            this.notifications.showNotification(message.data.message, message.data.type || 'info');
+            break;
           case 'updatePrice':
             const text = document.querySelector('.stream-currency');
 

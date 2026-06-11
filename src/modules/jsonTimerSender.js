@@ -260,10 +260,26 @@ class JsonTimerSender extends EventEmitter {
       // });
 
       const streamAPI = api.getPublicStream(symbol);
-      streamAPI.removeAllListeners('message'); // не дублировать слушатель при повторном start на singleton-инстансе
+      // не дублировать слушатели при повторном start на singleton-инстансе
+      streamAPI.removeAllListeners('message');
+      streamAPI.removeAllListeners('maxReconnectReached');
+      streamAPI.removeAllListeners('reconnected');
       streamAPI.start();
       streamAPI.on('message', (data) => {
         this.emit('price', data);
+      });
+
+      // Длительный сбой прайс-стрима: реконнект продолжается в фоне
+      // (capped backoff в StreamAPI), но UI должен знать, что цена замерла.
+      streamAPI.on('maxReconnectReached', () => {
+        const msg = `⚠️ ${symbol}: price stream lost, reconnecting in background...`;
+        logBus.log(msg);
+        this.emit('streamState', { symbol, up: false, message: msg });
+      });
+      streamAPI.on('reconnected', () => {
+        const msg = `🟢 ${symbol}: price stream restored`;
+        logBus.log(msg);
+        this.emit('streamState', { symbol, up: true, message: msg });
       });
 
       this.running[symbol] = true;
