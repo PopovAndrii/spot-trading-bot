@@ -6,7 +6,7 @@ const path = require('path');
 const { InvokeApi } = require('../lib/invokeAPI');
 const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
-const { pair } = require('../lib/pair');
+const { pair, statusPair } = require('../lib/pair');
 
 const API = new InvokeApi();
 
@@ -181,6 +181,17 @@ router.post('/calculator/save', async (req, res, next) => {
       return res.status(409).json({ message: 'Cycle is running — press "Stop" before saving' });
     }
 
+    // Recovery-лок (ANALYSIS п.1.5): рестарт сервера прервал цикл посередине —
+    // в файле живые ордера (NEW/PARTIALLY_FILLED), они висят на бирже, но цикл
+    // по ним не возобновлён. Save затёр бы их orderId — потеря контроля над
+    // реальными ордерами. Завершённые циклы (DONE, без живых ордеров) скан
+    // не помечает — их Save перезаписывает как обычно.
+    if (pair.needsAttention(symbol)) {
+      return res.status(409).json({
+        message: 'Server was restarted with live orders — press "Start" to resume or cancel orders before saving',
+      });
+    }
+
     const msg = req.body.message;
     if (
       !Array.isArray(msg.BUY) ||
@@ -326,6 +337,12 @@ router.post('/cancel/allorders', async (req, res, next) => {
 
   if (!result.success) {
     return res.status(500).json(result);
+  }
+
+  // Живых ордеров на бирже больше нет — снять recovery-лок (ANALYSIS п.1.5),
+  // иначе Save останется заблокированным до перезапуска цикла.
+  if (pair.needsAttention(symbol)) {
+    pair.updateSymbol({ symbol, status: statusPair.STOP });
   }
 
   res.json(result);

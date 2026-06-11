@@ -131,6 +131,19 @@ class WebSocketRouter {
             const ts = this.timerSenders.get(currentSymbol);
             const status = ts.getSpotStatus(currentSymbol);
             this.safeSend(ws, { event: 'spotStatus', data: status });
+
+            // recovery-скан пометил символ: живые ордера на бирже без цикла
+            if (pair.needsAttention(currentSymbol)) {
+              this.safeSend(ws, {
+                event: 'notification',
+                data: {
+                  message:
+                    `⚠️ ${currentSymbol}: server was restarted while orders were live. ` +
+                    'Cycle is NOT running — press Start to resume, or cancel orders. Save is locked.',
+                  type: 'warning',
+                },
+              });
+            }
           }
 
           if (data.type === 'start' && currentSymbol) {

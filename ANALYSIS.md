@@ -68,7 +68,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 > пишет в logBus и ре-эмитит `streamState`; `websocketRouter` рассылает
 > клиентам символа событие `notification`; `SpotWS.js` показывает его в UI.
 
-### 1.5. Состояние «running» не переживает рестарт сервера
+### 1.5. ✅ РЕШЕНО (ветка `restart-recovery`). Состояние «running» не переживает рестарт сервера
 `pair` и `timerSenders` живут в памяти. После рестарта контейнера:
 - цикл не возобновляется автоматически (открытые ордера остаются висеть на бирже,
   файл хранит их состояние, но `#jobItaretor` по ним больше не ходит);
@@ -78,6 +78,15 @@ notification + логBus; лучше — бесконечный reconnect с cap
 Стоит при старте сканировать `src/data/*.json` со `status === STARTED|REDY` +
 ордерами в статусе NEW/PARTIALLY_FILLED и либо авто-резюмировать цикл, либо как
 минимум помечать символ «требует внимания» в UI и блокировать Save.
+
+> Исправлено (безопасный минимум, без авто-резюма): `lib/recovery.js` —
+> `scanLiveCycles()` находит конфиги с живыми ордерами (NEW/PARTIALLY_FILLED +
+> orderId), архивы и битые файлы пропускаются; покрыт юнит-тестами.
+> `bin/www` при старте помечает такие символы новым статусом
+> `statusPair.ATTENTION` (+ console/logBus). Save отвечает 409, при subscribe
+> клиент получает warning-нотификацию. Возобновление — кнопка Start (state
+> цикла в файле), либо Cancel all orders (снимает лок → STOP). Повторный
+> subscribe не затирает ATTENTION (addSymbol сохраняет статус существующего).
 
 ---
 
@@ -274,7 +283,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 4 | ✅ Реакция на `maxReconnectReached` / бесконечный backoff | `streamAPI.js` + router | S |
 | 5 | ✅ Гонка param: мердж перед записью итератора | `jsonTimerSender.js` | M |
 | 6 | ✅ Server-side clamp runtime-параметров + 429-backoff | `spotbot.js`, `invokeAPI.js` | S |
-| 7 | Восстановление после рестарта (скан data/, лок Save) | `bin/www`, `pair.js` | M |
+| 7 | ✅ Восстановление после рестарта (скан data/, лок Save) | `bin/www`, `pair.js` | M |
 | 8 | Юнит-тесты на `job.js` (state machine) | `src/test/` | M |
 | 9 | Убрать мёртвый broadcast `type:'data'` или сделать push-обновление таблицы | router + `SpotWS.js` | M |
 | 10 | Включить `UserStreamAPI` (executionReport вместо опроса) | `jsonTimerSender.js` | L |
