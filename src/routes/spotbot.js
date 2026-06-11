@@ -239,7 +239,9 @@ router.post('/calculator/restart', async (req, res, next) => {
 
     await writeFileAtomic(filePath, data, 'utf8');
 
-    const str = newData.restart == "true" ? "on" : "off";
+    // newData.restart выше приведён к boolean — сравнение со строкой "true"
+    // всегда давало false и ответ «off» (ANALYSIS.md п.2, баги)
+    const str = newData.restart === true ? "on" : "off";
 
     res.json({ message: `Restart for: ${symbol} is <b>${str}</b>` });
   } catch (err) {

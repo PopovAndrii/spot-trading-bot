@@ -222,7 +222,12 @@ class JsonTimerSender extends EventEmitter {
           .finally(() => { this.busy = false; });
       }
 
-      this.interval = data['BUY'].length * data['param']['field-requestFrequency'];
+      // clamp: битые/отсутствующие параметры дают NaN|0 → setTimeout(…, NaN)
+      // сработал бы через 0 мс — тугая петля чтения ФС (ANALYSIS.md п.1.2)
+      this.interval = Math.max(
+        1000,
+        Number(data['BUY'].length * data['param']['field-requestFrequency']) || 5000
+      );
 
       // needs for update teble on UI
       const message = JSON.stringify({ type: 'data', data });
@@ -237,7 +242,8 @@ class JsonTimerSender extends EventEmitter {
     }
 
     if (!this.running[this.symbol]) return; // остановлены во время прохода — не планируем следующий тик
-    this.timer = setTimeout(() => this.readLoop(), this.interval);
+    // this.interval может быть не присвоен, если чтение упало на первом тике
+    this.timer = setTimeout(() => this.readLoop(), this.interval || 5000);
   }
 
   async start(symbol, strategy, options = {}) {
