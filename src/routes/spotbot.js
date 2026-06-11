@@ -263,10 +263,24 @@ router.post('/calculator/param', async (req, res, next) => {
       return res.status(400).json({ message: 'Pair is required' });
     }
 
-    const ALLOWED = ['field-activeOrders', 'field-requestFrequency'];
-    if (!ALLOWED.includes(msg.key)) {
+    // Server-side clamp (ANALYSIS п.2): UI-минимумы спинбоксов легко обходятся
+    // прямым POST, а requestFrequency=1 × getOrder на каждый ордер — риск бана
+    // Binance (-1003/418). Границы зеркалят SpinBox'ы в spotbot.ejs.
+    const LIMITS = {
+      'field-activeOrders': { min: 2, max: 50 },
+      'field-requestFrequency': { min: 1000, max: 5000 },
+    };
+
+    const limit = LIMITS[msg.key];
+    if (!limit) {
       return res.status(400).json({ message: 'Invalid param key' });
     }
+
+    const num = Number(msg.value);
+    if (!Number.isFinite(num)) {
+      return res.status(400).json({ message: 'Invalid param value' });
+    }
+    const value = Math.min(limit.max, Math.max(limit.min, Math.round(num)));
 
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
@@ -277,7 +291,7 @@ router.post('/calculator/param', async (req, res, next) => {
     if (!data.param || typeof data.param !== 'object') {
       data.param = {};
     }
-    data.param[msg.key] = String(msg.value);
+    data.param[msg.key] = String(value);
 
     let jsonString;
     try {
@@ -289,7 +303,8 @@ router.post('/calculator/param', async (req, res, next) => {
 
     await writeFileAtomic(filePath, jsonString, 'utf8');
 
-    res.json({ message: `${msg.key} = <b>${msg.value}</b> saved for ${symbol}` });
+    // value, а не msg.value: показать фактически сохранённое (после clamp)
+    res.json({ message: `${msg.key} = <b>${value}</b> saved for ${symbol}` });
   } catch (err) {
     console.error('Error saving param:', err);
     res.status(500).json({ message: 'Error saving param' });

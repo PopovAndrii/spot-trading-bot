@@ -109,11 +109,17 @@ notification + логBus; лучше — бесконечный reconnect с cap
 - **Нет `helmet`** — CSP/`X-Frame-Options`/`nosniff` бесплатные.
 - **`SESSION_SECRET` не проверяется при старте** — без него express-session
   бросит на первом запросе; лучше fail-fast с понятным сообщением.
-- **Нет server-side clamp для runtime-параметров** — `POST /calculator/param`
+- ✅ РЕШЕНО (ветка `param-clamp`). **Нет server-side clamp для runtime-параметров** — `POST /calculator/param`
   (`spotbot.js:256`) принимает любое значение; `field-requestFrequency: 1` ×
   опрос `getOrder` на каждый ордер = риск бана Binance (-1003 / 418). UI-минимум
   1000 мс легко обходится прямым POST. Клампить на сервере и обрабатывать 429
   с backoff в `invokeAPI`.
+
+  > Исправлено: clamp в роуте (activeOrders 2–50, requestFrequency 1000–5000 —
+  > зеркало границ SpinBox), в ответе показывается фактически сохранённое
+  > значение. В `invokeAPI` — `#withRateLimitRetry`: 429 ретраится до 3 раз
+  > с учётом Retry-After (или растущий дефолт 2/4/6 с); 418 (бан IP)
+  > сознательно не ретраится.
 - **Нет graceful shutdown** — ни одного `process.on('SIGTERM')` в проекте.
   `docker stop` обрывает процесс посреди прохода итератора. Записи атомарны,
   так что файл не побьётся, но правильно: закрыть HTTP, дождаться конца текущего
@@ -267,7 +273,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 3 | ✅ Фикс «всегда off» в `/calculator/restart` | `spotbot.js:242` | S |
 | 4 | ✅ Реакция на `maxReconnectReached` / бесконечный backoff | `streamAPI.js` + router | S |
 | 5 | ✅ Гонка param: мердж перед записью итератора | `jsonTimerSender.js` | M |
-| 6 | Server-side clamp runtime-параметров + 429-backoff | `spotbot.js`, `invokeAPI.js` | S |
+| 6 | ✅ Server-side clamp runtime-параметров + 429-backoff | `spotbot.js`, `invokeAPI.js` | S |
 | 7 | Восстановление после рестарта (скан data/, лок Save) | `bin/www`, `pair.js` | M |
 | 8 | Юнит-тесты на `job.js` (state machine) | `src/test/` | M |
 | 9 | Убрать мёртвый broadcast `type:'data'` или сделать push-обновление таблицы | router + `SpotWS.js` | M |
