@@ -164,10 +164,16 @@ notification + логBus; лучше — бесконечный reconnect с cap
   округляют `toFixed`. Для текущих масштабов погрешность прикрыта floor-ом по
   stepSize, но при желании убрать класс проблем целиком — `decimal.js` либо
   целочисленная арифметика в тиках/степах.
-- **`job.js` — самая денежная логика (state machine ордеров) без единого теста**,
+- ✅ РЕШЕНО (ветка `job-tests`). **`job.js` — самая денежная логика (state machine ордеров) без единого теста**,
   при том что в проекте уже есть культура unit-тестов (`partialFill`,
   `rebalanceClose`). Табличные тесты переходов (`FILLED`+`CANCELED`+higherFilled
   и т.д.) дали бы максимальную защиту на строку кода.
+
+  > Сделано: `src/test/job.test.js` — 19 табличных тестов переходов long/short:
+  > размещение entry, опрос NEW/PARTIALLY_FILLED, постановка закрытия
+  > (предрасчёт и rebalance после партиала), отмена устаревшего нижнего
+  > закрытия, pass только при делегировании вверх (higherFilled), DONE,
+  > тестовый режим.
 - Дублирование `decimalCount`/`roundToStep` в двух роутах `spotbot.js:22,120` —
   вынести в `lib/format.js`.
 
@@ -289,7 +295,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 5 | ✅ Гонка param: мердж перед записью итератора | `jsonTimerSender.js` | M |
 | 6 | ✅ Server-side clamp runtime-параметров + 429-backoff | `spotbot.js`, `invokeAPI.js` | S |
 | 7 | ✅ Восстановление после рестарта (скан data/, лок Save) | `bin/www`, `pair.js` | M |
-| 8 | Юнит-тесты на `job.js` (state machine) | `src/test/` | M |
+| 8 | ✅ Юнит-тесты на `job.js` (state machine) | `src/test/` | M |
 | 9 | Убрать мёртвый broadcast `type:'data'` или сделать push-обновление таблицы | router + `SpotWS.js` | M |
 | 10 | Включить `UserStreamAPI` (executionReport вместо опроса) | `jsonTimerSender.js` | L |
 | 11 | helmet + sameSite + file session store + fail-fast SECRET | `app.js` | S |
