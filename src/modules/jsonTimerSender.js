@@ -174,10 +174,13 @@ class JsonTimerSender extends EventEmitter {
 
           this.autoRestart = obj.restart == true ? true : false;
 
-          if (this.autoRestart) {
-            // write old data
-            await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
+          // Архив завершённой серии — ВСЕГДА, не только при autoRestart.
+          // Раньше копия {timestamp}-SYMBOL писалась только в ветке рестарта,
+          // и при выключенном Restart серия в историю не попадала.
+          // Основной файл при этом остаётся (статус DONE) — видно финал.
+          await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
+          if (this.autoRestart) {
             await this.#sleep(500);
             this.restartCycle(obj);
             await this.#sleep(500);
