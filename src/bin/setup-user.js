@@ -12,7 +12,10 @@ const crypto = require('crypto');
 const readline = require('readline');
 const bcrypt = require('bcrypt');
 
-const ENV_PATH = path.join(__dirname, '..', '.env');
+// ENV_OUT — куда писать .env. Нужен для prod-образа: src запечён в образ,
+// поэтому хостовый каталог монтируют отдельно (-v ./src:/out) и указывают
+// ENV_OUT=/out/.env (см. README, раздел Production launch).
+const ENV_PATH = process.env.ENV_OUT || path.join(__dirname, '..', '.env');
 const SALT_ROUNDS = 10;
 const MIN_PASSWORD_LENGTH = 8;
 

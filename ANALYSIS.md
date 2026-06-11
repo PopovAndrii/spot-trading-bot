@@ -288,16 +288,24 @@ notification + логBus; лучше — бесконечный reconnect с cap
 
 ## 5. Docker / инфраструктура
 
-- **Образ не самодостаточен** — `docker-config/Dockerfile` это `node:24-slim` +
+- ✅ **Образ не самодостаточен** — `docker-config/Dockerfile` это `node:24-slim` +
   curl/procps, весь код и `node_modules` приходят bind-mount-ом
   (`compose.prod.yml`). «Прод-образ» нельзя выкатить как артефакт: на новой
   машине нужен git clone + npm install вручную. Рекомендация: multi-stage
   (`COPY package*.json` → `npm ci --omit=dev` → `COPY src`) и собранный CSS в
   образ; bind-mount оставить только в dev-compose.
-- **Нет `healthcheck`** — curl ставится в образ ровно для этого, но в compose
+- ✅ **Нет `healthcheck`** — curl ставится в образ ровно для этого, но в compose
   его нет. `test: curl -fsS http://localhost:${PORT}/api/ping` (302 на /login
   curl без `-f`-ошибки не даёт; либо открыть `/api/ping` до auth-гарда — он и
   так в QUIET_PATHS логгера).
+
+  > Сделано (ветка `docker-build`): multi-stage Dockerfile (base/dev/builder/
+  > prod) — prod-образ самодостаточен (npm ci --omit=dev, CSS из builder,
+  > entrypoint запечён, 40 МБ deps), проверен изолированным запуском без
+  > bind-mount. compose.prod.yml монтирует только `src/data` (состояние
+  > робота) — выкат как артефакт. Healthcheck `curl /api/ping` в обоих
+  > compose, dev-контейнер показывает healthy. .dockerignore дополнен
+  > (**/node_modules, **/.env*, docker-config больше не игнорится).
 - `pm2-runtime` внутри контейнера + `restart: unless-stopped` — двойной
   супервизор. Допустимо (pm2 даст рестарт без пересоздания контейнера), но
   тогда настроить pm2 на форвард SIGTERM с таймаутом, когда появится graceful
@@ -331,7 +339,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 10 | Включить `UserStreamAPI` (executionReport вместо опроса) | `jsonTimerSender.js` | L |
 | 11 | ✅ helmet + sameSite + file session store + fail-fast SECRET | `app.js` | S |
 | 12 | ✅ Graceful shutdown (SIGTERM) | `bin/www` | S |
-| 13 | Multi-stage Dockerfile + healthcheck | `docker-config/` | M |
+| 13 | ✅ Multi-stage Dockerfile + healthcheck | `docker-config/` | M |
 | 14 | Чистка мёртвого кода, унификация CJS/ESM, переименования | везде | M |
 | 15 | ✅ Архив прожитого цикла перед перезаписью Save (запрос пользователя) | `cycleArchive.js`, `spotbot.js` | S |
 
