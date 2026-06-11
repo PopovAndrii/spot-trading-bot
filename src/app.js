@@ -30,16 +30,21 @@ const app = express();
 // этот проект: inline-скрипты в ejs (navbar/spotbot) → 'unsafe-inline';
 // WebSocket → connect-src ws:/wss:; приложение ходит по HTTP в локальной
 // сети → upgrade-insecure-requests выключен, иначе браузер форсирует https.
+// В dev CSP выключен: browser-sync (live-reload) грузит socket.io с отдельного
+// порта по http-polling, strict CSP это блокирует. CSP — фича прода.
+const isDev = process.env.NODE_ENV === 'development';
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        'script-src': ["'self'", "'unsafe-inline'"],
-        'connect-src': ["'self'", 'ws:', 'wss:'],
-        'upgrade-insecure-requests': null,
-      },
-    },
+    contentSecurityPolicy: isDev
+      ? false
+      : {
+          directives: {
+            ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+            'script-src': ["'self'", "'unsafe-inline'"],
+            'connect-src': ["'self'", 'ws:', 'wss:'],
+            'upgrade-insecure-requests': null,
+          },
+        },
   })
 );
 
