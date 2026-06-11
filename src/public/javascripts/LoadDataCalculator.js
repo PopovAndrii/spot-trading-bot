@@ -261,6 +261,14 @@ export class LoadDataCalculator {
   async settingsSave() {
     orders.param = this.defaultData;
 
+    // Текущее состояние свитча Restart → в сохраняемый конфиг. Иначе Save пишет
+    // файл без поля restart, и автоповтор не включится, пока свитч не тронут
+    // вручную (отдельный POST /calculator/restart).
+    const restartInput = document
+      .getElementById('settings-calculate-restart')
+      ?.querySelector('input');
+    orders.restart = Boolean(restartInput?.checked);
+
     try {
       const res = await fetch(`/spotbot/calculator/save`, {
         method: 'POST',
