@@ -66,10 +66,26 @@ class JsonTimerSender extends EventEmitter {
 
     this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
+
+    this.onExecReport = null; // слушатель user data stream (снимается в stop)
   }
 
   getSpotStatus(symbol) {
     return this.running[symbol];
+  }
+
+  /**
+   * Внеочередной тик readLoop — реакция на executionReport (ANALYSIS п.10).
+   * 50 мс — дебаунс на случай шквала отчётов (серия частичных исполнений).
+   * Если проход уже идёт (busy) — ничего не делаем: он подхватит свежие
+   * статусы через getOrder, а следующий тик запланирует readLoop как обычно.
+   */
+  #kickTick() {
+    if (!this.running[this.symbol]) return;
+    if (this.busy) return;
+
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.readLoop(), 50);
   }
 
   async #runToApi(data = {}) {
@@ -285,14 +301,24 @@ class JsonTimerSender extends EventEmitter {
 
       const api = new InvokeApi();
 
-      // const userStream = api.getUserStream();
-      // userStream.start();
-      // userStream.on('executionReport', (order) => {
-      //   console.log(`Execute order Stream`);
-      // });
-      // userStream.on('balance', (data) => {
-      //   console.log(`Balance Stream`);
-      // });
+      // User data stream (ANALYSIS п.10, фаза 1 — «ускоритель»):
+      // executionReport по нашему символу запускает внеочередной тик readLoop —
+      // реакция на исполнение за миллисекунды вместо ожидания интервала.
+      // Файл из обработчика НЕ пишем: источник правды — итератор (getOrder),
+      // это исключает гонки записи. Поллинг остаётся фолбэком при лежащем
+      // стриме. Без ключей (test-режим без них) стрим не поднимаем.
+      if (api.configured) {
+        const userStream = api.getUserStream();
+
+        this.onExecReport = (report) => {
+          if (report.s !== symbol) return;
+          logBus.log(`⚡ ${symbol} executionReport: ${report.S} ${report.X} (order ${report.i})`);
+          this.#kickTick();
+        };
+
+        userStream.on('executionReport', this.onExecReport);
+        userStream.start(); // повторный start() — no-op (isStarted)
+      }
 
       const streamAPI = api.getPublicStream(symbol);
       // не дублировать слушатели при повторном start на singleton-инстансе
@@ -336,7 +362,14 @@ class JsonTimerSender extends EventEmitter {
   async stop() {
     clearTimeout(this.timer);
 
-    // UserStreamAPI.removeInstance();
+    // user data stream общий для всего аккаунта (singleton) — снимаем только
+    // СВОЙ слушатель; сам стрим продолжает жить для других символов и для
+    // следующего Start (закрывается целиком в graceful shutdown)
+    if (this.onExecReport) {
+      this.API.getUserStream().removeListener('executionReport', this.onExecReport);
+      this.onExecReport = null;
+    }
+
     StreamAPI.removeInstance(this.symbol);
 
     this.timer = null;

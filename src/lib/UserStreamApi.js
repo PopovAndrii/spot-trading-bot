@@ -50,7 +50,14 @@ class UserStreamAPI extends EventEmitter {
       });
 
       this.ws.on('message', (data) => {
-        const json = JSON.parse(data);
+        // битый кадр не должен ронять процесс (ANALYSIS п.10)
+        let json;
+        try {
+          json = JSON.parse(data);
+        } catch (err) {
+          console.error('❌ User Stream JSON parse error:', err.message);
+          return;
+        }
 
         if (json.e === 'executionReport') {
           this.emit('executionReport', json);
@@ -71,19 +78,22 @@ class UserStreamAPI extends EventEmitter {
           clearInterval(this.keepAliveTimer);
           this.keepAliveTimer = null;
         }
+
+        // Неожиданный обрыв (при штатном stop() слушатели уже сняты и сюда
+        // не попадаем) — переподключаемся, как в StreamAPI
+        this.reconnect();
       });
 
       this.ws.on('error', (err) => {
         console.error('❌ User Stream error:', err.message);
-        this.emit('error', err);
-
-        // Reconnecting on network error
-        if (!this.isStarted) {
-          this.reconnect();
+        // emit('error') без слушателей роняет процесс; реконнект делает
+        // обработчик 'close', который ws эмитит следом за сетевой ошибкой
+        if (this.listenerCount('error') > 0) {
+          this.emit('error', err);
         }
       });
 
-      // Keep-alive every 30 min
+      // Keep-alive: Binance требует продлевать listenKey раз в <60 минут
       this.keepAliveTimer = setInterval(
         async () => {
           try {
@@ -106,7 +116,7 @@ class UserStreamAPI extends EventEmitter {
             this.reconnect();
           }
         },
-        5 * 60 * 1000
+        30 * 60 * 1000
       );
     } catch (error) {
       console.error('❌ Failed to start UserStream:', error.message);
@@ -116,17 +126,19 @@ class UserStreamAPI extends EventEmitter {
   }
 
   reconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('❌ The reconnection attempt limit has been exceeded');
-      // this.emit('maxReconnectReached');
-      return;
-    }
-
     this.stop();
 
-    // Задержка с увеличением
+    // Не сдаёмся навсегда (как StreamAPI, ANALYSIS п.1.4): после
+    // maxReconnectAttempts продолжаем с потолком задержки, один раз сигналим
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
     this.reconnectAttempts++;
+
+    if (this.reconnectAttempts === this.maxReconnectAttempts) {
+      console.error('❌ User Stream down for a long time, keep reconnecting...');
+      if (this.listenerCount('maxReconnectReached') > 0) {
+        this.emit('maxReconnectReached');
+      }
+    }
 
     console.log(
       `🔄 Reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
@@ -165,7 +177,8 @@ class UserStreamAPI extends EventEmitter {
 
     // close listenKey (ignore errors 400)
     if (this.listenKey) {
-      this.client.closeListenKey({ listenKey: this.listenKey }).catch(() => {
+      // сигнатура connector'а — строка, не объект (раньше ошибка тонула в catch)
+      this.client.closeListenKey(this.listenKey).catch(() => {
         // Молча игнорируем (ключ уже протух)
       });
       this.listenKey = null;

@@ -152,13 +152,23 @@ notification + логBus; лучше — бесконечный reconnect с cap
   > подхватит живые ордера при старте.
 
 ### Архитектура / качество кода
-- **`UserStreamAPI` написан, но закомментирован** (`jsonTimerSender.js:253-260`).
+- ✅ (фаза 1) **`UserStreamAPI` написан, но закомментирован** (`jsonTimerSender.js:253-260`).
   Это главное стратегическое улучшение: `executionReport` по user data stream
   заменяет постоянный опрос `getOrder` (weight 4/запрос) — мгновенная реакция на
   исполнение, на порядок меньше REST-трафика и риска rate-limit. Перед включением
   починить в нём: `JSON.parse` без try/catch (`UserStreamApi.js:53` — краш
   процесса на битом кадре), комментарий «Keep-alive every 30 min» при коде 5 мин,
   реконнект только при `!isStarted`.
+
+  > Фаза 1 (ветка `user-stream`): стрим включён как «ускоритель» —
+  > executionReport по символу запускает внеочередной тик readLoop (дебаунс
+  > 50 мс), источник правды остаётся итератор+getOrder, поллинг — фолбэк.
+  > Починено в UserStreamApi: try/catch на parse, реконнект из 'close'
+  > (бесконечный, capped backoff, как StreamAPI), guard на emit('error'),
+  > keep-alive 30 мин, сигнатура closeListenKey(строка). Слушатель снимается
+  > в stop(), весь стрим закрывается в graceful shutdown. Без ключей стрим
+  > не поднимается. Фаза 2 (замена поллинга push-статусами) — отдельно,
+  > после лайв-обкатки фазы 1.
 - **Смесь CJS и ESM**: `src/lib/calculator.js` — ESM (`export class`), всё
   остальное — CommonJS с `require()`. Работает только благодаря `require(esm)`
   в Node ≥22.12 и автодетекту синтаксиса. Хрупко и неочевидно — привести к
@@ -347,7 +357,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 7 | ✅ Восстановление после рестарта (скан data/, лок Save) | `bin/www`, `pair.js` | M |
 | 8 | ✅ Юнит-тесты на `job.js` (state machine) | `src/test/` | M |
 | 9 | ✅ Убрать мёртвый broadcast `type:'data'` или сделать push-обновление таблицы | router + `SpotWS.js` | M |
-| 10 | Включить `UserStreamAPI` (executionReport вместо опроса) | `jsonTimerSender.js` | L |
+| 10 | ✅ (фаза 1) Включить `UserStreamAPI` (executionReport вместо опроса) | `jsonTimerSender.js` | L |
 | 11 | ✅ helmet + sameSite + file session store + fail-fast SECRET | `app.js` | S |
 | 12 | ✅ Graceful shutdown (SIGTERM) | `bin/www` | S |
 | 13 | ✅ Multi-stage Dockerfile + healthcheck | `docker-config/` | M |

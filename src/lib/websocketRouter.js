@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const JsonTimerSender = require('../modules/jsonTimerSender.js');
 const { pair, statusPair } = require('./pair.js');
+const { UserStreamAPI } = require('./UserStreamApi.js');
 
 // Валидация входящих сообщений (ANALYSIS.md п.1.1): авторизованный клиент с
 // битым payload не должен ронять процесс вместе с торговыми циклами.
@@ -282,6 +283,11 @@ class WebSocketRouter {
     this.timerSenders.forEach((ts, symbol) => {
       if (ts.getSpotStatus(symbol)) ts.stop();
     });
+
+    // user data stream один на аккаунт — закрыть и отпустить listenKey
+    if (UserStreamAPI.hasInstance()) {
+      UserStreamAPI.removeInstance();
+    }
 
     this.wss.clients.forEach((ws) => ws.close());
   }
