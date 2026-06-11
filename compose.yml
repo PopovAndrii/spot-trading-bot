@@ -28,20 +28,9 @@ services:
             STATUS_APP: ${STATUS_APP:-false}
             STATUS_LOGIN: ${STATUS_LOGIN:-true}
             PORT: ${PORT:-3002}
-        # Автостарт dev-сервера (sass watch + nodemon + browser-sync): раньше был
-        # sleep infinity, и после рестарта контейнера приложение «не работало»,
-        # пока npm run dev не запустят руками. Фоллбэк в sleep — если dev-сервер
-        # не смог стартовать (нет node_modules и т.п.), контейнер остаётся живым,
-        # чтобы можно было зайти и починить.
-        command: ["bash", "-c", "npm run dev || sleep infinity"]
-        # curl ставится в образ ровно для этого; 302 на /login для curl -f
-        # ошибкой не является — проверяем, что сервер вообще слушает
-        healthcheck:
-            test: ["CMD", "curl", "-fsS", "http://localhost:${PORT:-3002}/api/ping"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 30s
+        # Контейнер просто висит; dev-сервер запускается вручную внутри:
+        #   docker compose exec app bash → npm run dev
+        command: ["sleep", "infinity"]
 
     # --- nginx ОТКЛЮЧЁН (не нужен) ---
     # Это PHP-прокси (fastcgi_pass → :9000, root src/php/) от старой PHP-версии,
