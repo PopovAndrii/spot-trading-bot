@@ -9,8 +9,6 @@ const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
 
-const activeSymbols = new Set();
-
 /**
  * Решает, нужно ли персистить рост частичного исполнения ордера.
  * Чистая функция — тестируется без биржи (REQUIREMENTS.md п.20).
@@ -60,11 +58,11 @@ class JsonTimerSender extends EventEmitter {
     this.timer = null;
     this.symbol = null;
     this.strategy = strategy;
-    this.autoRestart = false;  // ← ДОБАВЬ
-    this.running = [];
+    this.autoRestart = false;
+    this.running = {}; // словарь по символу (раньше был массив — работало случайно)
     this.exchangeName = 'binance';
 
-    this.busy = false; // идёт ли проход #jobItaretor (защита от наслаивания)
+    this.busy = false; // идёт ли проход #jobIterator (защита от наслаивания)
 
     this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
@@ -103,7 +101,7 @@ class JsonTimerSender extends EventEmitter {
 
   /**
    * Подмешивает в obj свежие live-правки из файла перед записью итератора.
-   * Проход #jobItaretor долгий (sleep на каждый ордер) и пишет ВЕСЬ obj целиком:
+   * Проход #jobIterator долгий (sleep на каждый ордер) и пишет ВЕСЬ obj целиком:
    * без мерджа правка param (/calculator/param) или restart (/calculator/restart),
    * сделанная во время прохода, молча терялась — lost update (ANALYSIS.md п.1.3).
    * Ордера (BUY/SELL) не трогаем: их единственный писатель во время цикла — сам
@@ -124,10 +122,10 @@ class JsonTimerSender extends EventEmitter {
    * @param {Object} obj - Configuration of order data from file or database.
    * @returns {Stop()} - Stop the cycle.
    */
-  async #jobItaretor(obj = {}) {
+  async #jobIterator(obj = {}) {
     const strategy = this.#strategy();
 
-    if (obj.status == Status.REDY && strategy != null) {
+    if (obj.status == Status.READY && strategy != null) {
       let i = 0;
 
       // never started 0
@@ -147,9 +145,6 @@ class JsonTimerSender extends EventEmitter {
 
         if (currentOrder.status === Status.DONE) {
           const result = await this.#runToApi(currentOrder); // cancelOpenOrders
-
-          // this.#applyStatusesToOrders(obj['BUY'], result);
-          // this.#applyStatusesToOrders(obj['SELL'], result);
 
           // cancelOpenOrders снял страховочные ордера на бирже — зафиксировать
           // их отмену в таблице (иначе в истории остаются вечные NEW)
@@ -242,15 +237,6 @@ class JsonTimerSender extends EventEmitter {
     }
   }
 
-  #applyStatusesToOrders(orders, statuses) {
-    orders.forEach((order) => {
-      const match = statuses.find((status) => status.orderId === order.orderId);
-      if (match) {
-        order.status = match.status;
-      }
-    });
-  }
-
   async readLoop() {
     if (!this.running[this.symbol]) return;
 
@@ -260,11 +246,11 @@ class JsonTimerSender extends EventEmitter {
 
       // один проход за раз: если предыдущий ещё идёт — пропускаем тик, но
       // планировщик не блокируем (устойчиво к медленным/зависшим запросам).
-      // stop() реагирует через guard внутри #jobItaretor (this.running).
+      // stop() реагирует через guard внутри #jobIterator (this.running).
       if (!this.busy) {
         this.busy = true;
-        this.#jobItaretor(data)
-          .catch((err) => console.error('jobItaretor:', err))
+        this.#jobIterator(data)
+          .catch((err) => console.error('jobIterator:', err))
           .finally(() => { this.busy = false; });
       }
 

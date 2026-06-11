@@ -8,6 +8,7 @@ const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
 const { pair, statusPair } = require('../lib/pair');
 const { archiveIfActive } = require('../lib/cycleArchive');
+const { decimalCount, roundToStep } = require('../lib/format');
 
 const API = new InvokeApi();
 
@@ -19,16 +20,6 @@ router.get('/:currency', async function (req, res, next) {
   let base = '';
   let quote = '';
   let formatInfo = {};
-
-  const decimalCount = (value) => {
-    const n = Number(value);
-    if (!n || !isFinite(n)) return 0;
-    // toExponential is robust against small numbers (0.0000001 → “1e-7”), 
-    // which break the naive split(‘.’) due to exponential notation.
-    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
-    const fractional = (mantissa.split('.')[1] || '').length;
-    return Math.max(0, fractional - Number(exp));
-  };
 
   const exchangeInfo = await API.exchangeInfo({ symbol: currency });
   const symbolData = exchangeInfo.message.symbols[0] || {};
@@ -116,26 +107,6 @@ router.post('/:symbol', async function (req, res, next) {
   const priceFilter = filters.find((f) => f.filterType === 'PRICE_FILTER');
   const lotSizeFilter = filters.find((f) => f.filterType === 'LOT_SIZE');
   const minNotionalFilter = filters.find((f) => f.filterType === 'NOTIONAL');
-
-  // Function for counting decimal places
-  const decimalCount = (value) => {
-    const n = Number(value);
-    if (!n || !isFinite(n)) return 0;
-    // toExponential устойчив к малым числам (0.0000001 → "1e-7"), которые
-    // ломают наивный split('.') из-за экспоненциальной записи.
-    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
-    const fractional = (mantissa.split('.')[1] || '').length;
-    return Math.max(0, fractional - Number(exp));
-  };
-
-  // Rounding to the nearest step. mode='floor' (default) для остатков,
-  // 'ceil' для минимумов (чтобы не упасть ниже биржевого порога).
-  const roundToStep = (value, step, mode = 'floor') => {
-    if (typeof value !== 'number' || isNaN(value) || !step) return 0;
-    const precision = Math.max(0, Math.floor(-Math.log10(step)));
-    const round = mode === 'ceil' ? Math.ceil : Math.floor;
-    return Number((round(value / step) * step).toFixed(precision));
-  };
 
   // Get your balance safely
   const balanceEntry = account.message.balances.find((b) => b.asset === asset);

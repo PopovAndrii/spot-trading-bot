@@ -194,6 +194,17 @@ notification + логBus; лучше — бесконечный reconnect с cap
 - Дублирование `decimalCount`/`roundToStep` в двух роутах `spotbot.js:22,120` —
   вынести в `lib/format.js`.
 
+  > Чистка выполнена (ветка `cleanup`): удалён DynamicMartingail.js, методы
+  > newMarketOrder/getHistory/#applyStatusesToOrders, неиспользуемый Set
+  > activeSymbols. test2.js и MomentumIndicator.js ОСТАВЛЕНЫ по запросу
+  > пользователя (эксперименты, нужны). Переименовано: REDY→READY,
+  > jobItaretor→jobIterator, опечатки в комментариях. calculator.js переведён
+  > на CommonJS. decimalCount/roundToStep вынесены в lib/format.js (+тесты).
+  > running: []→{}. НЕ трогал (сознательно): конструкторы-антипаттерны
+  > (singleton из constructor, Calculator→массив) и float→decimal — поведенческие
+  > рефакторинги с риском для денежной логики, отдельной задачей при
+  > необходимости.
+
 ---
 
 ## 3. WebSockets
@@ -340,7 +351,7 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 11 | ✅ helmet + sameSite + file session store + fail-fast SECRET | `app.js` | S |
 | 12 | ✅ Graceful shutdown (SIGTERM) | `bin/www` | S |
 | 13 | ✅ Multi-stage Dockerfile + healthcheck | `docker-config/` | M |
-| 14 | Чистка мёртвого кода, унификация CJS/ESM, переименования | везде | M |
+| 14 | ✅ Чистка мёртвого кода, унификация CJS/ESM, переименования | везде | M |
 | 15 | ✅ Архив прожитого цикла перед перезаписью Save (запрос пользователя) | `cycleArchive.js`, `spotbot.js` | S |
 
 S — до часа, M — до полудня, L — день+.

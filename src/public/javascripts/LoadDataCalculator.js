@@ -96,7 +96,7 @@ export class LoadDataCalculator {
     });
   }
 
-  // Chenge button restart
+  // Change button restart
   restart() {
     document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {
       this.addRestartStatus(e.detail.value);

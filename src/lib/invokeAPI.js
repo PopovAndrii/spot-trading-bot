@@ -119,57 +119,6 @@ class InvokeApi {
       return { success: false, message };
     }
   }
-  // @TODO not used!
-  async newMarketOrder(data) {
-    try {
-      const res = await this.client.newOrder(data.symbol, data.side, data.type, {
-        quantity: data.quantity,
-      });
-
-      console.log('✅ newMarketOrder():', [
-        res.data.symbol,
-        res.data.status,
-        res.data.side,
-        res.data.origQty,
-        res.data.executedQty,
-      ]);
-
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data newMarketOrder():', error.response.data);
-      } else {
-        console.error('❌ message newMarketOrder():', error.message);
-      }
-      return null;
-    }
-  }
-  // @TODO not used!
-  async getHistory(data) {
-    try {
-      const res = await this.client.klines(data.symbol, data.interval || '5s', {
-        limit: data.limit || 60,
-      });
-
-      // const res = await this.client.klines({
-      //   symbol: this.data.symbol,
-      //   interval: this.data.interval || '5s',
-      //   limit: this.data.limit || 60,
-      // });
-
-      // console.log('✅ getHistory():', candles, 'candles');
-
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data getHistory():', error.response.data);
-      } else {
-        console.error('❌ message getHistory():', error.message);
-      }
-      return null;
-    }
-  }
-
   async getOrder(data) {
     try {
       const res = await this.#withRateLimitRetry(() =>

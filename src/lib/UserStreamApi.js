@@ -163,7 +163,7 @@ class UserStreamAPI extends EventEmitter {
       this.ws = null;
     }
 
-    // clouse listenKey (ignore errors 400)
+    // close listenKey (ignore errors 400)
     if (this.listenKey) {
       this.client.closeListenKey({ listenKey: this.listenKey }).catch(() => {
         // Молча игнорируем (ключ уже протух)

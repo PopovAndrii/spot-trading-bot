@@ -22,7 +22,7 @@ const mkOrder = (side, status, over = {}) => ({
 
 function mkObj({ buys = [], sells = [], param = {} } = {}) {
   return {
-    status: Status.REDY,
+    status: Status.READY,
     pair: 'BNBUSDT',
     param: {
       'field-profit': '1',
