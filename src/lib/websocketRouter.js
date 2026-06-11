@@ -272,6 +272,19 @@ class WebSocketRouter {
       console.warn('❌Err Sending:', err.message);
     }
   }
+
+  // Graceful shutdown (ANALYSIS п.12): остановить циклы и стримы, закрыть
+  // клиентов. Файлы не трогаем — записи атомарны, recovery-скан пометит
+  // живые ордера при следующем старте.
+  shutdown() {
+    clearInterval(this.heartbeat);
+
+    this.timerSenders.forEach((ts, symbol) => {
+      if (ts.getSpotStatus(symbol)) ts.stop();
+    });
+
+    this.wss.clients.forEach((ws) => ws.close());
+  }
 }
 
 module.exports = WebSocketRouter;

@@ -3,9 +3,17 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
+const helmet = require('helmet');
 
 const Dotenv = require('dotenv');
 Dotenv.config();
+
+// Fail-fast (ANALYSIS п.11): без секрета express-session бросит на первом же
+// запросе невнятный stack — лучше упасть сразу с понятным сообщением.
+if (!process.env.SESSION_SECRET) {
+  console.error('❌ SESSION_SECRET is not set (src/.env) — refusing to start');
+  process.exit(1);
+}
 
 const loginRouter = require('./routes/login');
 const navRouter = require('./routes/nav');
@@ -14,8 +22,26 @@ const infoRouter = require('./routes/info');
 const spotbotRouter = require('./routes/spotbot');
 
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 
 const app = express();
+
+// Безопасные заголовки (CSP, nosniff, X-Frame-Options и т.д.). Поправки под
+// этот проект: inline-скрипты в ejs (navbar/spotbot) → 'unsafe-inline';
+// WebSocket → connect-src ws:/wss:; приложение ходит по HTTP в локальной
+// сети → upgrade-insecure-requests выключен, иначе браузер форсирует https.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'script-src': ["'self'", "'unsafe-inline'"],
+        'connect-src': ["'self'", 'ws:', 'wss:'],
+        'upgrade-insecure-requests': null,
+      },
+    },
+  })
+);
 
 // NOTE: dev live-reload (browser-sync) lives in bin/www, where it proxies the
 // REAL server (the one with WebSocketRouter). Do NOT call app.listen() here —
@@ -34,9 +60,19 @@ const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   rolling: true, // продлевать сессию по активности (инактивити-таймаут)
+  // Файловый стор вместо MemoryStore (ANALYSIS п.11): сессии переживают
+  // рестарт контейнера (не разлогинивает) и не текут по памяти.
+  // data/ уже в .gitignore и персистится bind-mount'ом.
+  store: new FileStore({
+    path: path.join(__dirname, 'data/sessions'),
+    ttl: 2 * 60 * 60, // секунды; согласован с cookie.maxAge
+    retries: 1,
+    logFn: () => {}, // file-store шумит ENOENT'ами на пустом сторе
+  }),
   cookie: {
     secure: 'auto', // auto for HTTP/HTTPS
     httpOnly: true,
+    sameSite: 'strict', // CSRF-минимум: POST-ы (cancel allorders) только со своего сайта
     maxAge: 2 * 60 * 60 * 1000,
   },
 });
