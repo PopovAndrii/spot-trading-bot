@@ -51,6 +51,21 @@ test('PARTIALLY_FILLED on SELL side counts as live', async () => {
   });
 });
 
+test('DONE cycle with stale NEW insurance orders → not found (false positive)', async () => {
+  // финальный cancelOpenOrders снимает ордера на бирже, но в старых файлах
+  // их статусы остались NEW — статус DONE файла авторитетнее
+  const config = JSON.stringify({
+    pair: 'BNBUSDT',
+    status: 3, // Status.DONE
+    BUY: [order('FILLED', 1), order('NEW', 2)],
+    SELL: [order('FILLED', 3), order('NEW', 4)],
+  });
+
+  await withTmpDir({ 'BNBUSDT-binance.json': config }, async (dir) => {
+    assert.deepEqual(await scanLiveCycles(dir), []);
+  });
+});
+
 test('finished cycle (FILLED/CANCELED only) → not found', async () => {
   const config = JSON.stringify({
     pair: 'BNBUSDT',

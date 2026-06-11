@@ -31,6 +31,13 @@ async function scanLiveCycles(dataDir) {
 
     try {
       const data = JSON.parse(await fs.readFile(path.join(dataDir, file), 'utf8'));
+
+      // Завершённый цикл (Status.DONE) живым не считается: финальный
+      // cancelOpenOrders уже снял страховочные ордера на бирже. В старых
+      // файлах их статусы могли остаться NEW (до фикса markOpenAsCanceled) —
+      // не поднимать по ним ложный ATTENTION.
+      if (data.status === 3 /* Status.DONE */) continue;
+
       const orders = [...(data.BUY || []), ...(data.SELL || [])];
       const live = orders.filter(
         (o) => o && o.orderId != null && LIVE_STATES.has(o.status)

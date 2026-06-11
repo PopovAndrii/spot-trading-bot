@@ -87,6 +87,12 @@ notification + логBus; лучше — бесконечный reconnect с cap
 > клиент получает warning-нотификацию. Возобновление — кнопка Start (state
 > цикла в файле), либо Cancel all orders (снимает лок → STOP). Повторный
 > subscribe не затирает ATTENTION (addSymbol сохраняет статус существующего).
+>
+> Доработка (false positive): финальный `cancelOpenOrders` снимал страховочные
+> ордера на бирже, но их статусы в таблице оставались NEW — скан считал
+> завершённый цикл живым. Теперь (а) DONE-ветка фиксирует отмену в файле
+> (`markOpenAsCanceled`, чистая функция + тесты), (б) скан пропускает файлы
+> со `status: DONE` (для старых файлов, записанных до фикса).
 
 ---
 
@@ -108,16 +114,22 @@ notification + логBus; лучше — бесконечный reconnect с cap
   но тик пропадёт — стоит добавить guard.
 
 ### Надёжность / безопасность
-- **Session MemoryStore в проде** — утечка памяти по мере логинов, сессии
+- ✅ **Session MemoryStore в проде** — утечка памяти по мере логинов, сессии
   умирают при рестарте. Для одного пользователя приемлемо, но хотя бы
   `connect-sqlite3`/file-store сделает рестарты бесшовными.
-- **Cookie без `sameSite`** (`src/app.js:37-41`) — браузерные дефолты спасают
+- ✅ **Cookie без `sameSite`** (`src/app.js:37-41`) — браузерные дефолты спасают
   (Lax), но для приложения, умеющего отменять ордера POST-запросом
   (`/spotbot/cancel/allorders` принимает и `urlencoded`), задать `sameSite: 'lax'`
   (а лучше `strict`) явно. CSRF-токенов нет — с `strict` и одним пользователем ок.
-- **Нет `helmet`** — CSP/`X-Frame-Options`/`nosniff` бесплатные.
-- **`SESSION_SECRET` не проверяется при старте** — без него express-session
+- ✅ **Нет `helmet`** — CSP/`X-Frame-Options`/`nosniff` бесплатные.
+- ✅ **`SESSION_SECRET` не проверяется при старте** — без него express-session
   бросит на первом запросе; лучше fail-fast с понятным сообщением.
+
+  > Все четыре исправлены (ветка `hardening`): `session-file-store` в
+  > `data/sessions` (ttl = cookie.maxAge, рестарт не разлогинивает);
+  > `sameSite: 'strict'`; helmet с CSP (inline-скрипты ejs разрешены,
+  > connect-src ws:/wss:, upgrade-insecure-requests выключен — приложение
+  > ходит по HTTP в LAN); fail-fast при пустом SESSION_SECRET.
 - ✅ РЕШЕНО (ветка `param-clamp`). **Нет server-side clamp для runtime-параметров** — `POST /calculator/param`
   (`spotbot.js:256`) принимает любое значение; `field-requestFrequency: 1` ×
   опрос `getOrder` на каждый ордер = риск бана Binance (-1003 / 418). UI-минимум
@@ -129,10 +141,15 @@ notification + логBus; лучше — бесконечный reconnect с cap
   > значение. В `invokeAPI` — `#withRateLimitRetry`: 429 ретраится до 3 раз
   > с учётом Retry-After (или растущий дефолт 2/4/6 с); 418 (бан IP)
   > сознательно не ретраится.
-- **Нет graceful shutdown** — ни одного `process.on('SIGTERM')` в проекте.
+- ✅ **Нет graceful shutdown** — ни одного `process.on('SIGTERM')` в проекте.
   `docker stop` обрывает процесс посреди прохода итератора. Записи атомарны,
   так что файл не побьётся, но правильно: закрыть HTTP, дождаться конца текущего
   прохода (`busy`), остановить стримы, и только потом выйти.
+
+  > Исправлено (ветка `hardening`): SIGTERM/SIGINT в `bin/www` → server.close,
+  > `wsRouter.shutdown()` (стоп heartbeat, циклов и стримов, закрытие клиентов),
+  > 3 с на in-flight записи, exit 0. Файлы не трогаются — recovery-скан
+  > подхватит живые ордера при старте.
 
 ### Архитектура / качество кода
 - **`UserStreamAPI` написан, но закомментирован** (`jsonTimerSender.js:253-260`).
@@ -312,8 +329,8 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 8 | ✅ Юнит-тесты на `job.js` (state machine) | `src/test/` | M |
 | 9 | ✅ Убрать мёртвый broadcast `type:'data'` или сделать push-обновление таблицы | router + `SpotWS.js` | M |
 | 10 | Включить `UserStreamAPI` (executionReport вместо опроса) | `jsonTimerSender.js` | L |
-| 11 | helmet + sameSite + file session store + fail-fast SECRET | `app.js` | S |
-| 12 | Graceful shutdown (SIGTERM) | `bin/www` | S |
+| 11 | ✅ helmet + sameSite + file session store + fail-fast SECRET | `app.js` | S |
+| 12 | ✅ Graceful shutdown (SIGTERM) | `bin/www` | S |
 | 13 | Multi-stage Dockerfile + healthcheck | `docker-config/` | M |
 | 14 | Чистка мёртвого кода, унификация CJS/ESM, переименования | везде | M |
 | 15 | ✅ Архив прожитого цикла перед перезаписью Save (запрос пользователя) | `cycleArchive.js`, `spotbot.js` | S |

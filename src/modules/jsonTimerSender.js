@@ -21,6 +21,25 @@ const activeSymbols = new Set();
  *   поля для записи, либо null если писать нечего (статус не PARTIALLY_FILLED
  *   или объём исполнения не вырос с прошлого опроса).
  */
+/**
+ * Помечает в конфиге CANCELED все ордера, реально размещённые на бирже
+ * (orderId) и не дошедшие до финального статуса. Вызывается после финального
+ * cancelOpenOrders в DONE-ветке: биржа ордера сняла, но в таблице они
+ * оставались NEW — recovery-скан после рестарта считал завершённый цикл
+ * «живым» (ложный ATTENTION + заблокированный Save).
+ * Чистая функция — тестируется без биржи.
+ */
+function markOpenAsCanceled(obj) {
+  for (const side of ['BUY', 'SELL']) {
+    for (const o of obj[side] || []) {
+      if (o && o.orderId != null && (o.status === 'NEW' || o.status === 'PARTIALLY_FILLED')) {
+        o.status = 'CANCELED';
+      }
+    }
+  }
+  return obj;
+}
+
 function partialFillDelta(stored, message) {
   if (!message || message.status !== 'PARTIALLY_FILLED') return null;
   if (message.executedQty === undefined) return null;
@@ -127,10 +146,14 @@ class JsonTimerSender extends EventEmitter {
         let currentOrder = this.job[strategy.method](obj, key, val); // strategy.
 
         if (currentOrder.status === Status.DONE) {
-          const result = await this.#runToApi(currentOrder);
+          const result = await this.#runToApi(currentOrder); // cancelOpenOrders
 
           // this.#applyStatusesToOrders(obj['BUY'], result);
           // this.#applyStatusesToOrders(obj['SELL'], result);
+
+          // cancelOpenOrders снял страховочные ордера на бирже — зафиксировать
+          // их отмену в таблице (иначе в истории остаются вечные NEW)
+          markOpenAsCanceled(obj);
 
           obj.status = Status.DONE;
           obj.date_modified = new Date().toISOString();
@@ -421,3 +444,4 @@ class JsonTimerSender extends EventEmitter {
 
 module.exports = JsonTimerSender;
 module.exports.partialFillDelta = partialFillDelta;
+module.exports.markOpenAsCanceled = markOpenAsCanceled;
