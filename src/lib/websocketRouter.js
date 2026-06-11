@@ -17,6 +17,20 @@ class WebSocketRouter {
     this.timerSenders = new Map();
 
     this.setup();
+    this.startHeartbeat();
+  }
+
+  // Зомби-сокеты (закрытый ноутбук, обрыв NAT) не эмитят 'close' и висели бы
+  // в комнатах вечно. Стандартный паттерн ws: ping каждые 30 с; кто не ответил
+  // pong к следующему тику — terminate (это уже эмитит 'close' → уборка комнат).
+  startHeartbeat() {
+    this.heartbeat = setInterval(() => {
+      this.wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) return ws.terminate();
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }, 30000);
   }
 
   // Called from bin/www after the session has been validated on the upgrade
@@ -31,6 +45,9 @@ class WebSocketRouter {
     this.wss.on('connection', (ws) => {
       let currentSymbol = null;
       console.log('🟢 WebSocket connected');
+
+      ws.isAlive = true;
+      ws.on('pong', () => { ws.isAlive = true; });
 
       ws.on('message', (msg) => {
         let data;
@@ -61,6 +78,13 @@ class WebSocketRouter {
               return this.safeSend(ws, { error: 'invalid strategy' });
             }
 
+            // resubscribe на другой символ: отписать сокет от прежней комнаты,
+            // иначе он навсегда остаётся в Set старого символа и получает чужие
+            // рассылки (раздел 3 ANALYSIS)
+            if (currentSymbol && currentSymbol !== symbol) {
+              this.clients.get(currentSymbol)?.delete(ws);
+            }
+
             currentSymbol = symbol;
 
             if (!this.clients.has(currentSymbol)) {
@@ -72,16 +96,21 @@ class WebSocketRouter {
               const ts = new JsonTimerSender(this.wss, data.strategy);
               this.timerSenders.set(currentSymbol, ts);
 
+              // sym — зафиксированный символ этого ts. Обработчики ниже живут
+              // на ts, а closure-переменная currentSymbol принадлежит соединению
+              // и мутирует при resubscribe — рассылка ушла бы не в ту комнату.
+              const sym = currentSymbol;
+
               // add symbol at ones
               pair.addSymbol({
-                symbol: currentSymbol, // @TODO remove
+                symbol: sym, // @TODO remove
                 status: statusPair.NEW,
                 base: data.base,
                 quote: data.quote,
               });
 
               ts.on('price', (price) => {
-                for (const client of this.clients.get(currentSymbol) || []) {
+                for (const client of this.clients.get(sym) || []) {
                   this.safeSend(client, {
                     event: 'updatePrice',
                     data: price,
@@ -98,11 +127,13 @@ class WebSocketRouter {
                     data: 0,
                   });
                 }
+
+                this.#maybeCleanup(symbol);
               });
 
               // полный конфиг каждый тик readLoop — только подписчикам символа
               ts.on('tableData', (tableData) => {
-                for (const client of this.clients.get(currentSymbol) || []) {
+                for (const client of this.clients.get(sym) || []) {
                   this.safeSend(client, { event: 'tableData', data: tableData });
                 }
               });
@@ -210,10 +241,26 @@ class WebSocketRouter {
           if (this.clients.get(currentSymbol).size === 0) {
             this.clients.delete(currentSymbol);
             console.log(`🔌 no clients for ${currentSymbol}, stream still active`);
+            this.#maybeCleanup(currentSymbol);
           }
         }
       });
     });
+  }
+
+  // timerSender жил вечно даже без клиентов и без цикла (утечка + слушатели).
+  // Убираем, когда некому слушать И цикл не работает; следующий subscribe
+  // создаст свежий инстанс, статус пары хранится в pair и переживает уборку.
+  #maybeCleanup(symbol) {
+    const ts = this.timerSenders.get(symbol);
+    if (!ts) return;
+
+    const hasClients = (this.clients.get(symbol)?.size || 0) > 0;
+    if (hasClients || ts.getSpotStatus(symbol)) return;
+
+    ts.removeAllListeners();
+    this.timerSenders.delete(symbol);
+    console.log(`🧹 timerSender ${symbol} removed (no clients, not running)`);
   }
 
   safeSend(ws, data) {

@@ -42,6 +42,7 @@ export class SpotWS {
     this.ws = new WebSocket(`${protocol}${location.host}`);
 
     this.ws.onopen = () => {
+      this.reconnectAttempts = 0; // успешное подключение — сбросить backoff
       this.notifications.showNotification('Web Socket open', 'success');
       this.ws.send(
         JSON.stringify({
@@ -115,10 +116,29 @@ export class SpotWS {
 
     this.ws.onclose = (event) => {
       this.notifications.showNotification(`Web Socket closed: ${event.code}`, 'info');
+
+      // Экспоненциальный backoff вместо вечных ретраев каждые 2 с: при 401
+      // (истёкшая сессия отбивает upgrade) клиент спамил нотификациями
+      // бесконечно. После лимита — предложение перелогиниться.
+      this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+
+      if (this.reconnectAttempts > 8) {
+        this.notifications.showNotification(
+          'WebSocket: connection lost. Reload the page — the session may have expired.',
+          'danger',
+          false
+        );
+        return;
+      }
+
+      const delay = Math.min(2000 * 2 ** (this.reconnectAttempts - 1), 30000);
       setTimeout(() => {
-        this.notifications.showNotification(`Web Socket Reconnecting...`, 'warning');
+        this.notifications.showNotification(
+          `Web Socket Reconnecting (${this.reconnectAttempts})...`,
+          'warning'
+        );
         this.connectWebSocket();
-      }, 2000);
+      }, delay);
     };
 
     this.ws.onerror = (err) => {
