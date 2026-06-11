@@ -268,6 +268,11 @@ notification + логBus; лучше — бесконечный reconnect с cap
 - `src/data/` в `.gitignore` и не закоммичен — правильно; но это единственное
   хранилище денег-состояния. Стоит добавить в README/cron бэкап каталога
   (он уже частично версионируется самим роботом — архивы `{timestamp}-SYMBOL`).
+
+  > Дополнено (ветка `cycle-archive`): архив пишет не только autoRestart —
+  > `/calculator/save` перед перезаписью снапшотит прожитый цикл (есть ордера
+  > с orderId) в `{timestamp}-SYMBOL-binance.json` (`lib/cycleArchive.js`,
+  > юнит-тесты). История прерванных/завершённых циклов больше не теряется.
 - `.env` симлинк в корне + `env_file required:false` + `setup-user` — удобная
   схема; проверить, что права на `src/.env` 600.
 
@@ -291,5 +296,6 @@ notification + логBus; лучше — бесконечный reconnect с cap
 | 12 | Graceful shutdown (SIGTERM) | `bin/www` | S |
 | 13 | Multi-stage Dockerfile + healthcheck | `docker-config/` | M |
 | 14 | Чистка мёртвого кода, унификация CJS/ESM, переименования | везде | M |
+| 15 | ✅ Архив прожитого цикла перед перезаписью Save (запрос пользователя) | `cycleArchive.js`, `spotbot.js` | S |
 
 S — до часа, M — до полудня, L — день+.

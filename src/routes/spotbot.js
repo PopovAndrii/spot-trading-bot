@@ -7,6 +7,7 @@ const { InvokeApi } = require('../lib/invokeAPI');
 const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
 const { pair, statusPair } = require('../lib/pair');
+const { archiveIfActive } = require('../lib/cycleArchive');
 
 const API = new InvokeApi();
 
@@ -213,9 +214,20 @@ router.post('/calculator/save', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
 
+    // история циклов: прожитый цикл (есть ордера с orderId) снапшотится в
+    // {timestamp}-SYMBOL-binance.json перед перезаписью новым расчётом
+    const archived = await archiveIfActive(filePath);
+    if (archived) {
+      console.log(`🗄️ Previous cycle archived: ${path.basename(archived)}`);
+    }
+
     await writeFileAtomic(filePath, jsonString, 'utf8');
 
-    res.json({ message: 'Order settings table saved' });
+    res.json({
+      message: archived
+        ? 'Order settings table saved. Previous cycle archived.'
+        : 'Order settings table saved',
+    });
   } catch (err) {
     console.error('Error saving file:', err);
     res.status(500).json({ message: 'Error saving file' });
