@@ -12,9 +12,10 @@ export class SetStrategy {
 
       this.notifications.showNotification(`The strategy chosen is: <b>${id}</b>`, 'success', 15000);
 
-      const url = new URL(window.location.href);
-      const base = url.searchParams.get('base');
-      const quote = url.searchParams.get('quote');
+      // base/quote — глобальные константы страницы (рендерятся сервером в
+      // spotbot.ejs), как уже делает LoadDataFromFileCalculator. Раньше они
+      // брались из query-параметров URL: переход по ссылке без ?base=&quote=
+      // (navbar) давал строки "undefined" и 500 на фетче.
       this.strategyName = id;
       this.#getStrategyData(base, quote);
     });

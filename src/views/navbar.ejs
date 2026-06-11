@@ -45,7 +45,10 @@
         status = value.status == 1 ? 'running' : 'pause';
       }
 
-      a.href = `/spotbot/${value.symbol}?base=${value.base}&quote=${value.quote}`;
+      // base/quote в query не нужны: GET /spotbot/:currency сам выводит их из
+      // exchangeInfo. А у символов, помеченных recovery-сканом при старте,
+      // base/quote в pair нет — ссылка получалась ?base=undefined&quote=undefined.
+      a.href = `/spotbot/${value.symbol}`;
       a.textContent = `${value.symbol} ${status}`;
 
       ddown.appendChild(a);
