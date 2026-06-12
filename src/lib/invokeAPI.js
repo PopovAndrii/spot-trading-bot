@@ -210,6 +210,15 @@ class InvokeApi {
       this.getConsoleMsg(`cancelOpenOrders() ${data.symbol}`);
       return { success: true, message: res.data.length };
     } catch (err) {
+      // -2011 "Unknown order sent": на бирже нечего отменять (ордера уже
+      // исполнены/сняты, либо гонка с openOrders). Для "отменить все" это не
+      // ошибка, а идемпотентный no-op → success (0 отменено), чтобы вызывающий
+      // мог штатно снять recovery-лок и убрать пару из меню.
+      if (err.response?.data?.code === -2011) {
+        this.getConsoleMsg(`cancelOpenOrders() ${data.symbol}: no open orders`);
+        return { success: true, message: 0 };
+      }
+
       const message = this.#getCatchMsg(err);
 
       this.getConsoleMsg(message, false);

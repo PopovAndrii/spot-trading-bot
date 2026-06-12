@@ -35,6 +35,7 @@
     const symbols = await res.json();
 
     const ddown = document.querySelector('#main-menu .ddown-menu');
+    ddown.replaceChildren(); // чистим перед заполнением: при повторном вызове (после отмены) иначе задвоит
 
     for (const [key, value] of symbols.entries()) {
       const a = document.createElement('a');

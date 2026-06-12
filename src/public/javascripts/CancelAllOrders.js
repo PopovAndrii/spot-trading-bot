@@ -43,6 +43,9 @@ export class CancelAllOrders {
 
       if (data.success) {
         this.notifications.showNotification(`${data.message} active orders cancelled per pair ${currency}`, 'success');
+        // Пара удалена из in-memory списка на бэке — перечитываем меню навигации,
+        // чтобы вкладка ушла без перезагрузки страницы.
+        window.fetchActiveSymbols?.();
       } else {
         this.notifications.showNotification(data.message, 'danger');
       }

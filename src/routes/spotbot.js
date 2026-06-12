@@ -344,6 +344,14 @@ router.post('/cancel/allorders', async (req, res, next) => {
     pair.updateSymbol({ symbol, status: statusPair.STOP });
   }
 
+  // Ордеров на бирже больше нет и цикл не работает (кнопка Cancel заблокирована,
+  // пока не нажат Stop) — убираем пару из in-memory списка, чтобы она ушла из
+  // меню навигации. Файл данных на диске не трогаем; повторный subscribe вернёт
+  // пару как NEW. deleteSymbol — no-op, если символа в Map уже нет.
+  if (!pair.isRunning(symbol)) {
+    pair.deleteSymbol(symbol);
+  }
+
   res.json(result);
 });
 
