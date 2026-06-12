@@ -92,8 +92,8 @@ class Calculator {
 
       let sellCurrency = ((spentTotal / totalSell) * (100 + this.data['field-profit'] + this.data['field-commission'])) / 100;
 
-      // Потрачено в quote-валюте (деньги = price × qty)
-      const spentQuote = actualSpent.toFixed(2);
+      // Потрачено в quote-валюте (деньги = price × qty); точность quote = tickSize цены
+      const spentQuote = actualSpent.toFixed(this.data['field-tickSize']);
 
       mainObj.push({
         overlapRange: overlapRange.toFixed(2),
@@ -168,8 +168,8 @@ class Calculator {
 
       let buyPrice = ((spentTotalMoney / sellTotalCoins) * (100 - (this.data['field-profit'] + this.data['field-commission']))) / 100;
 
-      // Потрачено в quote-валюте (деньги = qty × price)
-      const spentQuote = (currentOrderSell * sellPrice).toFixed(2);
+      // Потрачено в quote-валюте (деньги = qty × price); точность quote = tickSize цены
+      const spentQuote = (currentOrderSell * sellPrice).toFixed(this.data['field-tickSize']);
 
       mainObj.push({
         overlapRange: overlapRange.toFixed(2),

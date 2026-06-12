@@ -5,7 +5,10 @@ export class FooterStatus {
     this.timeEl = document.getElementById('ping-time');
     this.netEl = document.getElementById('net-label');
     this.noInternetEl = document.getElementById('no-internet');
+    this.versionEl = document.getElementById('app-version');
     if (!this.dot || !this.timeEl) return;
+
+    this.#loadVersion();
 
     this.offset = 0;
     this.online = false;
@@ -17,6 +20,25 @@ export class FooterStatus {
     setInterval(() => this.#tickClock(), 1000);
     setInterval(() => this.#ping(), 5000);
     this.#ping();
+  }
+
+  // Сборка не меняется в рамте процесса — тянем один раз. Формат: v1.1.0 · 2d6115a* · 14:32
+  // (звёздочка = незакоммиченные изменения; время — когда сервер поднят).
+  async #loadVersion() {
+    if (!this.versionEl) return;
+    try {
+      const res = await fetch('/api/version');
+      if (!res.ok) return;
+      const { version, branch, commit, dirty, startedAt } = await res.json();
+
+      const t = new Date(startedAt);
+      const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+      const rev = `${branch ? branch + '@' : ''}${commit}${dirty ? '*' : ''}`;
+      this.versionEl.textContent = `v${version} · ${rev} · ${hhmm}`;
+      this.versionEl.title = `version ${version} · ${branch ? 'branch ' + branch + ' · ' : ''}commit ${commit}${dirty ? ' (dirty)' : ''} · started ${t.toLocaleString()}`;
+    } catch {
+      /* футер без версии не критичен */
+    }
   }
 
   async #ping() {

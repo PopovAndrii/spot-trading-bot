@@ -17,6 +17,19 @@ export class ConsoleLog {
     this.#setupToggle();
     this.#renderFilters();
     this.#connect();
+
+    // Пара отменена/удалена (CancelAllOrders) — убрать её вкладку-фильтр и записи
+    // из консоли, как она уходит из меню навигации.
+    window.addEventListener('pair-removed', (e) => this.#removeSymbol(e.detail?.symbol));
+  }
+
+  #removeSymbol(symbol) {
+    if (!symbol || !this.symbols.has(symbol)) return;
+    this.symbols.delete(symbol);
+    this.entries = this.entries.filter((e) => e.symbol !== symbol);
+    // если активен фильтр удалённого символа — вернуться на ALL; иначе сохранить
+    // текущий. #setFilter перерисует и кнопки-фильтры, и содержимое.
+    this.#setFilter(this.filter === symbol ? null : this.filter);
   }
 
   #restoreOpen() {
@@ -26,7 +39,9 @@ export class ConsoleLog {
   }
 
   #setupToggle() {
-    this.toggleEl?.addEventListener('click', () => {
+    this.toggleEl?.addEventListener('click', (e) => {
+      // клик по инфо о git-сборке только выделяет текст, не трогает консоль
+      if (e.target.closest('#app-version')) return;
       const isOpen = this.consoleEl.classList.toggle('console--open');
       localStorage.setItem(LS_OPEN, isOpen);
     });

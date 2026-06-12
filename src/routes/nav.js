@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { pair } = require('../lib/pair');
 const logBus = require('../lib/logBus');
+const buildInfo = require('../lib/buildInfo');
 const { isTestnet, requestedTestnet } = require('../lib/runMode');
 
 router.get('/symbols', (req, res) => {
@@ -31,6 +32,11 @@ router.get('/ping', (req, res) => {
   // fallback=true: real, but due to the lack of real keys, it runs on testnet
   const fallback = !requestedTestnet() && testnet;
   res.json({ time: Date.now(), network: testnet ? 'testnet' : 'real', fallback });
+});
+
+// Идентификатор сборки для футера (version + commit + dirty + время старта).
+router.get('/version', (req, res) => {
+  res.json(buildInfo);
 });
 
 // SSE log stream

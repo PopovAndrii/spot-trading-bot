@@ -20,4 +20,13 @@ function history() {
   return [...entries];
 }
 
-module.exports = { log, subscribe, history };
+// Убрать из истории записи отменённой пары, иначе при перезагрузке страницы
+// replay history() снова создаст её вкладку-фильтр в консоли интерфейса.
+function clearSymbol(symbol) {
+  if (!symbol) return;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].msg.includes(symbol)) entries.splice(i, 1);
+  }
+}
+
+module.exports = { log, subscribe, history, clearSymbol };

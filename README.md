@@ -151,7 +151,9 @@ docker compose -f compose.prod.yml run --rm -v ./src:/out -e ENV_OUT=/out/.env a
 
 ```sh
 git pull
-docker compose -f compose.prod.yml up -d --build   # rebuild image + recreate container
+# Pass the commit/branch so the console footer shows them (prod image has no .git):
+GIT_COMMIT=$(git rev-parse --short HEAD) GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
+  docker compose -f compose.prod.yml up -d --build  # rebuild image + recreate container
 docker compose -f compose.prod.yml ps              # status
 docker logs -f exchange-crypto-app                 # live app logs (pm2-runtime → stdout)
 docker compose -f compose.prod.yml down            # stop
@@ -160,6 +162,30 @@ docker compose -f compose.prod.yml down            # stop
 `setup-user` is one-time only (or when changing login/keys). `.env` lives on
 the host (compose reads it via `env_file`), `src/data/` is a mount — the
 robot state and sessions survive the deploy.
+
+**Build info in the console footer (version · branch@commit · start time):**
+
+The footer shows the running build so you know exactly what is deployed —
+handy for dev testing. `GET /api/version` returns `{ version, branch, commit,
+dirty, startedAt }` (computed once at boot in `src/lib/buildInfo.js`):
+
+| Field    | Source (fallback chain)                                                        |
+| -------- | ----------------------------------------------------------------------------- |
+| `version`| `package.json` `version`                                                      |
+| `commit` | `GIT_COMMIT` env → `git rev-parse --short HEAD` → `dev`                        |
+| `branch` | `GIT_BRANCH` env → `git rev-parse --abbrev-ref HEAD` → `` (empty)              |
+| `dirty`  | `git status --porcelain` is non-empty (only when commit came from git; `*` in UI) |
+
+- **Dev** (`compose.yml`): the whole repo is bind-mounted, so `.git` is present;
+  `git` is installed in the image (`docker-config/Dockerfile`, base layer). The
+  footer shows the real `branch@commit` with `*` when there are uncommitted
+  changes. After pulling this change once, rebuild the dev image so `git` lands
+  in it: `docker compose up -d --build app`.
+- **Prod** (`compose.prod.yml`): the image bakes only `src/` — no `.git`. Pass
+  the values as build args (see the launch command above); they are wired through
+  `ARG`/`ENV GIT_COMMIT`/`GIT_BRANCH` in the Dockerfile `prod` target and
+  `build.args` in `compose.prod.yml`. Build **without** them → footer falls back
+  to `dev` (no branch).
 
 > ⚠️ Deploying while a cycle is running: `up -d --build` recreates the
 > container (SIGTERM → graceful shutdown stops cycles cleanly). The cycle

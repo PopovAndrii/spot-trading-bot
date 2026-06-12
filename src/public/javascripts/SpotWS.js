@@ -103,7 +103,14 @@ export class SpotWS {
             const text = document.querySelector('.stream-currency');
 
             if (text) {
-              text.innerHTML = `${message.data.s} ${parseFloat(message.data.c).toFixed(2)}`;
+              // Точность цены берём из tickSize пары (число знаков после
+              // запятой), иначе дешёвые пары (DOGE/SHIB) схлопнутся в 0.00.
+              // field-tickSize уже хранит decimalCount (как в LoadDataCalculator).
+              const tickEl = document.querySelector('#field-tickSize');
+              const tick = parseInt(tickEl?.value, 10);
+              const price = parseFloat(message.data.c);
+              const out = Number.isFinite(tick) ? price.toFixed(tick) : String(price);
+              text.innerHTML = `${message.data.s} ${out}`;
             }
 
             break;

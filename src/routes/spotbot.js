@@ -9,6 +9,7 @@ const { writeFileAtomic } = require('../lib/atomicWrite');
 const { pair, statusPair } = require('../lib/pair');
 const { archiveIfActive } = require('../lib/cycleArchive');
 const { decimalCount, roundToStep } = require('../lib/format');
+const logBus = require('../lib/logBus');
 
 const API = new InvokeApi();
 
@@ -22,7 +23,15 @@ router.get('/:currency', async function (req, res, next) {
   let formatInfo = {};
 
   const exchangeInfo = await API.exchangeInfo({ symbol: currency });
-  const symbolData = exchangeInfo.message.symbols[0] || {};
+  // При ошибке API .message — строка, а не объект; без этой проверки
+  // .message.symbols[0] бросал TypeError (async-роут → unhandled rejection,
+  // запрос подвисал вместо внятной error-страницы). ANALYSIS §2 Баги.
+  if (!exchangeInfo.success) {
+    const err = new Error(`Binance API error: ${exchangeInfo.message}`);
+    err.status = 502;
+    return next(err);
+  }
+  const symbolData = exchangeInfo.message.symbols?.[0] || {};
   const filters = symbolData.filters || [];
 
   base = symbolData.baseAsset || '';
@@ -100,7 +109,15 @@ router.post('/:symbol', async function (req, res, next) {
     API.exchangeInfo({ symbol }),
   ]);
 
-  const symbolData = exchangeInfo.message.symbols[0] || {};
+  // При ошибке любого из вызовов .message — строка; без проверки
+  // .message.symbols[0] / .message.balances.find бросали TypeError → 500.
+  // Возвращаем внятный JSON с сообщением биржи. ANALYSIS §2 Баги.
+  const failed = [account, tickerPrice, exchangeInfo].find((r) => !r.success);
+  if (failed) {
+    return res.status(502).json({ success: false, message: failed.message });
+  }
+
+  const symbolData = exchangeInfo.message.symbols?.[0] || {};
   const filters = symbolData.filters || [];
 
   // Safely take filters if they don't exist - undefined
@@ -326,6 +343,17 @@ router.post('/cancel/allorders', async (req, res, next) => {
   // иначе Save останется заблокированным до перезапуска цикла.
   if (pair.needsAttention(symbol)) {
     pair.updateSymbol({ symbol, status: statusPair.STOP });
+  }
+
+  // Ордеров на бирже больше нет и цикл не работает (кнопка Cancel заблокирована,
+  // пока не нажат Stop) — убираем пару из in-memory списка, чтобы она ушла из
+  // меню навигации. Файл данных на диске не трогаем; повторный subscribe вернёт
+  // пару как NEW. deleteSymbol — no-op, если символа в Map уже нет.
+  if (!pair.isRunning(symbol)) {
+    pair.deleteSymbol(symbol);
+    // чистим историю логов пары, иначе после перезагрузки страницы её вкладка-
+    // фильтр в консоли вернётся из replay logBus.history().
+    logBus.clearSymbol(symbol);
   }
 
   res.json(result);
