@@ -77,19 +77,17 @@ export class LoadDataFromFileCalculator {
 
     if (Object.keys(obj).length === 0) return;
 
-    const spinBox = this.getSpinBox?.();
     document.querySelectorAll('[id^="field-"]').forEach((el) => {
       const value = obj.param[el.id] ?? '';
-      const spin = el.closest('.UIsp');
-      // Спинбоксы: setValue({ silent }) ставит значение И синхронизирует стрелки +/-
-      // БЕЗ эмита ui-spinbox-change (иначе на каждом авто-опросе шли бы лишние
-      // пересчёты и live-записи). flash:false — без анимации на фоновом обновлении.
-      // Скрытые поля (strategy/tickSize/stepSize) — обычным присваиванием.
-      if (spin && spinBox) {
-        spinBox.setValue(spin, value, { silent: true, flash: false });
-      } else {
-        el.value = value;
-      }
+      // Пишем значение НАПРЯМУЮ, без spinBox.setValue: пакет всегда клампит к
+      // data-min/max (SpinBox.d.ts: «always clamped to min/max»). Сохранённый
+      // field-indent="0" (его пишет restartCycle) клампился к min 0.01 и сдвигал
+      // пересчёт сетки в /calculator/result (606.36 → 606.30) — таблица расходилась
+      // с файлом и реально выставленными ордерами. Прямое присваивание .value НЕ
+      // эмитит ui-spinbox-change, поэтому лишних пересчётов/live-записей нет —
+      // ровно поведение v1.0.4. Стрелки +/- во время цикла залочены (params-locked),
+      // их синхронизация тут косметическая.
+      el.value = value;
     });
 
     // Таблицу НЕ строим здесь: её авторитетно рендерит loadDataCalculator.calculate()
