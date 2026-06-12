@@ -51,3 +51,15 @@
 
   // }
 }
+
+.stream-currency {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 1rem;
+  text-align: center;
+  white-space: nowrap;
+  font-size: $font-size-base * 1.5;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
