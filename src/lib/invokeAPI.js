@@ -215,7 +215,6 @@ class InvokeApi {
       // ошибка, а идемпотентный no-op → success (0 отменено), чтобы вызывающий
       // мог штатно снять recovery-лок и убрать пару из меню.
       if (err.response?.data?.code === -2011) {
-        this.getConsoleMsg(`cancelOpenOrders() ${data.symbol}: no open orders`);
         return { success: true, message: 0 };
       }
 

@@ -9,6 +9,7 @@ const { writeFileAtomic } = require('../lib/atomicWrite');
 const { pair, statusPair } = require('../lib/pair');
 const { archiveIfActive } = require('../lib/cycleArchive');
 const { decimalCount, roundToStep } = require('../lib/format');
+const logBus = require('../lib/logBus');
 
 const API = new InvokeApi();
 
@@ -350,6 +351,9 @@ router.post('/cancel/allorders', async (req, res, next) => {
   // пару как NEW. deleteSymbol — no-op, если символа в Map уже нет.
   if (!pair.isRunning(symbol)) {
     pair.deleteSymbol(symbol);
+    // чистим историю логов пары, иначе после перезагрузки страницы её вкладка-
+    // фильтр в консоли вернётся из replay logBus.history().
+    logBus.clearSymbol(symbol);
   }
 
   res.json(result);
