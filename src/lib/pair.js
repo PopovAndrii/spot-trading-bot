@@ -2,6 +2,10 @@ const statusPair = Object.freeze({
   NEW: 0,
   START: 1,
   STOP: 2,
+  // Сервер рестартовал, а в конфиге остались живые ордера (NEW/PARTIALLY_FILLED
+  // с orderId): цикл по ним НЕ идёт, Save заблокирован до явного Start (resume)
+  // или отмены ордеров (ANALYSIS.md п.1.5).
+  ATTENTION: 3,
 });
 
 class Pair {
@@ -11,6 +15,13 @@ class Pair {
 
   addSymbol(obj = {}) {
     if (!obj.symbol) return;
+    const existing = this.symbols.get(obj.symbol);
+    if (existing) {
+      // повторный subscribe не должен затирать статус (например ATTENTION,
+      // выставленный recovery-сканом до первого подключения клиента)
+      this.symbols.set(obj.symbol, { ...obj, status: existing.status });
+      return;
+    }
     this.symbols.set(obj.symbol, obj);
   }
 
@@ -35,6 +46,11 @@ class Pair {
   // live order-state file (req 15). Unknown symbol → not running.
   isRunning(symbol) {
     return this.symbols.get(symbol)?.status === statusPair.START;
+  }
+
+  // Символ помечен recovery-сканом: живые ордера без работающего цикла.
+  needsAttention(symbol) {
+    return this.symbols.get(symbol)?.status === statusPair.ATTENTION;
   }
 }
 

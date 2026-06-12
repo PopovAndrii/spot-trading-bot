@@ -3,6 +3,7 @@ services:
         build:
             context: .
             dockerfile: docker-config/Dockerfile
+            target: dev # код и node_modules приходят bind-mount'ом
         image: exchange-crypto
         container_name: exchange-crypto-${PREFIX_CONTAINER_NAME:-dev}
         restart: unless-stopped
@@ -16,6 +17,8 @@ services:
             - exchange-crypto
         ports:
             - ${PORT:-3002}:${PORT:-3002}
+            # browser-sync (live-reload) — чтобы работал и http://localhost:3000
+            - 3000:3000
         env_file:
             # required:false — контейнер стартует даже без .env (его создаст setup-user)
             - path: .env
@@ -25,6 +28,8 @@ services:
             STATUS_APP: ${STATUS_APP:-false}
             STATUS_LOGIN: ${STATUS_LOGIN:-true}
             PORT: ${PORT:-3002}
+        # Контейнер просто висит; dev-сервер запускается вручную внутри:
+        #   docker compose exec app bash → npm run dev
         command: ["sleep", "infinity"]
 
     # --- nginx ОТКЛЮЧЁН (не нужен) ---

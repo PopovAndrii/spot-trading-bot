@@ -36,6 +36,36 @@ class InvokeApi {
     InvokeApi.instance = this;
   }
 
+  /**
+   * Повтор запроса при rate-limit (ANALYSIS п.2): 429 → ждём Retry-After
+   * (или растущий дефолт) и пробуем снова, максимум 3 ретрая. 418 (бан IP)
+   * НЕ ретраим — продолжать долбить забаненным IP только продлит бан;
+   * ошибка уйдёт в try/catch вызвавшего метода как обычно.
+   */
+  async #withRateLimitRetry(fn) {
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        const status = err.response?.status;
+        if (status !== 429 || attempt >= MAX_RETRIES) throw err;
+
+        const retryAfter = Number(err.response?.headers?.['retry-after']);
+        const delay =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? retryAfter * 1000
+            : 2000 * (attempt + 1);
+
+        this.getConsoleMsg(
+          `429 rate limit — retry in ${delay / 1000}s (${attempt + 1}/${MAX_RETRIES})`,
+          false
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
   getConsoleMsg(err, status = true) {
     if (!err) return;
 
@@ -64,11 +94,13 @@ class InvokeApi {
   async newOrder(data) {
     try {
 
-      const res = await this.client.newOrder(data.symbol, data.side, data.type, {
-        price: data.price,
-        quantity: data.quantity,
-        timeInForce: data.timeInForce,
-      });
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.newOrder(data.symbol, data.side, data.type, {
+          price: data.price,
+          quantity: data.quantity,
+          timeInForce: data.timeInForce,
+        })
+      );
 
       const msg = [
         res.data.symbol,
@@ -87,62 +119,13 @@ class InvokeApi {
       return { success: false, message };
     }
   }
-  // @TODO not used!
-  async newMarketOrder(data) {
-    try {
-      const res = await this.client.newOrder(data.symbol, data.side, data.type, {
-        quantity: data.quantity,
-      });
-
-      console.log('✅ newMarketOrder():', [
-        res.data.symbol,
-        res.data.status,
-        res.data.side,
-        res.data.origQty,
-        res.data.executedQty,
-      ]);
-
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data newMarketOrder():', error.response.data);
-      } else {
-        console.error('❌ message newMarketOrder():', error.message);
-      }
-      return null;
-    }
-  }
-  // @TODO not used!
-  async getHistory(data) {
-    try {
-      const res = await this.client.klines(data.symbol, data.interval || '5s', {
-        limit: data.limit || 60,
-      });
-
-      // const res = await this.client.klines({
-      //   symbol: this.data.symbol,
-      //   interval: this.data.interval || '5s',
-      //   limit: this.data.limit || 60,
-      // });
-
-      // console.log('✅ getHistory():', candles, 'candles');
-
-      return res.data;
-    } catch (error) {
-      if (error.response) {
-        console.error('❌ error.response.data getHistory():', error.response.data);
-      } else {
-        console.error('❌ message getHistory():', error.message);
-      }
-      return null;
-    }
-  }
-
   async getOrder(data) {
     try {
-      const res = await this.client.getOrder(data.symbol, {
-        orderId: data.orderId,
-      });
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.getOrder(data.symbol, {
+          orderId: data.orderId,
+        })
+      );
 
       const msg = [
         data.orderId,
@@ -165,9 +148,11 @@ class InvokeApi {
 
   async cancelOrder(data) {
     try {
-      const res = await this.client.cancelOrder(data.symbol, {
-        orderId: data.orderId,
-      });
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.cancelOrder(data.symbol, {
+          orderId: data.orderId,
+        })
+      );
 
       const msg = [
         data.orderId,
@@ -191,7 +176,7 @@ class InvokeApi {
   // @TODO not used!
   async openOrders(data) {
     try {
-      const res = await this.client.openOrders(data.symbol);
+      const res = await this.#withRateLimitRetry(() => this.client.openOrders(data.symbol));
 
       const msg = { count: res.data.length };
 
@@ -213,7 +198,9 @@ class InvokeApi {
     }
 
     try {
-      const res = await this.client.cancelOpenOrders(data.symbol);
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.cancelOpenOrders(data.symbol)
+      );
 
       if (res.data?.code < 0) {
         this.getConsoleMsg(res.data.msg, false);
@@ -232,7 +219,9 @@ class InvokeApi {
 
   async getAccount() {
     try {
-      const res = await this.client.account({ omitZeroBalances: true });
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.account({ omitZeroBalances: true })
+      );
 
       if (res.data?.code < 0) {
         this.getConsoleMsg(res.data.msg, false);
@@ -251,7 +240,7 @@ class InvokeApi {
 
   async exchangeInfo(data) {
     try {
-      const res = await this.client.exchangeInfo(data);
+      const res = await this.#withRateLimitRetry(() => this.client.exchangeInfo(data));
 
       if (res.data?.code < 0) {
         this.getConsoleMsg(res.data.msg, false);
@@ -270,7 +259,7 @@ class InvokeApi {
 
   async tickerPrice(data = {}) {
     try {
-      const res = await this.client.tickerPrice(data.symbol);
+      const res = await this.#withRateLimitRetry(() => this.client.tickerPrice(data.symbol));
 
       if (res.data?.code < 0) {
         this.getConsoleMsg(res.data.msg, false);
@@ -290,7 +279,7 @@ class InvokeApi {
   async bookTicker(data = {}) {
     try {
       // if data.symbol empty, Binance return arr for all pairs
-      const res = await this.client.bookTicker(data.symbol || '');
+      const res = await this.#withRateLimitRetry(() => this.client.bookTicker(data.symbol || ''));
 
       // Проверка на ошибку в ответе (если API вернуло структуру с ошибкой)
       if (res.data?.code < 0) {
@@ -320,7 +309,7 @@ class InvokeApi {
 
   async getSpotSymbols() {
     try {
-      const res = await this.client.exchangeInfo();
+      const res = await this.#withRateLimitRetry(() => this.client.exchangeInfo());
 
       if (res.data?.code < 0) {
         this.getConsoleMsg(res.data.msg, false);

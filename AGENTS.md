@@ -117,15 +117,35 @@ the singleton API/Stream patterns, and the `STATUS_APP` no-op flag when changing
 
 ## Git conventions
 
-- **Branches:** `dev` = anything that still needs live (real-trading) testing.
-  After live testing passes → merge `dev` into `main`/`master` and bump a version.
-  Default new work to `dev` unless told otherwise; never merge to master or tag a
-  version until the user confirms live testing passed.
+- **Branches / workflow:**
+  - `main` = **releases only** — every commit on it is a tested, tagged release.
+  - `dev` = integration line for **releases that are not yet live-tested**.
+  - **Topic branches are cut from a release** (`main` / a release tag), and after
+    their commits land they are **merged back into `dev`** (not straight into `main`).
+  - Flow: branch off a release → commit → merge into `dev` → live-test on `dev` →
+    merge `dev` into `main` and bump a version.
+  - Default new work to `dev` (or a branch off a release) unless told otherwise;
+    never merge to `main` or tag a version until the user confirms live testing passed.
+  - **No separate build/`release/*` branch** — `dev` *is* the pre-release/staging
+    line. Only cut a `release/1.0.x` branch off a tag if a past release must be
+    patched in parallel with ongoing `dev` work, or if CI build artifacts ever
+    need freezing apart from `dev`. Until then, don't add extra branches.
 - **Commits:** write subject + bullet body in **English**, concise imperative
   subject with a category prefix (`Fix:`, `Test:`, `Job:`, `@TODO`) and a short bullet body.
   **Do NOT append a `Co-Copyright-By` / copyright trailer.**
 - **Timing:** don't `git commit` unprompted — the user batches related changes and
   says when to commit.
+- **Releases:** keep every release in the SAME style as the previous ones — do
+  not change the formatting from release to release. Rules:
+  - **English only**, never Russian.
+  - **No emoji** anywhere.
+  - **Don't change the markdown style** between releases — match how the prior
+    release was formatted.
+  - Single-line annotated tag message: `Release vX.Y.Z — <short summary>`, where
+    the summary is a concise comma/`+` separated list (e.g. `Release v1.0.3 —
+    fixes + rebalance closing logic, dynamic pairs, prod Docker`). Title is just
+    `vX.Y.Z`.
+  - Don't invent a new format or add/remove sections each time.
 
 ## Parked work
 

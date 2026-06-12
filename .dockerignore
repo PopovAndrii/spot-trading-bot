@@ -4,13 +4,16 @@ tmp/
 src/data/*
 
 Dockerfile
-docker-config/
+# docker-config/ НЕ игнорируем: prod-образ копирует entrypoint.sh внутрь
 docker-compose.yml
 docker-compose.yaml
+compose.yml
+compose.prod.yml
 Homestead.json
 Homestead.yaml
 npm-debug.log
 node_modules/
+**/node_modules
 public/hot/
 public/storage/
 vendor/
@@ -21,6 +24,7 @@ storage/framework/views/**
 yarn-error.log
 
 .env*
+**/.env*
 .idea
 .phpunit.result.cache
 

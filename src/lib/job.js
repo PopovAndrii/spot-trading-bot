@@ -1,7 +1,7 @@
 const { rebalanceClose } = require('./rebalanceClose');
 
 const Status = Object.freeze({
-  REDY: 0, // 0 - can deletad. never started
+  READY: 0, // 0 - can deletad. never started
   STARTED: 1, // 1 - in process. some order done
   STOPPED: 2, // 2 -
   DONE: 3, // 3 - not done(error etc)

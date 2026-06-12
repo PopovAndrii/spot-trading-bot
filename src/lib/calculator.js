@@ -1,4 +1,6 @@
-export class Calculator {
+// CommonJS, как и весь остальной бэкенд (ANALYSIS п.14): раньше файл был
+// единственным ESM-модулем и работал только благодаря require(esm) в Node ≥22.
+class Calculator {
   constructor(constructorData, strategy = 'long') {
     const params = this.parseNumbers(constructorData);
 
@@ -183,3 +185,5 @@ export class Calculator {
     return mainObj;
   };
 }
+
+module.exports = { Calculator };

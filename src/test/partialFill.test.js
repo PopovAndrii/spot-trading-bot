@@ -49,3 +49,35 @@ test('invalid executedQty → treated as 0', () => {
     cummulativeQuoteQty: 0,
   });
 });
+
+// Финальный cancelOpenOrders снимает страховочные ордера на бирже; их отмена
+// должна фиксироваться в таблице (иначе вечные NEW + ложный ATTENTION).
+const { markOpenAsCanceled } = require('../modules/jsonTimerSender');
+
+test('markOpenAsCanceled: placed NEW/PARTIALLY_FILLED → CANCELED, finals untouched', () => {
+  const obj = {
+    BUY: [
+      { status: 'FILLED', orderId: 1 },
+      { status: 'NEW', orderId: 2 },
+      { status: null, orderId: null }, // не размещался — не трогаем
+    ],
+    SELL: [
+      { status: 'PARTIALLY_FILLED', orderId: 3 },
+      { status: 'CANCELED', orderId: 4 },
+    ],
+  };
+
+  markOpenAsCanceled(obj);
+
+  assert.equal(obj.BUY[0].status, 'FILLED');
+  assert.equal(obj.BUY[1].status, 'CANCELED');
+  assert.equal(obj.BUY[2].status, null);
+  assert.equal(obj.SELL[0].status, 'CANCELED');
+  assert.equal(obj.SELL[1].status, 'CANCELED');
+});
+
+test('markOpenAsCanceled: NEW without orderId (never reached exchange) → untouched', () => {
+  const obj = { BUY: [{ status: 'NEW', orderId: null }], SELL: [] };
+  markOpenAsCanceled(obj);
+  assert.equal(obj.BUY[0].status, 'NEW');
+});

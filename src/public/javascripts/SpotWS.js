@@ -42,6 +42,7 @@ export class SpotWS {
     this.ws = new WebSocket(`${protocol}${location.host}`);
 
     this.ws.onopen = () => {
+      this.reconnectAttempts = 0; // успешное подключение — сбросить backoff
       this.notifications.showNotification('Web Socket open', 'success');
       this.ws.send(
         JSON.stringify({
@@ -64,51 +65,39 @@ export class SpotWS {
               this.#btnRule(true);
               this.notifications.showNotification('Table data loaded. Bot in progress.', 'success');
               this.isRunning = true;
-
-              if (!this.interval) {
-                this.loadDataFromFileCalculator.getStateCalculator();
-                this.interval = setInterval(() => {
-                  if (this.#isWebSocketOpen(this.ws)) {
-                    this.loadDataFromFileCalculator.getStateCalculator();
-                  }
-                }, 20000);
-              }
+              // начальная отрисовка; дальше таблица приходит push-событием
+              // 'tableData' на каждом тике робота — поллинг не нужен
+              this.loadDataFromFileCalculator.getStateCalculator();
             } else {
               // Бот не запущен (в т.ч. после падения/рестарта сервера) — снять блокировку
               this.#btnRule(false);
               this.isRunning = false;
-              if (this.interval) {
-                clearInterval(this.interval);
-                this.interval = null;
-              }
             }
+            break;
+          case 'tableData':
+            // push полного конфига от readLoop (только наша комната символа)
+            this.loadDataFromFileCalculator.applyState(message.data);
             break;
           case 'updateTableData':
             if (message.data === 1) {
               this.#btnRule(true);
               this.isRunning = true;
-              if (!this.interval) {
-                this.interval = setInterval(() => {
-                  if (this.#isWebSocketOpen(this.ws)) {
-                    this.loadDataFromFileCalculator.getStateCalculator();
-                  }
-                }, 20000);
-              }
             }
             if (message.data === 0) {
-              if (this.interval) {
-                clearInterval(this.interval);
-                this.interval = null;
-              }
               this.#btnRule(false);
               this.isRunning = false;
               // финальное обновление таблицы — показать итоговые статусы/цвета
-              // (синий на закрытом SELL) без перезагрузки страницы
+              // (синий на закрытом SELL) без перезагрузки страницы; push больше
+              // не придёт (цикл остановлен), поэтому единичный fetch
               this.loadDataFromFileCalculator.getStateCalculator();
             }
             break;
           case 'restartSync':
             this.#updateRestartSwitch(message.data);
+            break;
+          case 'notification':
+            // generic server-side notification (e.g. price stream lost/restored)
+            this.notifications.showNotification(message.data.message, message.data.type || 'info');
             break;
           case 'updatePrice':
             const text = document.querySelector('.stream-currency');
@@ -127,15 +116,29 @@ export class SpotWS {
 
     this.ws.onclose = (event) => {
       this.notifications.showNotification(`Web Socket closed: ${event.code}`, 'info');
-      setTimeout(() => {
-        this.notifications.showNotification(`Web Socket Reconnecting...`, 'warning');
-        this.connectWebSocket();
-      }, 2000);
 
-      if (this.interval) {
-        clearInterval(this.interval);
-        this.interval = null;
+      // Экспоненциальный backoff вместо вечных ретраев каждые 2 с: при 401
+      // (истёкшая сессия отбивает upgrade) клиент спамил нотификациями
+      // бесконечно. После лимита — предложение перелогиниться.
+      this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+
+      if (this.reconnectAttempts > 8) {
+        this.notifications.showNotification(
+          'WebSocket: connection lost. Reload the page — the session may have expired.',
+          'danger',
+          false
+        );
+        return;
       }
+
+      const delay = Math.min(2000 * 2 ** (this.reconnectAttempts - 1), 30000);
+      setTimeout(() => {
+        this.notifications.showNotification(
+          `Web Socket Reconnecting (${this.reconnectAttempts})...`,
+          'warning'
+        );
+        this.connectWebSocket();
+      }, delay);
     };
 
     this.ws.onerror = (err) => {
@@ -151,14 +154,9 @@ export class SpotWS {
       this.ws = null;
     }
 
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
-    }
-
     const startBtn = document.getElementById('startBtn');
     if (startBtn && this.btnClickHandler) {
-      startBtn.removeEventListener('click', this.btnClickHandler);
+      startBtn.removeEventListener('ui-button-change', this.btnClickHandler);
     }
   }
 
@@ -236,11 +234,14 @@ export class SpotWS {
     document.querySelector('.UIbg')?.classList.toggle('params-locked', lock);
     document.getElementById('group-spinbox')?.classList.toggle('params-locked', lock);
 
+    // Блокируем Calculate и Save на время работы. Именно атрибут disabled, а не
+    // класс: пакет UIb гасит клик/события только по :disabled / [aria-disabled],
+    // CSS-правила для класса .disabled у UIb нет.
     const settingsCalculate = document.getElementById('settings-calculate');
-    settingsCalculate.classList.toggle('disabled', Boolean(status));
+    settingsCalculate.disabled = Boolean(status);
 
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
-    settingsCalculateSave.classList.toggle('disabled', Boolean(status));
+    settingsCalculateSave.disabled = Boolean(status);
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
     cancelAllOrders.disabled = Boolean(status);

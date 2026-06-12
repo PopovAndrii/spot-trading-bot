@@ -7,8 +7,12 @@
 const app = require('../app');
 const debug = require('debug')('www:server');
 const http = require('http');
+const path = require('path');
 // const JsonTimerSender = require('../modules/jsonTimerSender');
 const WebSocketRouter = require('../lib/websocketRouter');
+const { scanLiveCycles } = require('../lib/recovery');
+const { pair, statusPair } = require('../lib/pair');
+const logBus = require('../lib/logBus');
 /**
  * Get port from environment and store in Express.
  */
@@ -19,6 +23,21 @@ app.set('port', port);
 var server = http.createServer(app);
 
 const wsRouter = new WebSocketRouter();
+
+// Recovery-скан (ANALYSIS.md п.1.5): состояние «running» живёт в памяти и не
+// переживает рестарт. Если в data/ остались конфиги с живыми ордерами
+// (NEW/PARTIALLY_FILLED + orderId) — они висят на бирже, но цикл по ним не
+// ходит, и write-lock Save не действует. Помечаем символ ATTENTION: Save
+// блокируется, UI получает предупреждение при subscribe. Возобновление —
+// кнопкой Start (состояние цикла целиком в файле), либо отмена ордеров.
+scanLiveCycles(path.join(__dirname, '../data')).then((found) => {
+  for (const { symbol, file, liveOrders } of found) {
+    pair.addSymbol({ symbol, status: statusPair.ATTENTION });
+    const msg = `⚠️ ${symbol}: ${liveOrders} live order(s) in ${file} after server restart — cycle NOT running, Save locked. Press Start to resume or cancel orders.`;
+    console.warn(msg);
+    logBus.log(msg);
+  }
+});
 
 // Authorize the WebSocket handshake the same way HTTP routes are protected:
 // run the shared session middleware on the upgrade request and require a
@@ -66,6 +85,26 @@ server.listen(port, '0.0.0.0', () => {
 });
 server.on('error', onError);
 server.on('listening', onListening);
+
+// Graceful shutdown (ANALYSIS п.12): docker stop шлёт SIGTERM (pm2-runtime
+// форвардит). Закрываем HTTP, останавливаем циклы/стримы и даём текущему
+// проходу итератора дописаться (записи атомарны), затем выходим.
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  console.log(`⏹️ ${signal} received — shutting down...`);
+
+  server.close(() => console.log('HTTP server closed'));
+  wsRouter.shutdown();
+
+  // 3 с на завершение in-flight запросов/записей; docker даёт 10 c до SIGKILL
+  setTimeout(() => process.exit(0), 3000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 /**
  * Normalize a port into a number, string, or false.

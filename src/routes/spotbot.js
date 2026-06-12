@@ -6,7 +6,9 @@ const path = require('path');
 const { InvokeApi } = require('../lib/invokeAPI');
 const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
-const { pair } = require('../lib/pair');
+const { pair, statusPair } = require('../lib/pair');
+const { archiveIfActive } = require('../lib/cycleArchive');
+const { decimalCount, roundToStep } = require('../lib/format');
 
 const API = new InvokeApi();
 
@@ -18,16 +20,6 @@ router.get('/:currency', async function (req, res, next) {
   let base = '';
   let quote = '';
   let formatInfo = {};
-
-  const decimalCount = (value) => {
-    const n = Number(value);
-    if (!n || !isFinite(n)) return 0;
-    // toExponential is robust against small numbers (0.0000001 → “1e-7”), 
-    // which break the naive split(‘.’) due to exponential notation.
-    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
-    const fractional = (mantissa.split('.')[1] || '').length;
-    return Math.max(0, fractional - Number(exp));
-  };
 
   const exchangeInfo = await API.exchangeInfo({ symbol: currency });
   const symbolData = exchangeInfo.message.symbols[0] || {};
@@ -116,26 +108,6 @@ router.post('/:symbol', async function (req, res, next) {
   const lotSizeFilter = filters.find((f) => f.filterType === 'LOT_SIZE');
   const minNotionalFilter = filters.find((f) => f.filterType === 'NOTIONAL');
 
-  // Function for counting decimal places
-  const decimalCount = (value) => {
-    const n = Number(value);
-    if (!n || !isFinite(n)) return 0;
-    // toExponential устойчив к малым числам (0.0000001 → "1e-7"), которые
-    // ломают наивный split('.') из-за экспоненциальной записи.
-    const [mantissa, exp] = Math.abs(n).toExponential().split('e');
-    const fractional = (mantissa.split('.')[1] || '').length;
-    return Math.max(0, fractional - Number(exp));
-  };
-
-  // Rounding to the nearest step. mode='floor' (default) для остатков,
-  // 'ceil' для минимумов (чтобы не упасть ниже биржевого порога).
-  const roundToStep = (value, step, mode = 'floor') => {
-    if (typeof value !== 'number' || isNaN(value) || !step) return 0;
-    const precision = Math.max(0, Math.floor(-Math.log10(step)));
-    const round = mode === 'ceil' ? Math.ceil : Math.floor;
-    return Number((round(value / step) * step).toFixed(precision));
-  };
-
   // Get your balance safely
   const balanceEntry = account.message.balances.find((b) => b.asset === asset);
   const balance = balanceEntry ? parseFloat(balanceEntry.free) : 0;
@@ -181,6 +153,17 @@ router.post('/calculator/save', async (req, res, next) => {
       return res.status(409).json({ message: 'Cycle is running — press "Stop" before saving' });
     }
 
+    // Recovery-лок (ANALYSIS п.1.5): рестарт сервера прервал цикл посередине —
+    // в файле живые ордера (NEW/PARTIALLY_FILLED), они висят на бирже, но цикл
+    // по ним не возобновлён. Save затёр бы их orderId — потеря контроля над
+    // реальными ордерами. Завершённые циклы (DONE, без живых ордеров) скан
+    // не помечает — их Save перезаписывает как обычно.
+    if (pair.needsAttention(symbol)) {
+      return res.status(409).json({
+        message: 'Server was restarted with live orders — press "Start" to resume or cancel orders before saving',
+      });
+    }
+
     const msg = req.body.message;
     if (
       !Array.isArray(msg.BUY) ||
@@ -202,9 +185,20 @@ router.post('/calculator/save', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
 
+    // история циклов: прожитый цикл (есть ордера с orderId) снапшотится в
+    // {timestamp}-SYMBOL-binance.json перед перезаписью новым расчётом
+    const archived = await archiveIfActive(filePath);
+    if (archived) {
+      console.log(`🗄️ Previous cycle archived: ${path.basename(archived)}`);
+    }
+
     await writeFileAtomic(filePath, jsonString, 'utf8');
 
-    res.json({ message: 'Order settings table saved' });
+    res.json({
+      message: archived
+        ? 'Order settings table saved. Previous cycle archived.'
+        : 'Order settings table saved',
+    });
   } catch (err) {
     console.error('Error saving file:', err);
     res.status(500).json({ message: 'Error saving file' });
@@ -239,12 +233,75 @@ router.post('/calculator/restart', async (req, res, next) => {
 
     await writeFileAtomic(filePath, data, 'utf8');
 
-    const str = newData.restart == "true" ? "on" : "off";
+    // newData.restart выше приведён к boolean — сравнение со строкой "true"
+    // всегда давало false и ответ «off» (ANALYSIS.md п.2, баги)
+    const str = newData.restart === true ? "on" : "off";
 
     res.json({ message: `Restart for: ${symbol} is <b>${str}</b>` });
   } catch (err) {
     console.error('Error saving file:', err);
     res.status(500).json({ message: 'Error saving file' });
+  }
+});
+
+// Live-обновление параметров, не влияющих на расчётную таблицу: Active orders и
+// Request frequency. Эти спинбоксы НЕ блокируются на время работы (вынесены из
+// #group-spinbox), и их изменения должны попадать в файл прямо во время цикла —
+// робот перечитывает конфиг на каждом проходе readLoop. В отличие от /save, здесь
+// НЕТ guard isRunning: правка точечная (только param[key]), ордера не трогаются.
+router.post('/calculator/param', async (req, res, next) => {
+  try {
+    const msg = req.body.message || {};
+    const rawPair = msg.pair;
+    if (!rawPair) {
+      return res.status(400).json({ message: 'Pair is required' });
+    }
+
+    // Server-side clamp (ANALYSIS п.2): UI-минимумы спинбоксов легко обходятся
+    // прямым POST, а requestFrequency=1 × getOrder на каждый ордер — риск бана
+    // Binance (-1003/418). Границы зеркалят SpinBox'ы в spotbot.ejs.
+    const LIMITS = {
+      'field-activeOrders': { min: 2, max: 50 },
+      'field-requestFrequency': { min: 1000, max: 5000 },
+    };
+
+    const limit = LIMITS[msg.key];
+    if (!limit) {
+      return res.status(400).json({ message: 'Invalid param key' });
+    }
+
+    const num = Number(msg.value);
+    if (!Number.isFinite(num)) {
+      return res.status(400).json({ message: 'Invalid param value' });
+    }
+    const value = Math.min(limit.max, Math.max(limit.min, Math.round(num)));
+
+    const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
+    const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
+
+    const content = await fs.readFile(filePath, 'utf8');
+    const data = JSON.parse(content);
+
+    if (!data.param || typeof data.param !== 'object') {
+      data.param = {};
+    }
+    data.param[msg.key] = String(value);
+
+    let jsonString;
+    try {
+      jsonString = JSON.stringify(data, null, 2);
+    } catch (err) {
+      console.error('Invalid data for JSON:', err);
+      return res.status(400).json({ message: 'Invalid data for JSON' });
+    }
+
+    await writeFileAtomic(filePath, jsonString, 'utf8');
+
+    // value, а не msg.value: показать фактически сохранённое (после clamp)
+    res.json({ message: `${msg.key} = <b>${value}</b> saved for ${symbol}` });
+  } catch (err) {
+    console.error('Error saving param:', err);
+    res.status(500).json({ message: 'Error saving param' });
   }
 });
 
@@ -263,6 +320,12 @@ router.post('/cancel/allorders', async (req, res, next) => {
 
   if (!result.success) {
     return res.status(500).json(result);
+  }
+
+  // Живых ордеров на бирже больше нет — снять recovery-лок (ANALYSIS п.1.5),
+  // иначе Save останется заблокированным до перезапуска цикла.
+  if (pair.needsAttention(symbol)) {
+    pair.updateSymbol({ symbol, status: statusPair.STOP });
   }
 
   res.json(result);

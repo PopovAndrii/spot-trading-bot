@@ -1,5 +1,3 @@
-import { syncSpinBoxButtons } from './ui/spinboxSync.js';
-
 export class SetStrategy {
   constructor(notifications, onFormatChange) {
     this.notifications = notifications;
@@ -14,9 +12,10 @@ export class SetStrategy {
 
       this.notifications.showNotification(`The strategy chosen is: <b>${id}</b>`, 'success', 15000);
 
-      const url = new URL(window.location.href);
-      const base = url.searchParams.get('base');
-      const quote = url.searchParams.get('quote');
+      // base/quote — глобальные константы страницы (рендерятся сервером в
+      // spotbot.ejs), как уже делает LoadDataFromFileCalculator. Раньше они
+      // брались из query-параметров URL: переход по ссылке без ?base=&quote=
+      // (navbar) давал строки "undefined" и 500 на фетче.
       this.strategyName = id;
       this.#getStrategyData(base, quote);
     });
@@ -104,9 +103,9 @@ export class SetStrategy {
     if (depositSpin) depositSpin.setAttribute('data-step', data['balanceFormat']);
 
     // Reload the SpinBox, otherwise the modified data-step won't take effect.
+    // Пересоздание (destroy + new) заново сканирует все .UIsp и в scan() вызывает
+    // state() по каждому — стрелки +/- синхронизируются сами, ручной sync не нужен.
     this.onFormatChange?.();
-
-    syncSpinBoxButtons();
   }
 
   #getStaticText() {

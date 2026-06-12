@@ -136,31 +136,47 @@ docker network create nginxproxymanager_proxy-network
 # 2. Create ./tmp, .bash_history and the ./.env → ./src/.env symlink:
 ./init
 
-# 3. Create src/.env (login, keys, mode, region, HTTP_LOG):
-docker compose -f compose.prod.yml run --rm app npm run setup-user
+# 3. Create src/.env (login, keys, mode, region, HTTP_LOG).
+#    The prod image is self-contained (src is baked in), so mount the host
+#    src/ to /out and point the script at it with ENV_OUT:
+docker compose -f compose.prod.yml run --rm -v ./src:/out -e ENV_OUT=/out/.env app npm run setup-user
 
-# 4. Install dependencies (image has none — bind-mounted from host).
-#    NODE_ENV=production → installs prod deps only (incl. pm2-runtime).
-docker compose -f compose.prod.yml run --rm app npm ci
-
-# CSS: compiled public/stylesheets/style.css is committed — no build needed here.
-# (sass is a devDependency and is NOT installed under NODE_ENV=production.)
-# If you changed SCSS, rebuild on a dev machine and commit style.css. To build
-# once on the server, temporarily pull dev deps for that run only:
-#   docker compose -f compose.prod.yml run --rm -e NODE_ENV=development app sh -c "npm ci && npm run build-css"
-
-# entrypoint must be executable:
-chmod +x docker-config/entrypoint.sh
+# That's it. npm ci is NOT needed: dependencies, compiled CSS and
+# entrypoint.sh are baked into the image by the multi-stage build
+# (docker-config/Dockerfile, target `prod`). After changing code or SCSS,
+# rebuild the image: docker compose -f compose.prod.yml up -d --build
 ```
 
-**Launch / update:**
+**Launch / update (when `src/.env` already exists):**
 
 ```sh
-docker compose -f compose.prod.yml up -d --build   # build image + start
+git pull
+docker compose -f compose.prod.yml up -d --build   # rebuild image + recreate container
 docker compose -f compose.prod.yml ps              # status
 docker logs -f exchange-crypto-app                 # live app logs (pm2-runtime → stdout)
 docker compose -f compose.prod.yml down            # stop
 ```
+
+`setup-user` is one-time only (or when changing login/keys). `.env` lives on
+the host (compose reads it via `env_file`), `src/data/` is a mount — the
+robot state and sessions survive the deploy.
+
+> ⚠️ Deploying while a cycle is running: `up -d --build` recreates the
+> container (SIGTERM → graceful shutdown stops cycles cleanly). The cycle
+> does NOT resume by itself: the recovery scan marks the symbol with live
+> orders (ATTENTION, Save locked) — open the pair page and press **Start**.
+
+**Cleanup after deploys:**
+
+```sh
+docker image prune -f      # old images: after `up --build` the previous image
+                           # becomes dangling (<none>) — this removes exactly those
+docker builder prune       # build cache — only when you need disk space
+```
+
+Do NOT use `docker builder prune -a` routinely: it drops the cached `npm ci`
+layer, so every next build re-downloads all dependencies (minutes instead of
+seconds while package.json is unchanged).
 
 **PM2 inside the running container** (optional — logs already go to `docker logs`):
 
@@ -171,6 +187,21 @@ docker compose -f compose.prod.yml exec app npx pm2 monit    # live CPU / RAM
 
 > The prod compose starts the app automatically via the entrypoint (`pm2-runtime`).
 > To run it by hand inside the container: `npm run prod-runtime`.
+
+## Branching model
+
+- **`main`** — releases only. Every commit on it is a tested, tagged release.
+- **`dev`** — integration line for releases that are **not yet live-tested**.
+- **Topic branches are cut from a release** (`main` / a release tag). After their
+  commits are done they are **merged back into `dev`**, never straight into `main`.
+
+```
+release (main / tag) ──► topic branch ──commits──► merge into dev ──live test──► merge dev → main (new release)
+```
+
+So the lifecycle is: branch off a release → commit → merge into `dev` → live-test
+on `dev` → merge `dev` into `main` and tag the new version. Nothing reaches `main`
+until live testing on `dev` has passed.
 
 ## Release / versioning
 

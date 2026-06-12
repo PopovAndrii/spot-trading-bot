@@ -96,11 +96,46 @@ export class LoadDataCalculator {
     });
   }
 
-  // Chenge button restart
+  // Change button restart
   restart() {
     document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {
       this.addRestartStatus(e.detail.value);
     });
+  }
+
+  // Active orders / Request frequency: эти спинбоксы вынесены из #group-spinbox и
+  // НЕ блокируются во время работы. Любое изменение пишется в файл на лету —
+  // робот перечитывает конфиг на каждом проходе readLoop, поэтому новые значения
+  // подхватываются на следующем тике. На таблицу-расчёт они не влияют (см. calculator.js).
+  runtimeParams() {
+    const keys = ['field-activeOrders', 'field-requestFrequency'];
+    document.addEventListener('ui-spinbox-change', (e) => {
+      const key = e.detail?.id;
+      if (!keys.includes(key)) return;
+      this.saveRuntimeParam(key, e.detail.value);
+    });
+  }
+
+  async saveRuntimeParam(key, value) {
+    const obj = {
+      'pair': base + quote,
+      'key': key,
+      'value': value,
+    };
+
+    try {
+      const res = await fetch(`/spotbot/calculator/param`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: obj }),
+      });
+
+      const data = await res.json();
+      this.notifications.showNotification(data.message, res.ok ? 'success' : 'warning', 5000);
+    } catch (err) {
+      console.error('❌ saveRuntimeParam():', err);
+      return null;
+    }
   }
 
   getSettings() {
@@ -225,6 +260,14 @@ export class LoadDataCalculator {
 
   async settingsSave() {
     orders.param = this.defaultData;
+
+    // Текущее состояние свитча Restart → в сохраняемый конфиг. Иначе Save пишет
+    // файл без поля restart, и автоповтор не включится, пока свитч не тронут
+    // вручную (отдельный POST /calculator/restart).
+    const restartInput = document
+      .getElementById('settings-calculate-restart')
+      ?.querySelector('input');
+    orders.restart = Boolean(restartInput?.checked);
 
     try {
       const res = await fetch(`/spotbot/calculator/save`, {

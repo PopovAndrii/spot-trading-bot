@@ -9,8 +9,6 @@ const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
 
-const activeSymbols = new Set();
-
 /**
  * Решает, нужно ли персистить рост частичного исполнения ордера.
  * Чистая функция — тестируется без биржи (REQUIREMENTS.md п.20).
@@ -21,6 +19,25 @@ const activeSymbols = new Set();
  *   поля для записи, либо null если писать нечего (статус не PARTIALLY_FILLED
  *   или объём исполнения не вырос с прошлого опроса).
  */
+/**
+ * Помечает в конфиге CANCELED все ордера, реально размещённые на бирже
+ * (orderId) и не дошедшие до финального статуса. Вызывается после финального
+ * cancelOpenOrders в DONE-ветке: биржа ордера сняла, но в таблице они
+ * оставались NEW — recovery-скан после рестарта считал завершённый цикл
+ * «живым» (ложный ATTENTION + заблокированный Save).
+ * Чистая функция — тестируется без биржи.
+ */
+function markOpenAsCanceled(obj) {
+  for (const side of ['BUY', 'SELL']) {
+    for (const o of obj[side] || []) {
+      if (o && o.orderId != null && (o.status === 'NEW' || o.status === 'PARTIALLY_FILLED')) {
+        o.status = 'CANCELED';
+      }
+    }
+  }
+  return obj;
+}
+
 function partialFillDelta(stored, message) {
   if (!message || message.status !== 'PARTIALLY_FILLED') return null;
   if (message.executedQty === undefined) return null;
@@ -41,18 +58,34 @@ class JsonTimerSender extends EventEmitter {
     this.timer = null;
     this.symbol = null;
     this.strategy = strategy;
-    this.autoRestart = false;  // ← ДОБАВЬ
-    this.running = [];
+    this.autoRestart = false;
+    this.running = {}; // словарь по символу (раньше был массив — работало случайно)
     this.exchangeName = 'binance';
 
-    this.busy = false; // идёт ли проход #jobItaretor (защита от наслаивания)
+    this.busy = false; // идёт ли проход #jobIterator (защита от наслаивания)
 
     this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
+
+    this.onExecReport = null; // слушатель user data stream (снимается в stop)
   }
 
   getSpotStatus(symbol) {
     return this.running[symbol];
+  }
+
+  /**
+   * Внеочередной тик readLoop — реакция на executionReport (ANALYSIS п.10).
+   * 50 мс — дебаунс на случай шквала отчётов (серия частичных исполнений).
+   * Если проход уже идёт (busy) — ничего не делаем: он подхватит свежие
+   * статусы через getOrder, а следующий тик запланирует readLoop как обычно.
+   */
+  #kickTick() {
+    if (!this.running[this.symbol]) return;
+    if (this.busy) return;
+
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.readLoop(), 50);
   }
 
   async #runToApi(data = {}) {
@@ -83,14 +116,32 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
+   * Подмешивает в obj свежие live-правки из файла перед записью итератора.
+   * Проход #jobIterator долгий (sleep на каждый ордер) и пишет ВЕСЬ obj целиком:
+   * без мерджа правка param (/calculator/param) или restart (/calculator/restart),
+   * сделанная во время прохода, молча терялась — lost update (ANALYSIS.md п.1.3).
+   * Ордера (BUY/SELL) не трогаем: их единственный писатель во время цикла — сам
+   * итератор (Save заблокирован write-lock'ом, пока пара running).
+   */
+  async #mergeLiveEdits(obj) {
+    try {
+      const fresh = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
+      if (fresh.param) obj.param = fresh.param;
+      if ('restart' in fresh) obj.restart = fresh.restart;
+    } catch {
+      // файла нет/битый — пишем что есть; writeFileAtomic не даст битого JSON
+    }
+  }
+
+  /**
    * Iterates through the entire table of placed orders.
    * @param {Object} obj - Configuration of order data from file or database.
    * @returns {Stop()} - Stop the cycle.
    */
-  async #jobItaretor(obj = {}) {
+  async #jobIterator(obj = {}) {
     const strategy = this.#strategy();
 
-    if (obj.status == Status.REDY && strategy != null) {
+    if (obj.status == Status.READY && strategy != null) {
       let i = 0;
 
       // never started 0
@@ -109,20 +160,27 @@ class JsonTimerSender extends EventEmitter {
         let currentOrder = this.job[strategy.method](obj, key, val); // strategy.
 
         if (currentOrder.status === Status.DONE) {
-          const result = await this.#runToApi(currentOrder);
+          const result = await this.#runToApi(currentOrder); // cancelOpenOrders
 
-          // this.#applyStatusesToOrders(obj['BUY'], result);
-          // this.#applyStatusesToOrders(obj['SELL'], result);
+          // cancelOpenOrders снял страховочные ордера на бирже — зафиксировать
+          // их отмену в таблице (иначе в истории остаются вечные NEW)
+          markOpenAsCanceled(obj);
 
           obj.status = Status.DONE;
           obj.date_modified = new Date().toISOString();
 
+          // свежий restart: свитч могли переключить во время прохода
+          await this.#mergeLiveEdits(obj);
+
           this.autoRestart = obj.restart == true ? true : false;
 
-          if (this.autoRestart) {
-            // write old data
-            await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
+          // Архив завершённой серии — ВСЕГДА, не только при autoRestart.
+          // Раньше копия {timestamp}-SYMBOL писалась только в ветке рестарта,
+          // и при выключенном Restart серия в историю не попадала.
+          // Основной файл при этом остаётся (статус DONE) — видно финал.
+          await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
+          if (this.autoRestart) {
             await this.#sleep(500);
             this.restartCycle(obj);
             await this.#sleep(500);
@@ -165,6 +223,7 @@ class JsonTimerSender extends EventEmitter {
 
           if (delta) {
             Object.assign(stored, delta);
+            await this.#mergeLiveEdits(obj);
             await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
           }
 
@@ -189,20 +248,12 @@ class JsonTimerSender extends EventEmitter {
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
 
+        await this.#mergeLiveEdits(obj);
         await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
 
         await this.#sleep(500);
       }
     }
-  }
-
-  #applyStatusesToOrders(orders, statuses) {
-    orders.forEach((order) => {
-      const match = statuses.find((status) => status.orderId === order.orderId);
-      if (match) {
-        order.status = match.status;
-      }
-    });
   }
 
   async readLoop() {
@@ -214,30 +265,33 @@ class JsonTimerSender extends EventEmitter {
 
       // один проход за раз: если предыдущий ещё идёт — пропускаем тик, но
       // планировщик не блокируем (устойчиво к медленным/зависшим запросам).
-      // stop() реагирует через guard внутри #jobItaretor (this.running).
+      // stop() реагирует через guard внутри #jobIterator (this.running).
       if (!this.busy) {
         this.busy = true;
-        this.#jobItaretor(data)
-          .catch((err) => console.error('jobItaretor:', err))
+        this.#jobIterator(data)
+          .catch((err) => console.error('jobIterator:', err))
           .finally(() => { this.busy = false; });
       }
 
-      this.interval = data['BUY'].length * data['param']['field-requestFrequency'];
+      // clamp: битые/отсутствующие параметры дают NaN|0 → setTimeout(…, NaN)
+      // сработал бы через 0 мс — тугая петля чтения ФС (ANALYSIS.md п.1.2)
+      this.interval = Math.max(
+        1000,
+        Number(data['BUY'].length * data['param']['field-requestFrequency']) || 5000
+      );
 
-      // needs for update teble on UI
-      const message = JSON.stringify({ type: 'data', data });
-
-      this.wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-          client.send(message);
-        }
-      });
+      // push-обновление таблицы (ANALYSIS п.9): раньше полный конфиг шёл ВСЕМ
+      // клиентам как {type:'data'} — фронт его игнорировал (матчит только
+      // event) и поллил /spotbot/table каждые 20 с. Теперь websocketRouter
+      // рассылает событие 'tableData' только комнате этого символа.
+      this.emit('tableData', data);
     } catch (err) {
       console.error(this.#filePath(), 'Error reading file:', err);
     }
 
     if (!this.running[this.symbol]) return; // остановлены во время прохода — не планируем следующий тик
-    this.timer = setTimeout(() => this.readLoop(), this.interval);
+    // this.interval может быть не присвоен, если чтение упало на первом тике
+    this.timer = setTimeout(() => this.readLoop(), this.interval || 5000);
   }
 
   async start(symbol, strategy, options = {}) {
@@ -250,20 +304,46 @@ class JsonTimerSender extends EventEmitter {
 
       const api = new InvokeApi();
 
-      // const userStream = api.getUserStream();
-      // userStream.start();
-      // userStream.on('executionReport', (order) => {
-      //   console.log(`Execute order Stream`);
-      // });
-      // userStream.on('balance', (data) => {
-      //   console.log(`Balance Stream`);
-      // });
+      // User data stream (ANALYSIS п.10, фаза 1 — «ускоритель»):
+      // executionReport по нашему символу запускает внеочередной тик readLoop —
+      // реакция на исполнение за миллисекунды вместо ожидания интервала.
+      // Файл из обработчика НЕ пишем: источник правды — итератор (getOrder),
+      // это исключает гонки записи. Поллинг остаётся фолбэком при лежащем
+      // стриме. Без ключей (test-режим без них) стрим не поднимаем.
+      if (api.configured) {
+        const userStream = api.getUserStream();
+
+        this.onExecReport = (report) => {
+          if (report.s !== symbol) return;
+          logBus.log(`⚡ ${symbol} executionReport: ${report.S} ${report.X} (order ${report.i})`);
+          this.#kickTick();
+        };
+
+        userStream.on('executionReport', this.onExecReport);
+        userStream.start(); // повторный start() — no-op (isStarted)
+      }
 
       const streamAPI = api.getPublicStream(symbol);
-      streamAPI.removeAllListeners('message'); // не дублировать слушатель при повторном start на singleton-инстансе
+      // не дублировать слушатели при повторном start на singleton-инстансе
+      streamAPI.removeAllListeners('message');
+      streamAPI.removeAllListeners('maxReconnectReached');
+      streamAPI.removeAllListeners('reconnected');
       streamAPI.start();
       streamAPI.on('message', (data) => {
         this.emit('price', data);
+      });
+
+      // Длительный сбой прайс-стрима: реконнект продолжается в фоне
+      // (capped backoff в StreamAPI), но UI должен знать, что цена замерла.
+      streamAPI.on('maxReconnectReached', () => {
+        const msg = `⚠️ ${symbol}: price stream lost, reconnecting in background...`;
+        logBus.log(msg);
+        this.emit('streamState', { symbol, up: false, message: msg });
+      });
+      streamAPI.on('reconnected', () => {
+        const msg = `🟢 ${symbol}: price stream restored`;
+        logBus.log(msg);
+        this.emit('streamState', { symbol, up: true, message: msg });
       });
 
       this.running[symbol] = true;
@@ -285,7 +365,14 @@ class JsonTimerSender extends EventEmitter {
   async stop() {
     clearTimeout(this.timer);
 
-    // UserStreamAPI.removeInstance();
+    // user data stream общий для всего аккаунта (singleton) — снимаем только
+    // СВОЙ слушатель; сам стрим продолжает жить для других символов и для
+    // следующего Start (закрывается целиком в graceful shutdown)
+    if (this.onExecReport) {
+      this.API.getUserStream().removeListener('executionReport', this.onExecReport);
+      this.onExecReport = null;
+    }
+
     StreamAPI.removeInstance(this.symbol);
 
     this.timer = null;
@@ -379,3 +466,4 @@ class JsonTimerSender extends EventEmitter {
 
 module.exports = JsonTimerSender;
 module.exports.partialFillDelta = partialFillDelta;
+module.exports.markOpenAsCanceled = markOpenAsCanceled;

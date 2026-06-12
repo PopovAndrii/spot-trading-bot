@@ -3,19 +3,23 @@ services:
         build:
             context: .
             dockerfile: docker-config/Dockerfile
+            target: prod # самодостаточный образ: код, прод-deps, CSS, entrypoint внутри
         image: exchange-crypto:latest # tag for prod
         container_name: exchange-crypto-app
         restart: unless-stopped
         working_dir: /var/www/src
+        # Bind-mount исходников больше нет (ANALYSIS п.13) — образ выкатывается
+        # как артефакт. Монтируется только денежное состояние робота (data/)
+        # и localtime. entrypoint.sh запечён в образ (CMD по умолчанию).
         volumes:
-            - .:/var/www
-            - ./.bash_history:/home/node/.bash_history:rw
-            - ./tmp/app/:/home/node/.npm/
+            - ./src/data:/var/www/src/data
             - /etc/localtime:/etc/localtime:ro
-            # mount for production script
-            - ./docker-config/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro 
-            # start for production script
-        command: ['/usr/local/bin/entrypoint.sh']
+        healthcheck:
+            test: ["CMD", "curl", "-fsS", "http://localhost:${PORT:-3002}/api/ping"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 20s
 
         networks:
             - proxy-network
