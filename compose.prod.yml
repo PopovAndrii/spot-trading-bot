@@ -4,6 +4,12 @@ services:
             context: .
             dockerfile: docker-config/Dockerfile
             target: prod # самодостаточный образ: код, прод-deps, CSS, entrypoint внутри
+            args:
+                # хэш и ветка для футера; передай при сборке:
+                # GIT_COMMIT=$(git rev-parse --short HEAD) GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
+                #   docker compose -f compose.prod.yml build
+                GIT_COMMIT: ${GIT_COMMIT:-}
+                GIT_BRANCH: ${GIT_BRANCH:-}
         image: exchange-crypto:latest # tag for prod
         container_name: exchange-crypto-app
         restart: unless-stopped
