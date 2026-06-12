@@ -39,7 +39,9 @@ export class ConsoleLog {
   }
 
   #setupToggle() {
-    this.toggleEl?.addEventListener('click', () => {
+    this.toggleEl?.addEventListener('click', (e) => {
+      // клик по инфо о git-сборке только выделяет текст, не трогает консоль
+      if (e.target.closest('#app-version')) return;
       const isOpen = this.consoleEl.classList.toggle('console--open');
       localStorage.setItem(LS_OPEN, isOpen);
     });

@@ -25,16 +25,13 @@
   }
 }
 
-.console__arrow {
-  width: 0.75rem;
-  height: 0.75rem;
+.app-version {
+  font-size: 0.75rem;
   color: $c-g-500;
-  transition: transform 0.3s ease;
-  flex-shrink: 0;
-}
-
-.console--open .console__arrow {
-  transform: rotate(180deg);
+  font-variant-numeric: tabular-nums;
+  // клик по версии не сворачивает консоль, но текст можно выделить
+  cursor: text;
+  user-select: text;
 }
 
 .console__body {
