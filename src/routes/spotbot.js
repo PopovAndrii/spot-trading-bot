@@ -279,7 +279,7 @@ router.post('/calculator/param', async (req, res, next) => {
     // Binance (-1003/418). Границы зеркалят SpinBox'ы в spotbot.ejs.
     const LIMITS = {
       'field-activeOrders': { min: 2, max: 50 },
-      'field-requestFrequency': { min: 1000, max: 5000 },
+      'field-requestFrequency': { min: 500, max: 5000 },
     };
 
     const limit = LIMITS[msg.key];

@@ -215,8 +215,8 @@ class JsonTimerSender extends EventEmitter {
             const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
             logBus.log(
               `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
-                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
-                `Funds are on the exchange; decide manually (swap or keep).`
+              `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+              `Funds are on the exchange; decide manually (swap or keep).`
             );
           }
 
@@ -239,9 +239,9 @@ class JsonTimerSender extends EventEmitter {
           await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
           if (this.autoRestart) {
-            await this.#sleep(500);
+            // await this.#sleep(500);
             this.restartCycle(obj);
-            await this.#sleep(500);
+            await this.#sleep(100);
 
             return;
           } else {
@@ -257,7 +257,7 @@ class JsonTimerSender extends EventEmitter {
 
         if (currentOrder.status === 'pass') {
           logBus.log(`${this.symbol} ${JSON.stringify(currentOrder)}`);
-          await this.#sleep(100);
+          // await this.#sleep(100);
           continue;
         } // processed order (api request not needed) or test loop
 
@@ -309,7 +309,7 @@ class JsonTimerSender extends EventEmitter {
         await this.#mergeLiveEdits(obj);
         await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
 
-        await this.#sleep(500);
+        await this.#sleep(250);
       }
     }
   }

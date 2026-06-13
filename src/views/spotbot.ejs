@@ -72,12 +72,12 @@
                 </div>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 50 , max: 150 ,
+                <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 20 , max: 150 ,
                   step: 0 }); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0 , max:
-                  0 , step: 1 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0.01 ,
+                  max: 2 , step: 2}); %>
               </div>
               <div class="">
                 <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step:
@@ -96,7 +96,7 @@
                 step:0 }); %>
             </div>
             <div class="">
-              <%- include('../views/ui/SpinBox', { id:'field-requestFrequency' , label:'Request frequency' , min:1000,
+              <%- include('../views/ui/SpinBox', { id:'field-requestFrequency' , label:'Request frequency' , min:500,
                 max:5000, step:0 }); %>
             </div>
             <div class="UIsw info lg r-1 label-top" role="switch" tabindex="0" id="settings-calculate-restart">
