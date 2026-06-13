@@ -64,6 +64,12 @@ class JsonTimerSender extends EventEmitter {
 
     this.busy = false; // идёт ли проход #jobIterator (защита от наслаивания)
 
+    // Шаг 1: видимость сетевого обрыва. Подряд идущие неудачные вызовы к бирже
+    // (DNS EAI_AGAIN, captive-portal TLS и т.п.) итератор молча глотает через
+    // continue — робот крутится вслепую. Считаем серию и один раз сигналим.
+    this.apiFailStreak = 0;
+    this.apiOutageNotified = false; // алерт об обрыве уже выведен — не спамим
+
     this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
 
@@ -96,11 +102,45 @@ class JsonTimerSender extends EventEmitter {
 
     if (typeof this.API[data.method] === 'function') {
       const result = await this.API[data.method](data.data);
+      this.#trackApiHealth(result);
       return result;
     }
 
     console.error(`Method [${data.method}] does not exist`);
     return null;
+  }
+
+  /**
+   * Шаг 1: только видимость. При сетевом обрыве все вызовы к бирже возвращают
+   * { success:false }, итератор делает continue — состояние не двигается, но
+   * лимитки на бирже тем временем матчатся сами. Считаем подряд идущие неудачи
+   * и ОДИН раз пишем в консоль, что цикл идёт вслепую; на первом успехе после
+   * серии — сообщаем о восстановлении. Торговую логику не трогаем.
+   */
+  #trackApiHealth(result) {
+    const ALERT_AT = 5; // подряд неудач до алерта
+    if (!result) return; // null = программная ошибка метода, не сеть
+
+    if (result.success === false) {
+      this.apiFailStreak++;
+      if (this.apiFailStreak === ALERT_AT && !this.apiOutageNotified) {
+        this.apiOutageNotified = true;
+        logBus.log(
+          `⚠️ ${this.symbol}: exchange unreachable (${this.apiFailStreak} failures in a row) — cycle running blind, resting orders are uncontrolled`
+        );
+      }
+      return;
+    }
+
+    if (result.success === true) {
+      if (this.apiOutageNotified) {
+        logBus.log(
+          `🟢 ${this.symbol}: exchange connection restored (after ${this.apiFailStreak} failures in a row)`
+        );
+      }
+      this.apiFailStreak = 0;
+      this.apiOutageNotified = false;
+    }
   }
 
   #strategy() {
@@ -301,6 +341,11 @@ class JsonTimerSender extends EventEmitter {
       this.strategy = strategy == 'short' ? 'short' : 'long';
 
       this.autoRestart = options.autoRestart || false;
+
+      // singleton переживает stop()/start() — сбрасываем счётчик обрыва, чтобы
+      // не тянуть серию ошибок из прошлого запуска
+      this.apiFailStreak = 0;
+      this.apiOutageNotified = false;
 
       const api = new InvokeApi();
 
