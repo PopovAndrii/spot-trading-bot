@@ -23,7 +23,11 @@ html {
 
 body {
   padding: 0px;
-  padding-bottom: 2.5rem;
+  // Страница сама не скроллится — прокручивается только .content. Так скроллбар
+  // страницы не появляется и не накладывается на фиксированную консоль; её
+  // собственный скролл остаётся доступен.
+  height: 100vh;
+  overflow: hidden;
   background-color: var.$c-g-50;
   color: var.$c-g-950;
   transition: background 0.3s ease;

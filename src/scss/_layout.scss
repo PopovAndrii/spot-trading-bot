@@ -1,9 +1,19 @@
 @use './var' as *;
 
 .wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  height: 100vh;
+  // Главный скролл страницы держим на wrapper (на всю ширину вьюпорта), а не на
+  // .content — иначе полоса прокрутки уходит внутрь за паддинг .container-adaptive.
+  overflow-y: auto;
+  // Резерв под фиксированную консоль, чтобы низ контента можно было доскроллить
+  // над ней. Свёрнутая = заголовок 2.5rem; открытая = заголовок + тело 300px.
+  // .console--open висит на #console (вне wrapper-потока), поэтому селектор от body.
+  padding-bottom: 2.5rem;
+  transition: padding-bottom 0.3s ease;
+}
+
+body:has(.console--open) .wrapper {
+  padding-bottom: calc(2.5rem + 300px);
 }
 
 .container-adaptive {
@@ -16,7 +26,6 @@
 }
 
 .content {
-  flex: 1;
   display: flex;
   flex-direction: column;
 }
