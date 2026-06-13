@@ -18,7 +18,9 @@ export class Theme {
         localStorage.setItem('theme', 'dark');
         icon.textContent = '🌘';
       } else {
-        html.removeAttribute('data-theme');
+        // Явный 'light', а не removeAttribute: иначе ui-elements 0.4.0
+        // включит авто-тёмную тему по ОС (prefers-color-scheme).
+        html.setAttribute('data-theme', 'light');
         localStorage.setItem('theme', 'light');
         icon.textContent = '☀️';
       }
