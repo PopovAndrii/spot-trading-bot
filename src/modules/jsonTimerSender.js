@@ -70,6 +70,9 @@ class JsonTimerSender extends EventEmitter {
     this.apiFailStreak = 0;
     this.apiOutageNotified = false; // алерт об обрыве уже выведен — не спамим
 
+    this.baseAsset = ''; // имена активов для уведомления об орфан-остатке (Шаг 2)
+    this.quoteAsset = '';
+
     this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
 
@@ -201,6 +204,21 @@ class JsonTimerSender extends EventEmitter {
 
         if (currentOrder.status === Status.DONE) {
           const result = await this.#runToApi(currentOrder); // cancelOpenOrders
+
+          // Орфан-остаток (Шаг 2): закрытие исполнилось, но часть позиции набрана
+          // глубже, а до-закрыть нельзя — остаток меньше биржевого минимума.
+          // Уведомляем: средства на бирже, решение за пользователем.
+          if (currentOrder.leftover) {
+            const { quantity, price } = currentOrder.leftover;
+            const base = this.baseAsset || '';
+            const quote = this.quoteAsset || '';
+            const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
+            logBus.log(
+              `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
+                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+                `Funds are on the exchange; decide manually (swap or keep).`
+            );
+          }
 
           // cancelOpenOrders снял страховочные ордера на бирже — зафиксировать
           // их отмену в таблице (иначе в истории остаются вечные NEW)
@@ -334,6 +352,25 @@ class JsonTimerSender extends EventEmitter {
     this.timer = setTimeout(() => this.readLoop(), this.interval || 5000);
   }
 
+  // Подтягивает LOT_SIZE.minQty / NOTIONAL.minNotional и имена активов в Job,
+  // чтобы реконсиляция орфан-остатка знала биржевой минимум закрытия (Шаг 2).
+  async #loadExchangeLimits(api, symbol) {
+    try {
+      const info = await api.exchangeInfo({ symbol });
+      if (!info.success) return;
+      const s = info.message.symbols?.[0] || {};
+      const filters = s.filters || [];
+      const lot = filters.find((f) => f.filterType === 'LOT_SIZE');
+      const notional = filters.find((f) => f.filterType === 'NOTIONAL');
+      this.job.minQty = lot ? parseFloat(lot.minQty) || 0 : 0;
+      this.job.minNotional = notional ? parseFloat(notional.minNotional) || 0 : 0;
+      this.baseAsset = s.baseAsset || '';
+      this.quoteAsset = s.quoteAsset || '';
+    } catch (err) {
+      console.error('loadExchangeLimits:', err);
+    }
+  }
+
   async start(symbol, strategy, options = {}) {
 
     if (!this.running[symbol]) {
@@ -348,6 +385,11 @@ class JsonTimerSender extends EventEmitter {
       this.apiOutageNotified = false;
 
       const api = new InvokeApi();
+
+      // Биржевые лимиты для реконсиляции орфан-остатка (Шаг 2) + имена активов
+      // для уведомления. Сбой не критичен: лимиты останутся 0 → #belowMin не
+      // сработает, закрытие всегда пытается выставиться (поведение как раньше).
+      await this.#loadExchangeLimits(api, symbol);
 
       // User data stream (ANALYSIS п.10, фаза 1 — «ускоритель»):
       // executionReport по нашему символу запускает внеочередной тик readLoop —

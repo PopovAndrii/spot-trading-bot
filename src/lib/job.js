@@ -17,6 +17,18 @@ const state = Object.freeze({
   EXPIRED: 'EXPIRED', // Ордер истёк по времени (например, LIMIT GTC может быть отменён по тайм-ауту или из-за сетевых сбоев)
 });
 
+// Самый глубокий индекс ордера со статусом FILLED (или -1). Для long это buy,
+// для short — sell: индекс, до которого реально набрана позиция. Нужен, чтобы
+// не объявить цикл завершённым, пока ниже исполнившегося закрытия остались
+// залитые ордера набора (орфан-инвентарь после «слепого» окна).
+function deepestFilledIndex(arr) {
+  if (!Array.isArray(arr)) return -1;
+  for (let j = arr.length - 1; j >= 0; j--) {
+    if (arr[j] && arr[j].status === state.FILLED) return j;
+  }
+  return -1;
+}
+
 // Этап 3c: объём/цена закрывающего ордера с учётом реально проданного/выкупленного
 // в частично исполненных и отменённых закрытиях за цикл.
 // Возвращает { quantity, price } (строки, округлённые по step/tick) либо null —
@@ -60,19 +72,40 @@ function rebalancedClose(obj, i, strategy) {
 class Job {
   constructor(test = false) {
     this.test = test;
+    // Биржевые лимиты для реконсиляции орфан-остатка. Прокидываются из
+    // jsonTimerSender при старте цикла (exchangeInfo). 0 = неизвестны (тест или
+    // сбой запроса) → #belowMin не срабатывает, поведение как раньше.
+    this.minQty = 0;
+    this.minNotional = 0;
+  }
+
+  // Остаток меньше биржевых лимитов (LOT_SIZE.minQty / NOTIONAL.minNotional)?
+  // Если лимиты неизвестны (0) — считаем, что проходит (не блокируем закрытие).
+  #belowMin(qty, price) {
+    const q = parseFloat(qty) || 0;
+    const p = parseFloat(price) || 0;
+    if (this.minQty && q < this.minQty) return true;
+    if (this.minNotional && q * p < this.minNotional) return true;
+    return false;
   }
 
   long = (obj, i, el) => {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
     // Закрытие всей позиции висит на ОДНОМ sell верхнего исполненного buy-индекса;
-    // нижние sell отменяются как устаревшие — для них pass правилен. Но если sell
-    // верхнего индекса оказался CANCELED (отмена вручную; либо отмену поставил
-    // buy[i+1], который потом не исполнился), позиция остаётся без закрытия.
-    // Поэтому pass допустим ТОЛЬКО когда закрытие реально делегировано вверх,
-    // т.е. buy[i+1] тоже FILLED; иначе CANCELED трактуем как null и переставляем.
+    // нижние sell отменяются (CANCELED) или вовсе не выставлялись (null) как
+    // устаревшие — для них pass правилен, ПОКА закрытие делегировано вверх, т.е.
+    // buy[i+1] тоже FILLED. null здесь — орфан после «слепого» окна: несколько
+    // buy залились разом, а sell нижнего индекса исполнился раньше, чем закрытие
+    // успело переползти вниз; нижние закрытия так и не выставились. Без higherFilled
+    // (верхний sell CANCELED, а buy[i+1] не исполнился) позиция осталась бы без
+    // закрытия — тогда переставляем.
     const higherFilled = obj['BUY'][i + 1]?.status === state.FILLED;
-    if (el.status === state.FILLED && obj['SELL'][i].status === state.CANCELED && higherFilled) {
+    if (
+      el.status === state.FILLED &&
+      (obj['SELL'][i].status === state.CANCELED || obj['SELL'][i].status === null) &&
+      higherFilled
+    ) {
       return { status: 'pass', method: false, side: null, id: i, data: {} };
     }
 
@@ -94,7 +127,15 @@ class Job {
       switch (el.status) {
         case state.FILLED:
           if (i > 0) {
-            if (obj['SELL'][i - 1].status !== state.CANCELED) {
+            // отменяем нижний sell, только если он реально висит на бирже
+            // (orderId есть и статус NEW/PARTIALLY_FILLED). null (никогда не
+            // выставлялся — орфан) или уже FILLED/CANCELED — отменять нечего;
+            // cancelOrder(orderId:null) иначе зациклил бы проход на ошибке.
+            const prevClose = obj['SELL'][i - 1];
+            if (
+              prevClose.orderId != null &&
+              (prevClose.status === state.NEW || prevClose.status === state.PARTIALLY_FILLED)
+            ) {
               return {
                 status: null,
                 method: 'cancelOrder',
@@ -103,7 +144,7 @@ class Job {
                 data: {
                   id: i - 1,
                   symbol: el.symbol,
-                  orderId: obj['SELL'][i - 1].orderId,
+                  orderId: prevClose.orderId,
                 },
               };
             }
@@ -111,6 +152,24 @@ class Job {
 
           if (obj['SELL'][i].status === null || obj['SELL'][i].status === state.CANCELED) {
             const reb = rebalancedClose(obj, i, 'long'); // null → предрасчёт
+            const quantity = reb ? reb.quantity : obj['SELL'][i].quantity;
+            const price = reb ? reb.price : obj['SELL'][i].price;
+
+            // Орфан-инвентарь: часть позиции уже продал исполнившийся нижний
+            // sell, остаток меньше биржевого минимума — закрытие не выставить.
+            // Завершаем цикл и помечаем leftover: итератор уведомит, что мелочь
+            // осталась на балансе (решение за пользователем).
+            if (this.#belowMin(quantity, price)) {
+              return {
+                status: Status.DONE,
+                method: 'cancelOpenOrders',
+                side: null,
+                id: i,
+                leftover: { quantity, price, symbol: el.symbol },
+                data: { id: i, symbol: el.symbol },
+              };
+            }
+
             return {
               status: null,
               method: 'newOrder',
@@ -122,8 +181,8 @@ class Job {
                 side: 'SELL',
                 type: 'LIMIT',
                 timeInForce: 'GTC',
-                quantity: reb ? reb.quantity : obj['SELL'][i].quantity,
-                price: reb ? reb.price : obj['SELL'][i].price,
+                quantity,
+                price,
               },
             };
           } else if (
@@ -204,6 +263,16 @@ class Job {
       }
 
       if (obj['SELL'][i].status === state.FILLED) {
+        // Закрытие на индексе i исполнилось. DONE правомерен ТОЛЬКО если i —
+        // самый глубокий залитый buy. Если ниже есть исполненные buy (k>i) —
+        // орфан после «слепого» окна (sell проскочил между падением и отскоком):
+        // позиция закрыта лишь частично. Не завершаем цикл — pass отдаёт ход
+        // нижним индексам, которые доставят закрытие на остаток (guard выше +
+        // case FILLED с rebalancedClose).
+        if (deepestFilledIndex(obj['BUY']) > i) {
+          return { status: 'pass', method: false, side: null, id: i, data: {} };
+        }
+
         return {
           status: Status.DONE,
           method: 'cancelOpenOrders',
@@ -222,10 +291,15 @@ class Job {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
     // Зеркально long: закрытие short висит на ОДНОМ buy верхнего исполненного
-    // sell-индекса. pass по отменённому buy допустим только когда закрытие
-    // делегировано вверх (sell[i+1] тоже FILLED); иначе переставляем.
+    // sell-индекса. pass по нижнему buy (CANCELED или ещё не выставленному null —
+    // орфан после слепого окна) допустим только когда закрытие делегировано вверх
+    // (sell[i+1] тоже FILLED); иначе переставляем.
     const higherFilled = obj['SELL'][i + 1]?.status === state.FILLED;
-    if (el.status === state.FILLED && obj['BUY'][i].status === state.CANCELED && higherFilled) {
+    if (
+      el.status === state.FILLED &&
+      (obj['BUY'][i].status === state.CANCELED || obj['BUY'][i].status === null) &&
+      higherFilled
+    ) {
       return { status: 'pass', method: false, side: null, id: i, data: {} };
     }
 
@@ -247,7 +321,14 @@ class Job {
       switch (el.status) {
         case state.FILLED:
           if (i > 0) {
-            if (obj['BUY'][i - 1].status !== state.CANCELED) {
+            // отменяем нижний buy, только если он реально висит на бирже
+            // (orderId + NEW/PARTIALLY_FILLED). null/FILLED/CANCELED — отменять
+            // нечего; cancelOrder(orderId:null) иначе зациклил бы проход.
+            const prevClose = obj['BUY'][i - 1];
+            if (
+              prevClose.orderId != null &&
+              (prevClose.status === state.NEW || prevClose.status === state.PARTIALLY_FILLED)
+            ) {
               return {
                 status: null,
                 method: 'cancelOrder',
@@ -255,7 +336,7 @@ class Job {
                 id: i - 1,
                 data: {
                   symbol: el.symbol,
-                  orderId: obj['BUY'][i - 1].orderId,
+                  orderId: prevClose.orderId,
                 },
               };
             }
@@ -263,6 +344,23 @@ class Job {
 
           if (obj['BUY'][i].status === null || obj['BUY'][i].status === state.CANCELED) {
             const reb = rebalancedClose(obj, i, 'short'); // null → предрасчёт
+            const quantity = reb ? reb.quantity : obj['BUY'][i].quantity;
+            const price = reb ? reb.price : obj['BUY'][i].price;
+
+            // Орфан-инвентарь: часть позиции уже выкупил исполнившийся нижний buy,
+            // остаток меньше биржевого минимума — закрытие не выставить. Завершаем
+            // цикл и помечаем leftover для уведомления.
+            if (this.#belowMin(quantity, price)) {
+              return {
+                status: Status.DONE,
+                method: 'cancelOpenOrders',
+                side: null,
+                id: i,
+                leftover: { quantity, price, symbol: el.symbol },
+                data: { id: i, symbol: el.symbol },
+              };
+            }
+
             return {
               status: null,
               method: 'newOrder',
@@ -274,8 +372,8 @@ class Job {
                 side: 'BUY',
                 type: 'LIMIT',
                 timeInForce: 'GTC',
-                quantity: reb ? reb.quantity : obj['BUY'][i].quantity,
-                price: reb ? reb.price : obj['BUY'][i].price,
+                quantity,
+                price,
               },
             };
           } else if (
@@ -356,6 +454,12 @@ class Job {
       }
 
       if (obj['BUY'][i].status === state.FILLED) {
+        // Зеркально long: DONE правомерен только если i — самый глубокий залитый
+        // sell. Ниже остался исполненный sell (k>i) → орфан, цикл не завершаем.
+        if (deepestFilledIndex(obj['SELL']) > i) {
+          return { status: 'pass', method: false, side: null, id: i, data: {} };
+        }
+
         return {
           status: Status.DONE,
           method: 'cancelOpenOrders',
