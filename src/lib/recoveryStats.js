@@ -45,13 +45,13 @@ function recoveryStats(session) {
       strandedQty,
       breakevenPrice: 0,
       alreadyProfit: true,
-      text: `Серия уже в плюсе. Остаток ${strandedQty} ${base} — чистая прибыль.`,
+      text: `Series already in profit — the ${strandedQty} ${base} left over is pure profit.`,
     };
   }
 
   const breakevenPrice = Number(r.price.toFixed(pricePrec));
-  const side = strategy === 'short' ? 'купить' : 'продать';
-  const bound = strategy === 'short' ? 'не выше' : 'не ниже';
+  const side = strategy === 'short' ? 'buy' : 'sell';
+  const bound = strategy === 'short' ? 'no more than' : 'no less than';
 
   return {
     strategy,
@@ -59,7 +59,7 @@ function recoveryStats(session) {
     strandedQty,
     breakevenPrice,
     alreadyProfit: false,
-    text: `Вам нужно ${side} ${strandedQty} ${base} ${bound} по курсу ${breakevenPrice}`,
+    text: `If you want to stop the session, to break even you need to ${side} ${strandedQty} ${base} at ${bound} ${breakevenPrice}`,
   };
 }
 

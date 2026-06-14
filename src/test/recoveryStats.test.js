@@ -29,7 +29,10 @@ test('long: остаток на руках → курс безубытка вс�
   assert.equal(r.strandedQty, 0.947);
   assert.equal(r.breakevenPrice, 207.49);
   assert.equal(r.alreadyProfit, false);
-  assert.equal(r.text, 'Вам нужно продать 0.947 BNB не ниже по курсу 207.49');
+  assert.equal(
+    r.text,
+    'If you want to stop the session, to break even you need to sell 0.947 BNB at no less than 207.49'
+  );
 });
 
 test('позиция закрыта целиком → null', () => {
@@ -52,7 +55,7 @@ test('серия уже в плюсе (вернули больше потрач�
   const r = recoveryStats(session);
   assert.equal(r.alreadyProfit, true);
   assert.equal(r.breakevenPrice, 0);
-  assert.match(r.text, /уже в плюсе/);
+  assert.match(r.text, /already in profit/);
 });
 
 test('short: зеркально — выкупить не выше курса', () => {
@@ -65,7 +68,10 @@ test('short: зеркально — выкупить не выше курса', 
   const r = recoveryStats(session);
   assert.equal(r.strategy, 'short');
   assert.equal(r.strandedQty, 0.8);
-  assert.match(r.text, /^Вам нужно купить 0\.8 BNB не выше по курсу /);
+  assert.match(
+    r.text,
+    /^If you want to stop the session, to break even you need to buy 0\.8 BNB at no more than /
+  );
 });
 
 test('пустая/битая сессия → null', () => {

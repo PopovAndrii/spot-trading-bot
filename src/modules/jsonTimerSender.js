@@ -252,7 +252,7 @@ class JsonTimerSender extends EventEmitter {
             return;
           } else {
             if (this.autoRestart && stranded) {
-              const skipMsg = `⏸️ ${this.symbol}: авто-рестарт отменён — остался невыкупленный остаток`;
+              const skipMsg = `⏸️ ${this.symbol}: auto-restart canceled — unsold inventory left over`;
               console.log(skipMsg);
               logBus.log(skipMsg);
             }
