@@ -96,8 +96,14 @@ export class SpotWS {
             this.#updateRestartSwitch(message.data);
             break;
           case 'notification':
-            // generic server-side notification (e.g. price stream lost/restored)
-            this.notifications.showNotification(message.data.message, message.data.type || 'info');
+            // generic server-side notification (e.g. price stream lost/restored).
+            // persist:true → несхлопываемый тост (duration false), как у STOP —
+            // напр. статистика возврата средств при остановке цикла.
+            this.notifications.showNotification(
+              message.data.message,
+              message.data.type || 'info',
+              message.data.persist ? false : undefined
+            );
             break;
           case 'updatePrice':
             const text = document.querySelector('.stream-currency');

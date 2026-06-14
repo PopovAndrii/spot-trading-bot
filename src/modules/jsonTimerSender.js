@@ -7,6 +7,7 @@ const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
 const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
+const { recoveryStats } = require('../lib/recoveryStats');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
 
 /**
@@ -238,13 +239,23 @@ class JsonTimerSender extends EventEmitter {
           // Основной файл при этом остаётся (статус DONE) — видно финал.
           await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
-          if (this.autoRestart) {
+          // Зависший остаток на руках (частичное закрытие + добор) — НЕ
+          // рестартим поверх застрявшей позиции: новая сетка усреднялась бы
+          // с чужими монетами. Останавливаемся, stop() покажет курс возврата.
+          const stranded = recoveryStats(obj);
+
+          if (this.autoRestart && !stranded) {
             // await this.#sleep(500);
             this.restartCycle(obj);
             await this.#sleep(100);
 
             return;
           } else {
+            if (this.autoRestart && stranded) {
+              const skipMsg = `⏸️ ${this.symbol}: авто-рестарт отменён — остался невыкупленный остаток`;
+              console.log(skipMsg);
+              logBus.log(skipMsg);
+            }
             // сначала пишем ОСНОВНОЙ файл (статус DONE + date_modified + итоговые
             // цвета), и только потом stop() → 'stopped'. Иначе клиент дёрнет
             // финальный фетч таблицы раньше записи и снова покажет старое состояние.
@@ -468,7 +479,29 @@ class JsonTimerSender extends EventEmitter {
     const stopMsg = `🛑 Stop: ${this.symbol}`;
     console.log(stopMsg);
     logBus.log(stopMsg);
+
+    await this.#emitRecovery();
+
     this.emit('stopped', this.symbol);
+  }
+
+  // Статистика возврата при остановке: сколько осталось на руках по факту
+  // исполнений и по какому курсу это продать (long) / выкупить (short), чтобы
+  // серия вышла не в убыток. Печатается в консоль интерфейса (logBus) и уходит
+  // клиентам несхлопываемым тостом (событие 'recovery'). Read-only — ничего не
+  // размещает и схему файла не меняет; ошибка чтения не должна блокировать stop.
+  async #emitRecovery() {
+    try {
+      const obj = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
+      const rec = recoveryStats(obj);
+      if (!rec) return;
+      const line = `💰 ${this.symbol}: ${rec.text}`;
+      console.log(line);
+      logBus.log(line);
+      this.emit('recovery', { symbol: this.symbol, text: rec.text });
+    } catch (err) {
+      console.warn('🟡 recoveryStats failed:', err.message);
+    }
   }
 
   async restartCycle(obj = {}) {
