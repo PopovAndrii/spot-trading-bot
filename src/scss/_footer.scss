@@ -8,29 +8,34 @@
   z-index: 100;
   display: grid;
 
+  &--open {
+    box-shadow: 0 0px 20px 0px $c-g-300;
+  }
+
   &__header {
     padding: 0 1rem;
     height: 2.0rem;
-    background-color: $c-g-300;
-    // border-top: 1px solid $c-g-500;
+    background-color: $c-g-100;
+    border-top: 1px solid $c-g-300;
     cursor: pointer;
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
     align-items: center;
     justify-content: space-between;
     user-select: none;
 
     &:hover {
-      background-color: $c-g-100;
+      background-color: $c-g-50;
     }
   }
 
   &__body {
     height: 0;
     overflow: hidden;
-    background-color: $c-g-500;
+    background-color: $c-g-100;
     transition: height 0.5s ease;
     display: grid;
-    grid-template-rows: auto 1fr; // фильтры по контенту, логи занимают остаток
+    grid-template-rows: auto 1fr;
   }
 
   &--open &__body {
@@ -38,12 +43,15 @@
   }
 
   &__filters {
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    justify-content: start;
     gap: 0.25rem;
     padding: 0.25rem 0.75rem;
-    // border-bottom: 1px solid $c-g-300;
-    background-color: $c-g-700;
-    flex-shrink: 0;
+    border-bottom: 1px solid $c-g-300;
+    margin-bottom: 0.25rem;
+    background-color: $c-g-100;
+    // flex-shrink: 0;
   }
 
   &__filter {
@@ -52,24 +60,27 @@
     font-size: 0.75rem;
     font-family: monospace;
     cursor: pointer;
-    background: $c-g-500;
+    background: $c-g-300;
+    opacity: 0.5;
     color: $c-g-900;
     border: none;
 
     &:hover {
-      background: $c-g-50;
-      color: $c-g-950;
+      background-color: $c-w-500;
+      color: $c-w-50;
     }
 
     &--active {
-      background: $c-g-50;
+      background: $c-g-300;
       color: $c-g-950;
-      // font-weight: bold;
+      opacity: 1;
+
+      font-weight: bold;
     }
   }
 
   &__content {
-    min-height: 0; // позволяет 1fr-строке скроллиться, а не распирать body
+    min-height: 0; // can 1fr-row scrolling
     padding: 0 0.75rem;
     overflow-y: auto;
     font-family: monospace;
@@ -79,11 +90,18 @@
 
   &__line {
     padding: 0.1rem 0;
-    border-bottom: 1px solid $c-g-300;
+    // border-bottom: 1px solid $c-g-50;
     word-break: break-all;
+
+    &:nth-child(even) {
+      background-color: $c-g-50;
+    }
+
+    &:hover {
+      background-color: $c-w-100;
+    }
   }
 }
-
 
 .app-version {
   font-size: 0.75rem;
@@ -95,12 +113,13 @@
 }
 
 .footer-status {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
-  color: $c-g-700;
+  color: $c-g-900;
 }
 
 .ping-dot {
@@ -118,13 +137,18 @@
   }
 }
 
-.session-timer {
-  margin-left: auto;
+.session-timer,
+.net-label,
+.no-internet {
   padding: 0.1rem 0.4rem;
   border-radius: 0.4rem;
   font-size: 0.8rem;
-  color: $c-g-700;
-  background-color: $c-g-100;
+}
+
+.session-timer {
+  margin-left: auto;
+  color: $c-g-950;
+  background-color: $c-g-300;
 
   &--warn {
     color: $c-w-500;
@@ -133,13 +157,9 @@
 }
 
 .no-internet {
-  padding: 0.1rem 0.4rem;
-  border-radius: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: bold;
-  color: $c-p-500;
-  background-color: $c-p-100;
-  animation: blink 1s step-start infinite;
+  color: $c-i-950;
+  background-color: $c-i-300;
+  animation: blink 1.5s step-start infinite;
 }
 
 @keyframes blink {
@@ -149,14 +169,9 @@
 }
 
 .net-label {
-  padding: 0.1rem 0.4rem;
-  border-radius: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: bold;
-
   &--testnet {
-    color: $c-g-700;
-    background-color: $c-g-100;
+    color: $c-g-950;
+    background-color: $c-g-300;
   }
 
   &--real {
