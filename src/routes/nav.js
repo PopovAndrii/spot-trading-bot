@@ -1,14 +1,41 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs/promises');
+const path = require('path');
 
-const { pair } = require('../lib/pair');
+const { pair, statusPair } = require('../lib/pair');
 const logBus = require('../lib/logBus');
 const buildInfo = require('../lib/buildInfo');
 const { isTestnet, requestedTestnet } = require('../lib/runMode');
 
-router.get('/symbols', (req, res) => {
+// Источник правды для меню навигации — файлы текущих серий на диске
+// (SYMBOL-binance.json). Пара видна в меню, пока её файл существует; кнопка
+// Cancel All Orders удаляет файл — пара уходит из меню. Ручные ордера на бирже
+// файла не создают, поэтому в меню робота не попадают (в отличие от опроса
+// openOrders, который захватил бы и ручную спот-покупку).
+const DATA_DIR = path.join(__dirname, '../data');
+const ARCHIVE_RE = /^\d+-/; // {timestamp}-SYMBOL-binance.json — архив серии, не текущая
+const SERIES_SUFFIX = '-binance.json';
+
+router.get('/symbols', async (req, res) => {
   try {
-    const symbols = pair.getActiveSymbols();
+    const files = await fs.readdir(DATA_DIR).catch(() => []);
+    // статус (running/pause/attention) живёт в памяти; для пар, которых в карте
+    // нет (не подписаны в этой сессии, но файл на диске есть), показываем pause.
+    const inMem = new Map(pair.getActiveSymbols().map((s) => [s.symbol, s]));
+
+    const symbols = [];
+    const seen = new Set();
+    for (const file of files) {
+      if (!file.endsWith(SERIES_SUFFIX) || ARCHIVE_RE.test(file)) continue;
+      const symbol = file.slice(0, -SERIES_SUFFIX.length).toUpperCase();
+      if (seen.has(symbol)) continue;
+      seen.add(symbol);
+
+      const mem = inMem.get(symbol);
+      symbols.push({ symbol, status: mem ? mem.status : statusPair.STOP });
+    }
+
     res.json(symbols);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get active symbols' });

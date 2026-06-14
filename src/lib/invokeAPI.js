@@ -176,11 +176,15 @@ class InvokeApi {
   // @TODO not used!
   async openOrders(data) {
     try {
-      const res = await this.#withRateLimitRetry(() => this.client.openOrders(data.symbol));
+      // REST openOrders(options) ждёт ОБЪЕКТ; строка-symbol игнорировалась и
+      // запрос уходил без symbol → возвращались открытые ордера ВСЕГО аккаунта
+      // (а не только этой пары). Из-за этого count врал, а проверка перед
+      // удалением серии ложно видела «чужие» ордера.
+      const res = await this.#withRateLimitRetry(() => this.client.openOrders({ symbol: data.symbol }));
 
       const msg = { count: res.data.length };
 
-      this.getConsoleMsg(`openOrders() ${msg.count} active orders`);
+      this.getConsoleMsg(`openOrders(${data.symbol}) ${msg.count} active orders`);
       return { success: true, message: Number(msg.count) };
     } catch (err) {
       const message = this.#getCatchMsg(err);

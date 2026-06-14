@@ -156,13 +156,15 @@
 
         <div class="row">
           <div class="col">
-            <div class="mb-1">
-              <button href="#" data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb lg g-1 danger"
-                type="button">
-                Cancel all <%= base + quote %> pairs
+            <div class="line line-press">
+              <button data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb lg g-1 danger" type="button">
+                Check and Cancel all <%= base + quote %> pairs
                   <svg class="icon">
                     <use href="/sprite.svg#close"></use>
                   </svg>
+              </button>
+              <button data-value="<%= base + quote %>" id="delete-current-series" class="UIb lg" type="button" disabled>
+                Delete current series
               </button>
             </div>
           </div>

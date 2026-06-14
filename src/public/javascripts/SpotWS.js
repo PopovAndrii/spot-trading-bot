@@ -259,6 +259,12 @@ export class SpotWS {
     const cancelAllOrders = document.getElementById('cancel-all-orders');
     cancelAllOrders.disabled = Boolean(status);
 
+    // Delete current series доступна только после Cancel all orders. На любой
+    // смене статуса цикла (start/stop) сбрасываем в disabled — заново её активирует
+    // лишь успешная отмена ордеров (CancelAllOrders.enable()).
+    const deleteCurrentSeries = document.getElementById('delete-current-series');
+    if (deleteCurrentSeries) deleteCurrentSeries.disabled = true;
+
     const startBtn = document.getElementById('startBtn');
     if (status) {
       startBtn.classList.add('danger');
