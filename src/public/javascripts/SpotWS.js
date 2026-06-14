@@ -213,7 +213,7 @@ export class SpotWS {
           })
         );
         this.#btnRule();
-        this.notifications.showNotification('Pause of Spot Trading', 'warning', false);
+        this.notifications.showNotification('Pause of Spot Trading', 'warning', 10000);
         this.isRunning = false;
       }
     };
