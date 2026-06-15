@@ -267,7 +267,7 @@ class JsonTimerSender extends EventEmitter {
         }
 
         if (currentOrder.status === 'pass') {
-          logBus.log(`${this.symbol} ${JSON.stringify(currentOrder)}`);
+          console.log(`${this.symbol} ${JSON.stringify(currentOrder)}`);
           // await this.#sleep(100);
           continue;
         } // processed order (api request not needed) or test loop
