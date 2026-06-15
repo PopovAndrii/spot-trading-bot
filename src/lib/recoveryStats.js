@@ -52,6 +52,11 @@ function recoveryStats(session) {
   const breakevenPrice = Number(r.price.toFixed(pricePrec));
   const side = strategy === 'short' ? 'buy' : 'sell';
   const bound = strategy === 'short' ? 'no more than' : 'no less than';
+  // разовость: после восстановления цикл закончен — обратной сделки не нужно
+  const tail =
+    strategy === 'short'
+      ? "This is a one-time buy — you don't need to sell it again afterwards."
+      : "This is a one-time sell — you don't need to buy it back afterwards.";
 
   return {
     strategy,
@@ -59,7 +64,7 @@ function recoveryStats(session) {
     strandedQty,
     breakevenPrice,
     alreadyProfit: false,
-    text: `If you want to stop the session, to break even you need to ${side} ${strandedQty} ${base} at ${bound} ${breakevenPrice}`,
+    text: `If you want to stop the session, to break even you need to ${side} ${strandedQty} ${base} at ${bound} ${breakevenPrice}. ${tail}`,
   };
 }
 

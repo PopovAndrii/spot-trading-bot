@@ -31,7 +31,8 @@ test('long: остаток на руках → курс безубытка вс�
   assert.equal(r.alreadyProfit, false);
   assert.equal(
     r.text,
-    'If you want to stop the session, to break even you need to sell 0.947 BNB at no less than 207.49'
+    'If you want to stop the session, to break even you need to sell 0.947 BNB at no less than 207.49. ' +
+      "This is a one-time sell — you don't need to buy it back afterwards."
   );
 });
 
