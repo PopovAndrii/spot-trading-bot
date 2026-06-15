@@ -77,21 +77,32 @@ router.get('/logs', (req, res) => {
   // long-lived stream — drop the idle timeout on this response's socket
   req.socket.setTimeout(0);
 
+  // id: позволяет клиенту дедуплицировать после reconnect (replay истории).
   const send = (e) => {
     if (res.writableEnded) return;
-    try { res.write(`data: ${JSON.stringify(e)}\n\n`); } catch { }
+    try { res.write(`id: ${e.id}\ndata: ${JSON.stringify(e)}\n\n`); } catch { }
   };
 
-  logBus.history().forEach(send);
+  // Replay только того, что клиент ещё не видел. Last-Event-ID браузер шлёт сам
+  // при внутреннем reconnect; при ручном пересоздании EventSource клиент кладёт
+  // его в ?lastEventId. NaN (первое подключение) → реплеим всю историю.
+  const lastSeen = Number(req.headers['last-event-id'] ?? req.query.lastEventId);
+  logBus
+    .history()
+    .filter((e) => !(lastSeen >= 0) || e.id > lastSeen)
+    .forEach(send);
 
   const unsub = logBus.subscribe(send);
 
-  // heartbeat: an SSE comment every 15s. Keeps the connection alive so an idle
-  // timeout (NAT/proxy/browser) won't drop it. If the socket is dead anyway,
-  // write throws / 'close' fires, and the client's EventSource reconnects.
+  // heartbeat: named 'ping' event every 15s. Двойная роль:
+  //  1) держит соединение живым против idle-timeout (NAT/proxy/browser);
+  //  2) клиент его ВИДИТ (именованное событие, в отличие от комментария : ping)
+  //     и сбрасывает watchdog — иначе полуоткрытый сокет (sleep, рециклинг
+  //     upstream в nginx-proxy-manager) клиент не замечал и консоль молча вставала.
+  // Без id: ping не сдвигает Last-Event-ID, replay остаётся корректным.
   const heartbeat = setInterval(() => {
     if (res.writableEnded) return;
-    try { res.write(`: ping\n\n`); } catch { }
+    try { res.write(`event: ping\ndata: {}\n\n`); } catch { }
   }, 15000);
 
   req.on('close', () => {

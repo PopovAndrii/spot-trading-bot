@@ -13,6 +13,10 @@ export class ConsoleLog {
     this.filter = localStorage.getItem(LS_FILTER) ?? null;
     this.symbols = new Set();
 
+    this.es = null;
+    this.watchdog = null;
+    this.lastId = 0; // id последней показанной записи — для replay/дедупа после reconnect
+
     this.#restoreOpen();
     this.#setupToggle();
     this.#renderFilters();
@@ -47,14 +51,59 @@ export class ConsoleLog {
     });
   }
 
+  // Liveness: 45с = 3 пропущенных heartbeat'а (сервер шлёт ping каждые 15с).
+  #WATCHDOG_MS = 45000;
+
   #connect() {
-    const es = new EventSource('/api/logs');
+    // ручной reconnect создаёт новый EventSource — браузер НЕ шлёт Last-Event-ID
+    // (это делает только его внутренний reconnect того же объекта). Передаём id
+    // сами в query, чтобы сервер реплеил лишь новое.
+    const url = this.lastId ? `/api/logs?lastEventId=${this.lastId}` : '/api/logs';
+    const es = new EventSource(url);
+    this.es = es;
+
     es.onmessage = (e) => {
+      this.#kickWatchdog();
       try { this.#add(JSON.parse(e.data)); } catch { }
     };
+
+    // heartbeat виден как именованное событие — данных не несёт, только
+    // подтверждает, что канал жив, и сбрасывает watchdog.
+    es.addEventListener('ping', () => this.#kickWatchdog());
+
+    // штатный обрыв: EventSource сам переподключается, пока readyState !== CLOSED.
+    // Если он сдался (CLOSED) — пересоздаём вручную.
+    es.onerror = () => {
+      if (es.readyState === EventSource.CLOSED) this.#reconnect();
+    };
+
+    this.#kickWatchdog();
+  }
+
+  // Полуоткрытый сокет (sleep ноутбука, рециклинг upstream прокси) браузер не
+  // замечает: readyState остаётся OPEN, onerror не стреляет, авто-reconnect не
+  // запускается. Сторожим сами: нет ни лога, ни ping дольше WATCHDOG_MS —
+  // принудительно рвём и пересоздаём соединение.
+  #kickWatchdog() {
+    clearTimeout(this.watchdog);
+    this.watchdog = setTimeout(() => this.#reconnect(), this.#WATCHDOG_MS);
+  }
+
+  #reconnect() {
+    clearTimeout(this.watchdog);
+    try { this.es?.close(); } catch { }
+    this.#connect();
   }
 
   #add(entry) {
+    // replay истории после reconnect может прислать уже показанные записи —
+    // дедуплицируем по монотонному id (см. lib/logBus). lastId двигаем только
+    // вперёд, чтобы следующий reconnect просил продолжение, а не дубли.
+    if (entry.id != null) {
+      if (this.lastId && entry.id <= this.lastId) return;
+      this.lastId = entry.id;
+    }
+
     entry.symbol = this.#parseSymbol(entry.msg);
 
     this.entries.push(entry);
