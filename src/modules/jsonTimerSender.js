@@ -1,7 +1,7 @@
 const EventEmitter = require('events');
 const fs = require('fs/promises');
 const path = require('path');
-const { Job, Status } = require('../lib/job');
+const { Job, Status, rebalancedClose, deepestFilledIndex } = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
@@ -37,6 +37,22 @@ function markOpenAsCanceled(obj) {
     }
   }
   return obj;
+}
+
+// Pure: нужно ли консолидировать закрытия (Шаг 3). true когда сетка набора
+// исчерпана (ВСЕ entry FILLED) и закрытия перекрылись (≥2 живых NEW) — типовой
+// итог залпового залива по фитилю на тонком стакане (testnet): усредняться
+// больше нечем, а несколько закрытий висят на куски одной позиции (риск oversell).
+// Тогда бот сводит к ОДНОМУ закрытию, останавливается и зовёт человека.
+// Тестируется без биржи.
+function needsRecoveryConsolidation(obj, strategy) {
+  const entrySide = strategy === 'short' ? 'SELL' : 'BUY';
+  const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
+  const entries = obj?.[entrySide] || [];
+  const closes = obj?.[closeSide] || [];
+  if (entries.length === 0) return false;
+  if (!entries.every((e) => e?.status === 'FILLED')) return false;
+  return closes.filter((c) => c?.status === 'NEW').length >= 2;
 }
 
 function partialFillDelta(stored, message) {
@@ -178,6 +194,52 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
+   * Шаг 3: сетка набора исчерпана (все entry FILLED) и закрытия перекрылись
+   * (≥2 живых NEW — залповый залив по фитилю). Усредняться больше нечем, а
+   * несколько закрытий висят на куски одной позиции. Действие: снять перекрытые
+   * закрытия на бирже, записать ОДНО закрытие на самый глубокий индекс набора
+   * (объём/цена по rebalancedClose = avg×(1+profit+comm) — ровно то, что job
+   * поставит при Start), остановить цикл и уведомить. Лимитку сами НЕ дёргаем:
+   * через минуту обычно отскок, и человек решает — Start (бот выставит этот
+   * close) или продать вручную выше. Возвращает true, если подготовка сделана.
+   */
+  async #maybePrepareRecoveryClose(obj, strategy) {
+    if (!needsRecoveryConsolidation(obj, strategy.method)) return false;
+
+    const closeSide = strategy.method === 'short' ? 'BUY' : 'SELL';
+    const entrySide = strategy.side; // BUY для long, SELL для short
+    const k = deepestFilledIndex(obj[entrySide]);
+    const reb = rebalancedClose(obj, k, strategy.method);
+    if (!reb) return false; // позиция фактически закрыта — нечего готовить
+
+    // снять перекрытые закрытия на бирже (entry уже FILLED, живут только closes).
+    // не удалось (сеть) — выходим без записи, повторим на следующем тике.
+    const res = await this.#runToApi({ method: 'cancelOpenOrders', data: { symbol: this.symbol } });
+    if (!res || res.success === false) return false;
+    markOpenAsCanceled(obj); // снятые NEW → CANCELED в таблице
+
+    // одно подготовленное закрытие на глубоком индексе (ещё не на бирже: status null)
+    obj[closeSide][k] = {
+      ...obj[closeSide][k],
+      status: null,
+      orderId: null,
+      quantity: reb.quantity,
+      price: reb.price,
+    };
+    obj.date_modified = new Date().toISOString();
+    await this.#mergeLiveEdits(obj);
+    await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
+    this.emit('tableData', obj); // обновить таблицу в UI сразу
+
+    const line = `🧰 ${this.symbol}: grid fully filled — consolidated to one ${closeSide} of ${reb.quantity} ${this.baseAsset || ''} @ ${reb.price}. Stopped: press Start to place it, or sell manually.`;
+    console.log(line);
+    logBus.log(line);
+
+    this.stop(); // stop() сам эмитит recovery-тост с курсом безубытка
+    return true;
+  }
+
+  /**
    * Iterates through the entire table of placed orders.
    * @param {Object} obj - Configuration of order data from file or database.
    * @returns {Stop()} - Stop the cycle.
@@ -186,6 +248,11 @@ class JsonTimerSender extends EventEmitter {
     const strategy = this.#strategy();
 
     if (obj.status == Status.READY && strategy != null) {
+      // Сетка исчерпана и закрытия перекрылись — свести к одному closing-ордеру,
+      // остановиться и позвать человека (Шаг 3). prepareRecoveryClose сам пишет
+      // файл и делает stop(); проход дальше не идём.
+      if (await this.#maybePrepareRecoveryClose(obj, strategy)) return;
+
       let i = 0;
 
       // never started 0
@@ -216,8 +283,8 @@ class JsonTimerSender extends EventEmitter {
             const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
             logBus.log(
               `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
-              `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
-              `Funds are on the exchange; decide manually (swap or keep).`
+                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+                `Funds are on the exchange; decide manually (swap or keep).`
             );
           }
 
@@ -587,3 +654,4 @@ class JsonTimerSender extends EventEmitter {
 module.exports = JsonTimerSender;
 module.exports.partialFillDelta = partialFillDelta;
 module.exports.markOpenAsCanceled = markOpenAsCanceled;
+module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;

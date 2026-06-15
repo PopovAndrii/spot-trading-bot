@@ -474,4 +474,4 @@ class Job {
   };
 }
 
-module.exports = { Job, Status };
+module.exports = { Job, Status, rebalancedClose, deepestFilledIndex };
