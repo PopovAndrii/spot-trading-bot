@@ -16,6 +16,7 @@
 
 @use 'media';
 @use 'layout';
+@use 'utils';
 
 html {
   font-size: var.$font-size-base;

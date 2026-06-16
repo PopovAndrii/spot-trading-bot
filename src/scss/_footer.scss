@@ -39,7 +39,7 @@
   }
 
   &--open &__body {
-    height: 450px;
+    height: var(--console-open-h, 450px);
   }
 
   &__filters {
@@ -107,7 +107,6 @@
   font-size: 0.75rem;
   color: $c-g-500;
   font-variant-numeric: tabular-nums;
-  // клик по версии не сворачивает консоль, но текст можно выделить
   cursor: text;
   user-select: text;
 }
