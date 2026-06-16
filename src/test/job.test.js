@@ -274,6 +274,22 @@ test('short: cycle complete (SELL FILLED + BUY FILLED) → DONE + cancelOpenOrde
   assert.equal(r.method, 'cancelOpenOrders');
 });
 
+test('long: active close lagging below i-1 (gap-fill) → cancel it before placing', () => {
+  // Залповый залив: buy[0..3] FILLED, активное закрытие застряло на SELL[1],
+  // промежуточный SELL[2] null. На глубоком индексе 3 надо снять SELL[1]
+  // (а не смотреть только на SELL[2]=null), иначе оно держит баланс → -2010.
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 }), mkOrder('BUY', 'FILLED', { orderId: 3 }), mkOrder('BUY', 'FILLED', { orderId: 4 })],
+    sells: [mkOrder('SELL', 'CANCELED', { orderId: 101 }), mkOrder('SELL', 'NEW', { orderId: 102 }), mkOrder('SELL', null), mkOrder('SELL', null)],
+  });
+
+  const r = job.long(obj, 3, obj.BUY[3]);
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.side, 'SELL');
+  assert.equal(r.id, 1); // именно застрявший SELL[1], не SELL[2]
+  assert.equal(r.data.orderId, 102);
+});
+
 // ===== орфан-инвентарь после «слепого» окна (Шаг 2) =====
 // sell проскочил между падением и отскоком внутри одного интервала опроса:
 // нижние buy успели залиться, но закрытие исполнилось на верхнем индексе раньше,

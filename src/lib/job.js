@@ -126,25 +126,27 @@ class Job {
     if (obj['SELL'][i].status !== state.FILLED) {
       switch (el.status) {
         case state.FILLED:
-          if (i > 0) {
-            // отменяем нижний sell, только если он реально висит на бирже
-            // (orderId есть и статус NEW/PARTIALLY_FILLED). null (никогда не
-            // выставлялся — орфан) или уже FILLED/CANCELED — отменять нечего;
-            // cancelOrder(orderId:null) иначе зациклил бы проход на ошибке.
-            const prevClose = obj['SELL'][i - 1];
+          // Отменить ЛЮБОЕ живое нижнее закрытие, не только i-1. При залповом
+          // заливе промежуточные индексы проходят как «делегировано вверх»
+          // (guard выше), и активное закрытие может остаться на индексе < i-1.
+          // Оно резервирует базовый баланс → новый close упрётся в -2010
+          // insufficient balance. Отменяем по одному за проход, пока есть живые.
+          for (let j = i - 1; j >= 0; j--) {
+            const prev = obj['SELL'][j];
             if (
-              prevClose.orderId != null &&
-              (prevClose.status === state.NEW || prevClose.status === state.PARTIALLY_FILLED)
+              prev &&
+              prev.orderId != null &&
+              (prev.status === state.NEW || prev.status === state.PARTIALLY_FILLED)
             ) {
               return {
                 status: null,
                 method: 'cancelOrder',
                 side: 'SELL',
-                id: i - 1,
+                id: j,
                 data: {
-                  id: i - 1,
+                  id: j,
                   symbol: el.symbol,
-                  orderId: prevClose.orderId,
+                  orderId: prev.orderId,
                 },
               };
             }
@@ -320,23 +322,24 @@ class Job {
     if (obj['BUY'][i].status !== state.FILLED) {
       switch (el.status) {
         case state.FILLED:
-          if (i > 0) {
-            // отменяем нижний buy, только если он реально висит на бирже
-            // (orderId + NEW/PARTIALLY_FILLED). null/FILLED/CANCELED — отменять
-            // нечего; cancelOrder(orderId:null) иначе зациклил бы проход.
-            const prevClose = obj['BUY'][i - 1];
+          // Зеркально long: отменить ЛЮБОЕ живое нижнее закрытие (buy), не только
+          // i-1 — при залповом заливе активное закрытие может застрять ниже и
+          // резервировать quote-баланс → -2010 на новом close.
+          for (let j = i - 1; j >= 0; j--) {
+            const prev = obj['BUY'][j];
             if (
-              prevClose.orderId != null &&
-              (prevClose.status === state.NEW || prevClose.status === state.PARTIALLY_FILLED)
+              prev &&
+              prev.orderId != null &&
+              (prev.status === state.NEW || prev.status === state.PARTIALLY_FILLED)
             ) {
               return {
                 status: null,
                 method: 'cancelOrder',
                 side: 'BUY',
-                id: i - 1,
+                id: j,
                 data: {
                   symbol: el.symbol,
-                  orderId: prevClose.orderId,
+                  orderId: prev.orderId,
                 },
               };
             }
