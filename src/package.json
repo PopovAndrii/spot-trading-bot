@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@binance/connector": "^3.6.1",
-    "@popovandrii/ui-elements": "^0.4.2",
+    "@popovandrii/ui-elements": "^0.4.3",
     "bcrypt": "^6.0.0",
     "cookie-parser": "~1.4.7",
     "debug": "~4.4.3",

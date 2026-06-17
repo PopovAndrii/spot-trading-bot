@@ -6,3 +6,5 @@ const notifications = new Notifications();
 
 new LoadInfo(notifications);
 new Theme();
+
+UiElements.initQuestionTooltips();

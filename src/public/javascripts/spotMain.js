@@ -54,3 +54,5 @@ new SpotWS(
 );
 
 new Theme();
+
+UiElements.initQuestionTooltips();
