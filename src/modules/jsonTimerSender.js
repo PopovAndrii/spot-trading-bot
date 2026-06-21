@@ -358,6 +358,9 @@ class JsonTimerSender extends EventEmitter {
           const delta = partialFillDelta(stored, result.message);
 
           if (delta) {
+            // Stop мог быть нажат, пока ждали #runToApi выше — не писать файл
+            // после stop (инвариант: после Stop файл сетки заморожен).
+            if (!this.running[this.symbol]) return;
             Object.assign(stored, delta);
             await this.#mergeLiveEdits(obj);
             await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
@@ -379,6 +382,10 @@ class JsonTimerSender extends EventEmitter {
           toObj.executedQty = parseFloat(result.message.executedQty) || 0;
           toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
         }
+
+        // Stop мог быть нажат, пока ждали #runToApi выше — не писать файл после
+        // stop (инвариант: после Stop файл сетки заморожен).
+        if (!this.running[this.symbol]) return;
 
         // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
