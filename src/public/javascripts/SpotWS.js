@@ -160,19 +160,6 @@ export class SpotWS {
     };
   }
 
-  // not used method
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-
-    const startBtn = document.getElementById('startBtn');
-    if (startBtn && this.btnClickHandler) {
-      startBtn.removeEventListener('ui-button-change', this.btnClickHandler);
-    }
-  }
-
   btnStart() {
     const startBtn = document.getElementById('startBtn');
     if (!startBtn) return;

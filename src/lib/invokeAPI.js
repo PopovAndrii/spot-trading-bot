@@ -173,7 +173,6 @@ class InvokeApi {
     }
   }
 
-  // @TODO not used!
   async openOrders(data) {
     try {
       // REST openOrders(options) ждёт ОБЪЕКТ; строка-symbol игнорировалась и

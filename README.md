@@ -365,5 +365,12 @@ VScode must have the ESlint plugin from Microsoft installed.
 }
 ```
 
+## Experimental files (not in the flow)
+These live in the repo by request but are **not wired into the app** — nothing
+imports them, they don't run as part of the bot:
+- `src/lib/test2.js`
+- `src/lib/MomentumIndicator.js`
 
+Kept as experiments/scratch. Safe to ignore when reading the trading flow
+(cli → ws → jsonTimerSender → job → invokeAPI).
 
