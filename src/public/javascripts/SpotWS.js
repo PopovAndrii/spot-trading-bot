@@ -24,6 +24,13 @@ export class SpotWS {
       }
     };
 
+    // Item 10: manual single-order cancel → tell this symbol's bot over WS.
+    this.loadDataCalculator.onCancelOrder = ({ side, index, orderId }) => {
+      if (this.#isWebSocketOpen(this.ws)) {
+        this.ws.send(JSON.stringify({ type: 'cancelOrder', symbol: base + quote, side, index, orderId }));
+      }
+    };
+
     window.addEventListener('load', () => {
       this.connectWebSocket();
     });
@@ -94,6 +101,14 @@ export class SpotWS {
             break;
           case 'restartSync':
             this.#updateRestartSwitch(message.data);
+            break;
+          case 'cancelOrderResult':
+            // Item 10: result of a manual single-order cancel
+            this.notifications.showNotification(
+              message.data?.message || 'Cancel result',
+              message.data?.success ? 'success' : 'warning',
+              5000
+            );
             break;
           case 'notification':
             // generic server-side notification (e.g. price stream lost/restored).

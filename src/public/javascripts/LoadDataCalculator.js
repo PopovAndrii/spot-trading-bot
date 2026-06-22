@@ -13,6 +13,7 @@ export class LoadDataCalculator {
     this.notifications = notifications;
     this._ignoreSelectChange = false;
     this.onRestartChange = null;
+    this.onCancelOrder = null; // set by SpotWS — sends a 'cancelOrder' WS message
     this._calcSeq = 0; // sequence token: drop stale async calculator() renders
 
     // Change any button settings param
@@ -244,8 +245,14 @@ export class LoadDataCalculator {
         return;
       }
 
-      // TODO(Item 10): real cancel — POST the orderId to a cancel endpoint here
-      // once ORDER_CANCEL_ENABLED is turned on.
+      // Real cancel: send to this symbol's bot via WS (SpotWS sets the callback).
+      // The bot cancels on the exchange and marks the order manual:true, so the
+      // engine won't re-place it. Enabled only when ORDER_CANCEL_ENABLED is true.
+      this.onCancelOrder?.({
+        side: payload.side,
+        index: payload.index,
+        orderId: payload.orderId,
+      });
     });
   }
 

@@ -94,6 +94,11 @@ class JsonTimerSender extends EventEmitter {
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
 
     this.onExecReport = null; // слушатель user data stream (снимается в stop)
+
+    // Item 10: ручные отмены ордеров этой сессии { BUY: Set<index>, SELL: ... }.
+    // cancelManualOrder() кладёт сюда после отмены на бирже; #applyManualPulls
+    // штампует manual:true на сетку при чтении и записи — без файловой гонки.
+    this.manualPulls = { BUY: new Set(), SELL: new Set() };
   }
 
   getSpotStatus(symbol) {
@@ -183,6 +188,41 @@ class JsonTimerSender extends EventEmitter {
    * Ордера (BUY/SELL) не трогаем: их единственный писатель во время цикла — сам
    * итератор (Save заблокирован write-lock'ом, пока пара running).
    */
+  // Item 10: штампует manual:true на ордера, снятые вручную в этой сессии
+  // (this.manualPulls). Источник — память бота, не файл → нет гонки с тиком.
+  // Зовётся при чтении (readLoop) и перед каждой записью (#mergeLiveEdits).
+  #applyManualPulls(obj) {
+    for (const side of ['BUY', 'SELL']) {
+      for (const i of this.manualPulls[side]) {
+        if (obj[side]?.[i]) obj[side][i].manual = true;
+      }
+    }
+  }
+
+  // Item 10: ручная отмена ОДНОГО ордера из UI (через WS → этот инстанс бота,
+  // сериализовано с циклом). Снимает ордер на бирже, затем помечает индекс в
+  // памяти; движок (job.js manual-guard) перестанет его переставлять. Файл
+  // напрямую НЕ трогаем — флаг наносит тик через #applyManualPulls (без гонки).
+  async cancelManualOrder({ side, index, orderId } = {}) {
+    if (!this.running[this.symbol]) {
+      return { success: false, message: 'cycle is not running' };
+    }
+    if ((side !== 'BUY' && side !== 'SELL') || !Number.isInteger(index) || orderId == null) {
+      return { success: false, message: 'invalid cancel request' };
+    }
+
+    const res = await this.#runToApi({
+      method: 'cancelOrder',
+      data: { symbol: this.symbol, orderId },
+    });
+    if (!res || res.success === false) {
+      return res || { success: false, message: 'cancel failed' };
+    }
+
+    this.manualPulls[side].add(index);
+    return { success: true, message: `${side} #${index + 1} cancelled` };
+  }
+
   async #mergeLiveEdits(obj) {
     try {
       const fresh = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
@@ -210,6 +250,10 @@ class JsonTimerSender extends EventEmitter {
     } catch {
       // файла нет/битый — пишем что есть; writeFileAtomic не даст битого JSON
     }
+
+    // in-memory ручные отмены этой сессии — наносим перед записью (на случай,
+    // если файл их ещё не содержит до первого тика после отмены)
+    this.#applyManualPulls(obj);
   }
 
   /**
@@ -425,6 +469,10 @@ class JsonTimerSender extends EventEmitter {
       const content = await fs.readFile(this.#filePath(), 'utf8');
       const data = JSON.parse(content);
 
+      // ручные отмены этой сессии (Item 10) — наносим до итератора, чтобы job
+      // сразу видел manual и не переставлял снятый ордер
+      this.#applyManualPulls(data);
+
       // один проход за раз: если предыдущий ещё идёт — пропускаем тик, но
       // планировщик не блокируем (устойчиво к медленным/зависшим запросам).
       // stop() реагирует через guard внутри #jobIterator (this.running).
@@ -487,6 +535,9 @@ class JsonTimerSender extends EventEmitter {
       // не тянуть серию ошибок из прошлого запуска
       this.apiFailStreak = 0;
       this.apiOutageNotified = false;
+
+      // новый цикл = свежая сетка, ручные отмены прошлого цикла неактуальны
+      this.manualPulls = { BUY: new Set(), SELL: new Set() };
 
       const api = InvokeApi.getInstance();
 
