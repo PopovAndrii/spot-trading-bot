@@ -188,6 +188,25 @@ class JsonTimerSender extends EventEmitter {
       const fresh = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
       if (fresh.param) obj.param = fresh.param;
       if ('restart' in fresh) obj.restart = fresh.restart;
+
+      // Manual-pull marker (Item 10): a manual single-order cancel writes
+      // { status: CANCELED, manual: true } straight to the grid file. The robot
+      // owns the file and rewrites it every tick, so without this merge its
+      // write would clobber that flag. Carry a manual pull (with its canceled
+      // status/orderId) over from the fresh file so the engine can later respect
+      // it. No-op until the cancel route actually sets `manual` — nothing writes
+      // it yet, so existing behaviour is unchanged.
+      for (const side of ['BUY', 'SELL']) {
+        const arr = fresh[side];
+        if (!Array.isArray(arr)) continue;
+        arr.forEach((o, i) => {
+          if (o && o.manual && obj[side]?.[i]) {
+            obj[side][i].manual = true;
+            obj[side][i].status = o.status;
+            obj[side][i].orderId = o.orderId;
+          }
+        });
+      }
     } catch {
       // файла нет/битый — пишем что есть; writeFileAtomic не даст битого JSON
     }
