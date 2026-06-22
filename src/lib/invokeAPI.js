@@ -82,12 +82,12 @@ class InvokeApi {
 
   getPublicStream(symbol) {
     if (!symbol) return false;
-    return new StreamAPI(symbol);
+    return StreamAPI.getInstance(symbol);
   }
 
   getUserStream(wssUserURL = null) {
     const url = wssUserURL ? wssUserURL : this.wssUserURL;
-    return new UserStreamAPI(this.client, url);
+    return UserStreamAPI.getInstance(this.client, url);
   }
 
   getClientKey() {

@@ -7,11 +7,6 @@ class UserStreamAPI extends EventEmitter {
   constructor(client, wssURL = null) {
     super();
 
-    if (UserStreamAPI.instance) {
-      console.log('❕ UserStreamAPI already exists, returning it ❕');
-      return UserStreamAPI.instance;
-    }
-
     this.client = client;
     this.ws = null;
     this.wssURL = wssURL ? wssURL : `wss://stream.binance.com:9443/ws/`;
@@ -22,8 +17,6 @@ class UserStreamAPI extends EventEmitter {
 
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
-
-    UserStreamAPI.instance = this;
   }
 
   async start() {
@@ -199,9 +192,9 @@ class UserStreamAPI extends EventEmitter {
    * @param {*} client
    * @returns
    */
-  static getInstance(client) {
+  static getInstance(client, wssURL = null) {
     if (!UserStreamAPI.instance) {
-      UserStreamAPI.instance = new UserStreamAPI(client);
+      UserStreamAPI.instance = new UserStreamAPI(client, wssURL);
     }
     return UserStreamAPI.instance;
   }

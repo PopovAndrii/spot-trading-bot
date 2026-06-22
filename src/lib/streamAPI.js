@@ -5,37 +5,28 @@ class StreamAPI extends EventEmitter {
   static instances = new Map();
 
   /**
-   * const btcStream = new StreamAPI('BTCUSDT');
-   * btcStream.on('message', (data) => {
-   *  console.log('BTC price:', data.c);
-   * });
+   * One stream per symbol is obtained via the static getInstance() — the
+   * constructor no longer deduplicates (previously `new StreamAPI(sym)` returned
+   * a cached instance — an antipattern).
+   *
+   * const btcStream = StreamAPI.getInstance('BTCUSDT');
+   * btcStream.on('message', (data) => console.log('BTC price:', data.c));
    * btcStream.start();
    *
-   * const btcStream2 = new StreamAPI('BTCUSDT');  // same instance!
-   * console.log(btcStream === btcStream2);  // true
+   * const sameBtc = StreamAPI.getInstance('BTCUSDT'); // same object
+   * console.log(btcStream === sameBtc); // true
    * @param {*} symbol
-   * @returns
    */
   constructor(symbol) {
     super();
 
-    const normalizedSymbol = symbol.toLowerCase();
-
-    // If an instance of this symbol already exists, return it.
-    if (StreamAPI.instances.has(normalizedSymbol)) {
-      console.log(`⚠️ StreamAPI for ${normalizedSymbol} already exist`);
-      return StreamAPI.instances.get(normalizedSymbol);
-    }
-
-    this.symbol = normalizedSymbol;
+    this.symbol = symbol.toLowerCase();
     this.ws = null;
     this.reconnectTimer = null;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.lastMessageTime = null;
     this.heartbeatTimer = null;
-
-    StreamAPI.instances.set(normalizedSymbol, this);
   }
 
   start() {
@@ -235,7 +226,7 @@ class StreamAPI extends EventEmitter {
     const normalizedSymbol = symbol.toLowerCase();
 
     if (!StreamAPI.instances.has(normalizedSymbol)) {
-      new StreamAPI(normalizedSymbol);
+      StreamAPI.instances.set(normalizedSymbol, new StreamAPI(normalizedSymbol));
     }
 
     return StreamAPI.instances.get(normalizedSymbol);
