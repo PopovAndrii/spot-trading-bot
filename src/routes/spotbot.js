@@ -279,7 +279,7 @@ router.post('/calculator/param', async (req, res, next) => {
     // Binance (-1003/418). Границы зеркалят SpinBox'ы в spotbot.ejs.
     const LIMITS = {
       'field-activeOrders': { min: 2, max: 50 },
-      'field-requestFrequency': { min: 1000, max: 5000 },
+      'field-requestFrequency': { min: 500, max: 5000 },
     };
 
     const limit = LIMITS[msg.key];
@@ -345,18 +345,59 @@ router.post('/cancel/allorders', async (req, res, next) => {
     pair.updateSymbol({ symbol, status: statusPair.STOP });
   }
 
-  // Ордеров на бирже больше нет и цикл не работает (кнопка Cancel заблокирована,
-  // пока не нажат Stop) — убираем пару из in-memory списка, чтобы она ушла из
-  // меню навигации. Файл данных на диске не трогаем; повторный subscribe вернёт
-  // пару как NEW. deleteSymbol — no-op, если символа в Map уже нет.
-  if (!pair.isRunning(symbol)) {
-    pair.deleteSymbol(symbol);
-    // чистим историю логов пары, иначе после перезагрузки страницы её вкладка-
-    // фильтр в консоли вернётся из replay logBus.history().
-    logBus.clearSymbol(symbol);
+  // Пару из меню здесь НЕ убираем: меню = файлы серий на диске, а файл остаётся.
+  // Удаление серии — отдельное осознанное действие (кнопка Delete current series →
+  // POST /series/delete), которое снова проверяет биржу и стирает файл.
+  res.json(result);
+});
+
+// Удалить файл текущей серии (SYMBOL-binance.json) → пара уходит из меню.
+// Кнопка активна только после Cancel all orders. Перед удалением ПЕРЕПРОВЕРЯЕМ
+// биржу: если на паре остались живые ордера, файл не трогаем — иначе потеряли бы
+// orderId, по которым потом нечем снять ордера (осиротевшие ордера на бирже).
+router.post('/series/delete', async (req, res) => {
+  const rawSymbol = req.body.message;
+  if (!rawSymbol) {
+    return res.status(400).json({ success: false, message: 'Symbol is required in request body' });
   }
 
-  res.json(result);
+  const symbol = rawSymbol.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!symbol) {
+    return res.status(400).json({ success: false, message: 'Invalid symbol' });
+  }
+
+  // Цикл не должен работать (иначе он перезапишет файл следующим тиком).
+  if (pair.isRunning(symbol)) {
+    return res.status(409).json({ success: false, message: 'Cycle is running — press Stop first' });
+  }
+
+  const open = await API.openOrders({ symbol });
+  if (!open.success) {
+    return res.status(502).json(open);
+  }
+  if (open.message > 0) {
+    return res.status(409).json({
+      success: false,
+      message: `${open.message} active order(s) still on the exchange — cancel them first`,
+    });
+  }
+
+  const file = path.join(__dirname, '../data', `${symbol}-binance.json`);
+  try {
+    await fs.unlink(file);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      return res.status(500).json({ success: false, message: `Failed to delete series file: ${err.message}` });
+    }
+    // ENOENT — файла и так нет, считаем удаление успешным (идемпотентно).
+  }
+
+  pair.deleteSymbol(symbol);
+  // чистим историю логов пары, иначе после перезагрузки страницы её вкладка-
+  // фильтр в консоли вернётся из replay logBus.history().
+  logBus.clearSymbol(symbol);
+
+  res.json({ success: true, message: 'No active orders.<br>Series deleted' });
 });
 
 router.post('/calculator/result', async (req, res, next) => {

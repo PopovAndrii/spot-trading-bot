@@ -1,0 +1,35 @@
+// Утилити-классы под пристрелку адаптивной видимости.
+// Держим кучно и в «пакетном» стиле (чистые generic-классы, без привязки к
+// прикладным селекторам) — когда пороги устаканятся, файл переезжает в пакет
+// @popovandrii/ui-elements как opt-in dist/utils.css по образцу base.css.
+//
+// !important здесь оправдан (не атавизм): ui-elements style.css подключается в
+// head ПОСЛЕ нашего style.css, и его правила вроде .UIsp{display:grid} имеют ту
+// же специфичность (0,1,0), но грузятся позже — без !important они перебили бы
+// утилиту на корне компонента. Утилита по определению должна выигрывать.
+
+// --- Прятать по ориентации (любой вьюпорт, включая десктоп) ---
+.h-portrait {
+  @media (orientation: portrait) {
+    display: none !important;
+  }
+}
+
+.h-landscape {
+  @media (orientation: landscape) {
+    display: none !important;
+  }
+}
+
+// --- Прятать только на мобильном (порог отсекает десктоп) ---
+.h-portrait-m {
+  @media (orientation: portrait) and (max-width: 768px) {
+    display: none !important;
+  }
+}
+
+.h-landscape-m {
+  @media (orientation: landscape) and (max-height: 600px) {
+    display: none !important;
+  }
+}

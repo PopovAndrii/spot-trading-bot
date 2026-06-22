@@ -151,6 +151,18 @@ class WebSocketRouter {
                 }
               });
 
+              // Статистика возврата при остановке: несхлопываемый тост
+              // (persist:true → duration false на клиенте), как «Pause of Spot
+              // Trading». Сама фраза посчитана в jsonTimerSender (read-only).
+              ts.on('recovery', (data) => {
+                for (const client of this.clients.get(data.symbol) || []) {
+                  this.safeSend(client, {
+                    event: 'notification',
+                    data: { message: data.text, type: 'warning', persist: true },
+                  });
+                }
+              });
+
               ts.on('restarted', (data) => {
                 console.log(`🔄 Cycle restarted for ${data.symbol} at price ${data.price}`);
 

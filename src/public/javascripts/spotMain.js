@@ -1,4 +1,5 @@
 import { CancelAllOrders } from './CancelAllOrders.js';
+import { DeleteCurrentSeries } from './DeleteCurrentSeries.js';
 import { LoadDataCalculator } from './LoadDataCalculator.js';
 import { LoadDataFromFileCalculator } from './LoadDataFromFileCalculator.js';
 import { Notifications } from './ui/Notifications.js';
@@ -13,7 +14,8 @@ const sl = new UiElements.Select();
 
 const notifications = new Notifications();
 
-const cancelAllOrders = new CancelAllOrders(notifications);
+const deleteCurrentSeries = new DeleteCurrentSeries(notifications);
+const cancelAllOrders = new CancelAllOrders(notifications, deleteCurrentSeries);
 
 const colors = {
   null: '',
@@ -52,3 +54,5 @@ new SpotWS(
 );
 
 new Theme();
+
+UiElements.initQuestionTooltips();

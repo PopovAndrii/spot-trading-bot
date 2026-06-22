@@ -94,6 +94,22 @@ notification + логBus; лучше — бесконечный reconnect с cap
 > (`markOpenAsCanceled`, чистая функция + тесты), (б) скан пропускает файлы
 > со `status: DONE` (для старых файлов, записанных до фикса).
 
+### 1.6. ✅ ПРОВЕРЕНО НА LIVE. Маппинг qty в `restartCycle → #config` для SHORT корректен
+Было подозрение, что `#config` маппит `BUY.quantity = el.buy` для short неверно по
+размерности (`el.buy = initialDeposit − currentBalance` приняли за quote-деньги, а не
+base-объём). **Опровергнуто на реальных данных (2026-06-22).**
+
+В `Calculator.short` `deposit`/`orderSize`/`currentOrderSell` — в **base-монетах**, а
+не в quote-деньгах. Доказательство — поле `cummulativeQuoteQty` в живых файлах:
+`SELL[0]` qty=0.018 → cumQuote≈10.5 USDT, т.е. `quantity` в BNB. Поэтому
+`el.buy = накопленный base к выкупу` — это и есть правильный объём закрытия, а
+`el.totalSell = currentOrderSell` — объём набора. Обе стороны верны.
+
+Подтверждено сверкой того, что строит `#config`, с фактическими объёмами ордеров на
+активном цикле + двух закрытых SHORT-сериях — совпадает до цифры (в т.ч. реально
+исполненный `BUY[0]` = 0.018 BNB). Имена `spentTotalMoney`/`sellTotalCoins` внутри
+`short()` обманчивы, но математика и выход корректны. Менять нечего.
+
 ---
 
 ## 2. Бэкенд

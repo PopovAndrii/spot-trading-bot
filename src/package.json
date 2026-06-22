@@ -1,9 +1,10 @@
 {
-  "name": "www",
-  "version": "1.1.1",
+  "name": "Binance Trading bot",
+  "version": "1.1.2",
   "private": true,
   "scripts": {
     "build-css": "sass scss/:public/stylesheets/ --no-source-map",
+    "gen-qr": "node ./tools/gen-qr.js",
     "dev": "concurrently \"npm:watch-css\" \"npm:start\"",
     "start": "nodemon ./bin/www",
     "setup-user": "node ./bin/setup-user.js",
@@ -15,7 +16,7 @@
   },
   "dependencies": {
     "@binance/connector": "^3.6.1",
-    "@popovandrii/ui-elements": "^0.3.0",
+    "@popovandrii/ui-elements": "^0.4.4",
     "bcrypt": "^6.0.0",
     "cookie-parser": "~1.4.7",
     "debug": "~4.4.3",
@@ -34,11 +35,12 @@
   "devDependencies": {
     "browser-sync": "^3.0.4",
     "concurrently": "^10.0.3",
-    "eslint": "^10.4.1",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
     "nodemon": "^3.1.14",
     "prettier": "^3.8.4",
-    "sass": "^1.100.0"
+    "qrcode": "^1.5.4",
+    "sass": "^1.101.0"
   }
 }

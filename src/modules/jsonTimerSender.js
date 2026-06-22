@@ -1,12 +1,13 @@
 const EventEmitter = require('events');
 const fs = require('fs/promises');
 const path = require('path');
-const { Job, Status } = require('../lib/job');
+const { Job, Status, rebalancedClose, deepestFilledIndex } = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
 const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
+const { recoveryStats } = require('../lib/recoveryStats');
 // const { UserStreamAPI } = require('../lib/UserStreamApi');
 
 /**
@@ -38,6 +39,22 @@ function markOpenAsCanceled(obj) {
   return obj;
 }
 
+// Pure: нужно ли консолидировать закрытия (Шаг 3). true когда сетка набора
+// исчерпана (ВСЕ entry FILLED) и закрытия перекрылись (≥2 живых NEW) — типовой
+// итог залпового залива по фитилю на тонком стакане (testnet): усредняться
+// больше нечем, а несколько закрытий висят на куски одной позиции (риск oversell).
+// Тогда бот сводит к ОДНОМУ закрытию, останавливается и зовёт человека.
+// Тестируется без биржи.
+function needsRecoveryConsolidation(obj, strategy) {
+  const entrySide = strategy === 'short' ? 'SELL' : 'BUY';
+  const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
+  const entries = obj?.[entrySide] || [];
+  const closes = obj?.[closeSide] || [];
+  if (entries.length === 0) return false;
+  if (!entries.every((e) => e?.status === 'FILLED')) return false;
+  return closes.filter((c) => c?.status === 'NEW').length >= 2;
+}
+
 function partialFillDelta(stored, message) {
   if (!message || message.status !== 'PARTIALLY_FILLED') return null;
   if (message.executedQty === undefined) return null;
@@ -63,6 +80,15 @@ class JsonTimerSender extends EventEmitter {
     this.exchangeName = 'binance';
 
     this.busy = false; // идёт ли проход #jobIterator (защита от наслаивания)
+
+    // Шаг 1: видимость сетевого обрыва. Подряд идущие неудачные вызовы к бирже
+    // (DNS EAI_AGAIN, captive-portal TLS и т.п.) итератор молча глотает через
+    // continue — робот крутится вслепую. Считаем серию и один раз сигналим.
+    this.apiFailStreak = 0;
+    this.apiOutageNotified = false; // алерт об обрыве уже выведен — не спамим
+
+    this.baseAsset = ''; // имена активов для уведомления об орфан-остатке (Шаг 2)
+    this.quoteAsset = '';
 
     this.API = new InvokeApi();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
@@ -96,11 +122,45 @@ class JsonTimerSender extends EventEmitter {
 
     if (typeof this.API[data.method] === 'function') {
       const result = await this.API[data.method](data.data);
+      this.#trackApiHealth(result);
       return result;
     }
 
     console.error(`Method [${data.method}] does not exist`);
     return null;
+  }
+
+  /**
+   * Шаг 1: только видимость. При сетевом обрыве все вызовы к бирже возвращают
+   * { success:false }, итератор делает continue — состояние не двигается, но
+   * лимитки на бирже тем временем матчатся сами. Считаем подряд идущие неудачи
+   * и ОДИН раз пишем в консоль, что цикл идёт вслепую; на первом успехе после
+   * серии — сообщаем о восстановлении. Торговую логику не трогаем.
+   */
+  #trackApiHealth(result) {
+    const ALERT_AT = 5; // подряд неудач до алерта
+    if (!result) return; // null = программная ошибка метода, не сеть
+
+    if (result.success === false) {
+      this.apiFailStreak++;
+      if (this.apiFailStreak === ALERT_AT && !this.apiOutageNotified) {
+        this.apiOutageNotified = true;
+        logBus.log(
+          `⚠️ ${this.symbol}: exchange unreachable (${this.apiFailStreak} failures in a row) — cycle running blind, resting orders are uncontrolled`
+        );
+      }
+      return;
+    }
+
+    if (result.success === true) {
+      if (this.apiOutageNotified) {
+        logBus.log(
+          `🟢 ${this.symbol}: exchange connection restored (after ${this.apiFailStreak} failures in a row)`
+        );
+      }
+      this.apiFailStreak = 0;
+      this.apiOutageNotified = false;
+    }
   }
 
   #strategy() {
@@ -134,6 +194,52 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
+   * Шаг 3: сетка набора исчерпана (все entry FILLED) и закрытия перекрылись
+   * (≥2 живых NEW — залповый залив по фитилю). Усредняться больше нечем, а
+   * несколько закрытий висят на куски одной позиции. Действие: снять перекрытые
+   * закрытия на бирже, записать ОДНО закрытие на самый глубокий индекс набора
+   * (объём/цена по rebalancedClose = avg×(1+profit+comm) — ровно то, что job
+   * поставит при Start), остановить цикл и уведомить. Лимитку сами НЕ дёргаем:
+   * через минуту обычно отскок, и человек решает — Start (бот выставит этот
+   * close) или продать вручную выше. Возвращает true, если подготовка сделана.
+   */
+  async #maybePrepareRecoveryClose(obj, strategy) {
+    if (!needsRecoveryConsolidation(obj, strategy.method)) return false;
+
+    const closeSide = strategy.method === 'short' ? 'BUY' : 'SELL';
+    const entrySide = strategy.side; // BUY для long, SELL для short
+    const k = deepestFilledIndex(obj[entrySide]);
+    const reb = rebalancedClose(obj, k, strategy.method);
+    if (!reb) return false; // позиция фактически закрыта — нечего готовить
+
+    // снять перекрытые закрытия на бирже (entry уже FILLED, живут только closes).
+    // не удалось (сеть) — выходим без записи, повторим на следующем тике.
+    const res = await this.#runToApi({ method: 'cancelOpenOrders', data: { symbol: this.symbol } });
+    if (!res || res.success === false) return false;
+    markOpenAsCanceled(obj); // снятые NEW → CANCELED в таблице
+
+    // одно подготовленное закрытие на глубоком индексе (ещё не на бирже: status null)
+    obj[closeSide][k] = {
+      ...obj[closeSide][k],
+      status: null,
+      orderId: null,
+      quantity: reb.quantity,
+      price: reb.price,
+    };
+    obj.date_modified = new Date().toISOString();
+    await this.#mergeLiveEdits(obj);
+    await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
+    this.emit('tableData', obj); // обновить таблицу в UI сразу
+
+    const line = `🧰 ${this.symbol}: grid fully filled — consolidated to one ${closeSide} of ${reb.quantity} ${this.baseAsset || ''} @ ${reb.price}. Stopped: press Start to place it, or sell manually.`;
+    console.log(line);
+    logBus.log(line);
+
+    this.stop(); // stop() сам эмитит recovery-тост с курсом безубытка
+    return true;
+  }
+
+  /**
    * Iterates through the entire table of placed orders.
    * @param {Object} obj - Configuration of order data from file or database.
    * @returns {Stop()} - Stop the cycle.
@@ -142,6 +248,11 @@ class JsonTimerSender extends EventEmitter {
     const strategy = this.#strategy();
 
     if (obj.status == Status.READY && strategy != null) {
+      // Сетка исчерпана и закрытия перекрылись — свести к одному closing-ордеру,
+      // остановиться и позвать человека (Шаг 3). prepareRecoveryClose сам пишет
+      // файл и делает stop(); проход дальше не идём.
+      if (await this.#maybePrepareRecoveryClose(obj, strategy)) return;
+
       let i = 0;
 
       // never started 0
@@ -162,6 +273,21 @@ class JsonTimerSender extends EventEmitter {
         if (currentOrder.status === Status.DONE) {
           const result = await this.#runToApi(currentOrder); // cancelOpenOrders
 
+          // Орфан-остаток (Шаг 2): закрытие исполнилось, но часть позиции набрана
+          // глубже, а до-закрыть нельзя — остаток меньше биржевого минимума.
+          // Уведомляем: средства на бирже, решение за пользователем.
+          if (currentOrder.leftover) {
+            const { quantity, price } = currentOrder.leftover;
+            const base = this.baseAsset || '';
+            const quote = this.quoteAsset || '';
+            const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
+            logBus.log(
+              `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
+                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+                `Funds are on the exchange; decide manually (swap or keep).`
+            );
+          }
+
           // cancelOpenOrders снял страховочные ордера на бирже — зафиксировать
           // их отмену в таблице (иначе в истории остаются вечные NEW)
           markOpenAsCanceled(obj);
@@ -180,13 +306,23 @@ class JsonTimerSender extends EventEmitter {
           // Основной файл при этом остаётся (статус DONE) — видно финал.
           await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
-          if (this.autoRestart) {
-            await this.#sleep(500);
+          // Зависший остаток на руках (частичное закрытие + добор) — НЕ
+          // рестартим поверх застрявшей позиции: новая сетка усреднялась бы
+          // с чужими монетами. Останавливаемся, stop() покажет курс возврата.
+          const stranded = recoveryStats(obj);
+
+          if (this.autoRestart && !stranded) {
+            // await this.#sleep(500);
             this.restartCycle(obj);
-            await this.#sleep(500);
+            await this.#sleep(100);
 
             return;
           } else {
+            if (this.autoRestart && stranded) {
+              const skipMsg = `⏸️ ${this.symbol}: auto-restart canceled — unsold inventory left over`;
+              console.log(skipMsg);
+              logBus.log(skipMsg);
+            }
             // сначала пишем ОСНОВНОЙ файл (статус DONE + date_modified + итоговые
             // цвета), и только потом stop() → 'stopped'. Иначе клиент дёрнет
             // финальный фетч таблицы раньше записи и снова покажет старое состояние.
@@ -198,8 +334,8 @@ class JsonTimerSender extends EventEmitter {
         }
 
         if (currentOrder.status === 'pass') {
-          logBus.log(`${this.symbol} ${JSON.stringify(currentOrder)}`);
-          await this.#sleep(100);
+          console.log(`${this.symbol} ${JSON.stringify(currentOrder)}`);
+          // await this.#sleep(100);
           continue;
         } // processed order (api request not needed) or test loop
 
@@ -222,6 +358,9 @@ class JsonTimerSender extends EventEmitter {
           const delta = partialFillDelta(stored, result.message);
 
           if (delta) {
+            // Stop мог быть нажат, пока ждали #runToApi выше — не писать файл
+            // после stop (инвариант: после Stop файл сетки заморожен).
+            if (!this.running[this.symbol]) return;
             Object.assign(stored, delta);
             await this.#mergeLiveEdits(obj);
             await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
@@ -244,6 +383,10 @@ class JsonTimerSender extends EventEmitter {
           toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
         }
 
+        // Stop мог быть нажат, пока ждали #runToApi выше — не писать файл после
+        // stop (инвариант: после Stop файл сетки заморожен).
+        if (!this.running[this.symbol]) return;
+
         // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
@@ -251,7 +394,7 @@ class JsonTimerSender extends EventEmitter {
         await this.#mergeLiveEdits(obj);
         await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
 
-        await this.#sleep(500);
+        await this.#sleep(250);
       }
     }
   }
@@ -294,6 +437,25 @@ class JsonTimerSender extends EventEmitter {
     this.timer = setTimeout(() => this.readLoop(), this.interval || 5000);
   }
 
+  // Подтягивает LOT_SIZE.minQty / NOTIONAL.minNotional и имена активов в Job,
+  // чтобы реконсиляция орфан-остатка знала биржевой минимум закрытия (Шаг 2).
+  async #loadExchangeLimits(api, symbol) {
+    try {
+      const info = await api.exchangeInfo({ symbol });
+      if (!info.success) return;
+      const s = info.message.symbols?.[0] || {};
+      const filters = s.filters || [];
+      const lot = filters.find((f) => f.filterType === 'LOT_SIZE');
+      const notional = filters.find((f) => f.filterType === 'NOTIONAL');
+      this.job.minQty = lot ? parseFloat(lot.minQty) || 0 : 0;
+      this.job.minNotional = notional ? parseFloat(notional.minNotional) || 0 : 0;
+      this.baseAsset = s.baseAsset || '';
+      this.quoteAsset = s.quoteAsset || '';
+    } catch (err) {
+      console.error('loadExchangeLimits:', err);
+    }
+  }
+
   async start(symbol, strategy, options = {}) {
 
     if (!this.running[symbol]) {
@@ -302,7 +464,17 @@ class JsonTimerSender extends EventEmitter {
 
       this.autoRestart = options.autoRestart || false;
 
+      // singleton переживает stop()/start() — сбрасываем счётчик обрыва, чтобы
+      // не тянуть серию ошибок из прошлого запуска
+      this.apiFailStreak = 0;
+      this.apiOutageNotified = false;
+
       const api = new InvokeApi();
+
+      // Биржевые лимиты для реконсиляции орфан-остатка (Шаг 2) + имена активов
+      // для уведомления. Сбой не критичен: лимиты останутся 0 → #belowMin не
+      // сработает, закрытие всегда пытается выставиться (поведение как раньше).
+      await this.#loadExchangeLimits(api, symbol);
 
       // User data stream (ANALYSIS п.10, фаза 1 — «ускоритель»):
       // executionReport по нашему символу запускает внеочередной тик readLoop —
@@ -381,7 +553,29 @@ class JsonTimerSender extends EventEmitter {
     const stopMsg = `🛑 Stop: ${this.symbol}`;
     console.log(stopMsg);
     logBus.log(stopMsg);
+
+    await this.#emitRecovery();
+
     this.emit('stopped', this.symbol);
+  }
+
+  // Статистика возврата при остановке: сколько осталось на руках по факту
+  // исполнений и по какому курсу это продать (long) / выкупить (short), чтобы
+  // серия вышла не в убыток. Печатается в консоль интерфейса (logBus) и уходит
+  // клиентам несхлопываемым тостом (событие 'recovery'). Read-only — ничего не
+  // размещает и схему файла не меняет; ошибка чтения не должна блокировать stop.
+  async #emitRecovery() {
+    try {
+      const obj = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
+      const rec = recoveryStats(obj);
+      if (!rec) return;
+      const line = `💰 ${this.symbol}: ${rec.text}`;
+      console.log(line);
+      logBus.log(line);
+      this.emit('recovery', { symbol: this.symbol, text: rec.text });
+    } catch (err) {
+      console.warn('🟡 recoveryStats failed:', err.message);
+    }
   }
 
   async restartCycle(obj = {}) {
@@ -467,3 +661,4 @@ class JsonTimerSender extends EventEmitter {
 module.exports = JsonTimerSender;
 module.exports.partialFillDelta = partialFillDelta;
 module.exports.markOpenAsCanceled = markOpenAsCanceled;
+module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;

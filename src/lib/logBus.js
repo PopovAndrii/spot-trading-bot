@@ -2,9 +2,14 @@ const MAX = 200;
 const entries = [];
 const clients = new Set();
 
+// Монотонный id записи (переживает shift кольцевого буфера). Нужен SSE-каналу:
+// клиент шлёт Last-Event-ID при reconnect, сервер реплеит только новое, а клиент
+// дедуплицирует по id (иначе после каждого переподключения логи задваивались).
+let seq = 0;
+
 function log(msg) {
   try {
-    const entry = { t: Date.now(), msg: String(msg) };
+    const entry = { id: ++seq, t: Date.now(), msg: String(msg) };
     entries.push(entry);
     if (entries.length > MAX) entries.shift();
     clients.forEach(fn => { try { fn(entry); } catch {} });

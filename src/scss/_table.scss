@@ -16,6 +16,7 @@
   &>* td {
     padding: 0.25rem;
     text-align: left;
+    font-variant-numeric: tabular-nums;
   }
 
   &.t-border th,
@@ -63,8 +64,8 @@
   display: inline-block;
   padding: 0.1rem 0.5rem;
   border-radius: 0.25rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: #aaa;
+  background: $c-g-100;
+  color: $c-g-900;
   font-family: monospace;
   font-size: 0.7rem;
   font-weight: normal;
@@ -77,10 +78,11 @@
 // (#, %) and the last two (Spent, Balance), keeping the 4 trading columns
 // (Buy currency, BUY, SELL, Sell currency). tr > * targets both th and td.
 @media (max-width: 768px) {
-  #settings-table tr > *:nth-child(1),
-  #settings-table tr > *:nth-child(2),
-  #settings-table tr > *:nth-last-child(1),
-  #settings-table tr > *:nth-last-child(2) {
+
+  #settings-table tr>*:nth-child(1),
+  #settings-table tr>*:nth-child(2),
+  #settings-table tr>*:nth-last-child(1),
+  #settings-table tr>*:nth-last-child(2) {
     display: none;
   }
 }

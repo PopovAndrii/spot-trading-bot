@@ -1,14 +1,41 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs/promises');
+const path = require('path');
 
-const { pair } = require('../lib/pair');
+const { pair, statusPair } = require('../lib/pair');
 const logBus = require('../lib/logBus');
 const buildInfo = require('../lib/buildInfo');
 const { isTestnet, requestedTestnet } = require('../lib/runMode');
 
-router.get('/symbols', (req, res) => {
+// Источник правды для меню навигации — файлы текущих серий на диске
+// (SYMBOL-binance.json). Пара видна в меню, пока её файл существует; кнопка
+// Cancel All Orders удаляет файл — пара уходит из меню. Ручные ордера на бирже
+// файла не создают, поэтому в меню робота не попадают (в отличие от опроса
+// openOrders, который захватил бы и ручную спот-покупку).
+const DATA_DIR = path.join(__dirname, '../data');
+const ARCHIVE_RE = /^\d+-/; // {timestamp}-SYMBOL-binance.json — архив серии, не текущая
+const SERIES_SUFFIX = '-binance.json';
+
+router.get('/symbols', async (req, res) => {
   try {
-    const symbols = pair.getActiveSymbols();
+    const files = await fs.readdir(DATA_DIR).catch(() => []);
+    // статус (running/pause/attention) живёт в памяти; для пар, которых в карте
+    // нет (не подписаны в этой сессии, но файл на диске есть), показываем pause.
+    const inMem = new Map(pair.getActiveSymbols().map((s) => [s.symbol, s]));
+
+    const symbols = [];
+    const seen = new Set();
+    for (const file of files) {
+      if (!file.endsWith(SERIES_SUFFIX) || ARCHIVE_RE.test(file)) continue;
+      const symbol = file.slice(0, -SERIES_SUFFIX.length).toUpperCase();
+      if (seen.has(symbol)) continue;
+      seen.add(symbol);
+
+      const mem = inMem.get(symbol);
+      symbols.push({ symbol, status: mem ? mem.status : statusPair.STOP });
+    }
+
     res.json(symbols);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get active symbols' });
@@ -50,21 +77,32 @@ router.get('/logs', (req, res) => {
   // long-lived stream — drop the idle timeout on this response's socket
   req.socket.setTimeout(0);
 
+  // id: позволяет клиенту дедуплицировать после reconnect (replay истории).
   const send = (e) => {
     if (res.writableEnded) return;
-    try { res.write(`data: ${JSON.stringify(e)}\n\n`); } catch { }
+    try { res.write(`id: ${e.id}\ndata: ${JSON.stringify(e)}\n\n`); } catch { }
   };
 
-  logBus.history().forEach(send);
+  // Replay только того, что клиент ещё не видел. Last-Event-ID браузер шлёт сам
+  // при внутреннем reconnect; при ручном пересоздании EventSource клиент кладёт
+  // его в ?lastEventId. NaN (первое подключение) → реплеим всю историю.
+  const lastSeen = Number(req.headers['last-event-id'] ?? req.query.lastEventId);
+  logBus
+    .history()
+    .filter((e) => !(lastSeen >= 0) || e.id > lastSeen)
+    .forEach(send);
 
   const unsub = logBus.subscribe(send);
 
-  // heartbeat: an SSE comment every 15s. Keeps the connection alive so an idle
-  // timeout (NAT/proxy/browser) won't drop it. If the socket is dead anyway,
-  // write throws / 'close' fires, and the client's EventSource reconnects.
+  // heartbeat: named 'ping' event every 15s. Двойная роль:
+  //  1) держит соединение живым против idle-timeout (NAT/proxy/browser);
+  //  2) клиент его ВИДИТ (именованное событие, в отличие от комментария : ping)
+  //     и сбрасывает watchdog — иначе полуоткрытый сокет (sleep, рециклинг
+  //     upstream в nginx-proxy-manager) клиент не замечал и консоль молча вставала.
+  // Без id: ping не сдвигает Last-Event-ID, replay остаётся корректным.
   const heartbeat = setInterval(() => {
     if (res.writableEnded) return;
-    try { res.write(`: ping\n\n`); } catch { }
+    try { res.write(`event: ping\ndata: {}\n\n`); } catch { }
   }, 15000);
 
   req.on('close', () => {

@@ -1,0 +1,89 @@
+@use './var' as *;
+
+.donate {
+  padding: 1rem;
+
+  &__title {
+    font-size: 1.5rem;
+    margin: 0 0 0.5rem;
+  }
+
+  &__lead {
+    max-width: 60ch;
+    margin: 0 0 1.5rem;
+    color: $c-g-700;
+    line-height: $line-height;
+  }
+
+  &__grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+}
+
+.donate-card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid $c-g-300;
+  border-radius: $border-radius;
+  background-color: $c-g-100;
+
+  &__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  &__coin {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: $c-g-950;
+  }
+
+  &__network {
+    font-size: 0.85rem;
+    color: $c-g-500;
+    text-align: right;
+  }
+
+  &__qr {
+    justify-self: center;
+    display: block;
+    padding: 0.125rem;
+    border-radius: $border-radius;
+    background-color: #ffffff;
+    line-height: 0;
+
+    &[aria-disabled='true'] {
+      pointer-events: none;
+    }
+
+    img {
+      display: block;
+      width: 240px;
+      height: 240px;
+    }
+  }
+
+  &__addr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__address {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: $c-g-900;
+  }
+
+  &__copy.copied {
+    color: $c-s-700;
+  }
+}

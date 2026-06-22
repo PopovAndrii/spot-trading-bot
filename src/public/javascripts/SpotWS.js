@@ -96,8 +96,14 @@ export class SpotWS {
             this.#updateRestartSwitch(message.data);
             break;
           case 'notification':
-            // generic server-side notification (e.g. price stream lost/restored)
-            this.notifications.showNotification(message.data.message, message.data.type || 'info');
+            // generic server-side notification (e.g. price stream lost/restored).
+            // persist:true → несхлопываемый тост (duration false), как у STOP —
+            // напр. статистика возврата средств при остановке цикла.
+            this.notifications.showNotification(
+              message.data.message,
+              message.data.type || 'info',
+              message.data.persist ? false : undefined
+            );
             break;
           case 'updatePrice':
             const text = document.querySelector('.stream-currency');
@@ -154,19 +160,6 @@ export class SpotWS {
     };
   }
 
-  // not used method
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-
-    const startBtn = document.getElementById('startBtn');
-    if (startBtn && this.btnClickHandler) {
-      startBtn.removeEventListener('ui-button-change', this.btnClickHandler);
-    }
-  }
-
   btnStart() {
     const startBtn = document.getElementById('startBtn');
     if (!startBtn) return;
@@ -207,7 +200,7 @@ export class SpotWS {
           })
         );
         this.#btnRule();
-        this.notifications.showNotification('Pause of Spot Trading', 'warning', false);
+        this.notifications.showNotification('Pause of Spot Trading', 'warning', 10000);
         this.isRunning = false;
       }
     };
@@ -252,6 +245,12 @@ export class SpotWS {
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
     cancelAllOrders.disabled = Boolean(status);
+
+    // Delete current series доступна только после Cancel all orders. На любой
+    // смене статуса цикла (start/stop) сбрасываем в disabled — заново её активирует
+    // лишь успешная отмена ордеров (CancelAllOrders.enable()).
+    const deleteCurrentSeries = document.getElementById('delete-current-series');
+    if (deleteCurrentSeries) deleteCurrentSeries.disabled = true;
 
     const startBtn = document.getElementById('startBtn');
     if (status) {

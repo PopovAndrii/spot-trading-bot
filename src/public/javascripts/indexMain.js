@@ -27,6 +27,88 @@ btn?.addEventListener('ui-button-change', () => {
   if (navigateUrl) window.location.href = navigateUrl;
 });
 
+// Донат: копирование адреса в буфер обмена (всё локально, без сети).
+// navigator.clipboard есть только в защищённом контексте (https/localhost);
+// по http://<IP> его нет, поэтому держим запасной путь через execCommand.
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) throw new Error('execCommand copy failed');
+}
+
+document.querySelectorAll('.donate-card__copy').forEach((button) => {
+  button.addEventListener('ui-button-change', async () => {
+    const address = button.dataset.copy;
+    const label = button.querySelector('.btn-label') ?? button;
+    const original = label.textContent;
+    try {
+      await copyText(address);
+      label.textContent = 'Copied!';
+    } catch {
+      label.textContent = 'Copy failed';
+    }
+    button.classList.add('copied');
+    setTimeout(() => {
+      label.textContent = original;
+      button.classList.remove('copied');
+    }, 1500);
+  });
+});
+
+// Инфо-блоки на главной: кнопка "yes" помечает блок прочитанным (localStorage)
+// и скрывает его; при повторном заходе прочитанные блоки не показываем.
+(() => {
+  const STORE_KEY = 'index-massege-read';
+  const section = document.querySelector('.index-massege');
+  const items = section ? [...section.querySelectorAll('.index-massege__item')] : [];
+  if (!items.length) return;
+
+  let read;
+  try {
+    read = new Set(JSON.parse(localStorage.getItem(STORE_KEY) || '[]'));
+  } catch {
+    read = new Set();
+  }
+  const save = () => {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify([...read]));
+    } catch {}
+  };
+  const syncSection = () => {
+    if (items.every((el) => el.hidden)) section.hidden = true;
+  };
+
+  items.forEach((item) => {
+    const id = item.dataset.msg;
+    if (id && read.has(id)) {
+      item.hidden = true;
+      return;
+    }
+    const ack = item.querySelector('.index-massege__ack');
+    ack?.addEventListener('ui-button-change', () => {
+      item.hidden = true;
+      if (id) {
+        read.add(id);
+        save();
+      }
+      syncSection();
+    });
+  });
+
+  syncSection();
+})();
+
 // Проверка пары ключей (real | test): подписанный запрос делает сервер.
 document.querySelectorAll('[data-check]').forEach((button) => {
   button.addEventListener('ui-button-change', async (e) => {

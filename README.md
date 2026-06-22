@@ -59,7 +59,7 @@ API_SECRET_TEST='you_testnet_secret_form_binance'
 # SSH keys / git config are NOT mounted into the container anymore.
 
 ```
-After that, run ./int and follow the instructions.
+After that, run ./init and follow the instructions.
 
 ### Bootstrap a fresh setup (no .env yet)
 
@@ -343,31 +343,8 @@ The footer shows which Binance environment is actually used:
 - Check and fix one file
 
 ```sh
-npx eslint /var/www/lib/job.js
-npx eslint /var/www/lib/job.js --fix
-```
-
-### Releasing
-
-`dist/` is git-ignored, so always build before packing or publishing. Tags use the
-`vX.Y.Z` scheme and point at the merge commit on `main`.
-
-```sh
-# 1. Bump the version on dev (no auto-tag — we tag on main after the merge)
-npm version 0.0.0 --no-git-tag-version
-git commit -am "Version: 0.0.0"
-
-# 2. Push dev to GitLab
-git push origin dev
-
-# 3 Open a merge request dev -> main on GitLab, then merge it
-
-# 4. Tag the merged main (annotated) and push the tag
-git checkout main
-git pull origin main
-git tag -a v0.0.0 origin/main -m "Release 0.0.0"
-git push origin v0.0.0
-
+npx eslint /var/www/src/lib/job.js
+npx eslint /var/www/src/lib/job.js --fix
 ```
 
 ## Config .vscode/settings.json in root dirrectory
@@ -384,10 +361,16 @@ VScode must have the ESlint plugin from Microsoft installed.
   },
   "eslint.validate": [
     "javascript"
-  ],
-  "eslint.experimental.useFlatConfig": true
+  ]
 }
 ```
 
+## Experimental files (not in the flow)
+These live in the repo by request but are **not wired into the app** — nothing
+imports them, they don't run as part of the bot:
+- `src/lib/test2.js`
+- `src/lib/MomentumIndicator.js`
 
+Kept as experiments/scratch. Safe to ignore when reading the trading flow
+(cli → ws → jsonTimerSender → job → invokeAPI).
 

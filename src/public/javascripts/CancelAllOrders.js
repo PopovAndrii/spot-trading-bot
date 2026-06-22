@@ -1,8 +1,9 @@
 export class CancelAllOrders {
-  constructor(notifications) {
+  constructor(notifications, deleteCurrentSeries) {
     this.listenerStatus = true;
 
     this.notifications = notifications;
+    this.deleteCurrentSeries = deleteCurrentSeries;
 
     new UiElements.Button();
 
@@ -43,10 +44,10 @@ export class CancelAllOrders {
 
       if (data.success) {
         this.notifications.showNotification(`${data.message} active orders cancelled per pair ${currency}`, 'success');
-        // Пара удалена из in-memory списка на бэке — перечитываем меню навигации
-        // и убираем её вкладку-фильтр из консоли, без перезагрузки страницы.
-        window.fetchActiveSymbols?.();
-        window.dispatchEvent(new CustomEvent('pair-removed', { detail: { symbol: currency } }));
+        // Ордера сняты — пару из меню НЕ убираем (файл серии ещё на диске).
+        // Активируем соседнюю кнопку Delete current series: следующим осознанным
+        // нажатием она перепроверит биржу и удалит файл серии → пара уйдёт.
+        this.deleteCurrentSeries?.enable();
       } else {
         this.notifications.showNotification(data.message, 'danger');
       }

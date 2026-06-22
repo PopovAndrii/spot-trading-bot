@@ -4,18 +4,20 @@
 
 @use 'button';
 @use 'currency';
+@use 'donate';
 @use 'footer';
 @use 'icon';
+@use 'index';
 @use 'input-btn';
 @use 'line';
 @use 'login';
 @use 'nav';
-@use 'notifications';
 @use 'switch';
 @use 'table';
 
 @use 'media';
 @use 'layout';
+@use 'utils';
 
 html {
   font-size: var.$font-size-base;
@@ -23,7 +25,11 @@ html {
 
 body {
   padding: 0px;
-  padding-bottom: 2.5rem;
+  // Страница сама не скроллится — прокручивается только .content. Так скроллбар
+  // страницы не появляется и не накладывается на фиксированную консоль; её
+  // собственный скролл остаётся доступен.
+  height: 100vh;
+  overflow: hidden;
   background-color: var.$c-g-50;
   color: var.$c-g-950;
   transition: background 0.3s ease;
@@ -52,35 +58,4 @@ body {
 .color-warning {
   color: var.$c-w-500;
   background-color: var.$c-w-100;
-}
-
-.server-address {
-  padding: 1rem 0;
-  // text-align: center;
-  font-size: 1.5rem;
-
-  &>span {
-    color: var.$c-p-700;
-  }
-}
-
-.api-keys {
-  display: grid;
-  gap: 2.5rem;
-
-  & a {
-    text-decoration: underline;
-    color: var.$c-w-700;
-  }
-
-  &__group {
-    display: grid;
-    // width: 100%;
-    gap: 0.5rem;
-  }
-
-  &__title {
-    font-size: 1.5rem;
-  }
-
 }

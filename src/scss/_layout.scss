@@ -1,9 +1,32 @@
 @use './var' as *;
 
+:root {
+  // Высота открытой консоли. На мобильном в альбомной ориентации вьюпорт
+  // низкий — фиксированные 450px вылезали за экран и перекрывали шапку.
+  // Ограничиваем долей вьюпорта (dvh учитывает панели мобильного браузера),
+  // на десктопе и в портрете остаётся 450px.
+  --console-open-h: 450px;
+  --console-open-h: min(450px, 60dvh);
+}
+
+// На мобильном в альбомной ориентации (низкий вьюпорт) открываем консоль на всю
+// высоту окна — тело занимает вьюпорт за вычетом шапки (2rem). max-height
+// отсекает десктоп, где ориентация тоже landscape, но окно высокое.
+@media (orientation: landscape) and (max-height: 600px) {
+  :root {
+    --console-open-h: calc(100dvh - 2rem);
+  }
+}
+
 .wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+  padding-bottom: 2.5rem;
+  transition: padding-bottom 0.3s ease;
+}
+
+body:has(.console--open) .wrapper {
+  padding-bottom: calc(2.5rem + var(--console-open-h) + 20px);
 }
 
 .container-adaptive {
@@ -16,7 +39,6 @@
 }
 
 .content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  gap: 1rem;
 }

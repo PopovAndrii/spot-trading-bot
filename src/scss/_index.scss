@@ -1,0 +1,79 @@
+@use './var' as *;
+
+
+.index-massege {
+  display: grid;
+  gap: 0.5rem;
+  padding: .5rem 0 0 0;
+
+  &>div {
+    display: grid;
+    grid-template-columns: 1fr min-content;
+    gap: 2rem;
+    border-radius: $border-radius;
+    font-size: $font-size-base + 0;
+    padding: 1rem;
+  }
+
+  // прочитанные блоки (item.hidden = true) — перебиваем display:grid выше
+  &>div[hidden] {
+    display: none;
+  }
+
+  &__warning {
+    background-color: $c-w-100;
+    border: 1px solid $c-w-300;
+    color: $c-w-950;
+  }
+
+  &__info {
+    background-color: $c-i-100;
+    border: 1px solid $c-i-300;
+    color: $c-i-950;
+  }
+}
+
+.start-trading {
+  padding: 1rem;
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 2fr 1fr;
+
+}
+
+.index-h1 {
+  margin: 0;
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.server-address {
+  display: grid;
+  justify-items: center;
+  padding: 1rem 0;
+  // text-align: center;
+  font-size: 1.5rem;
+
+  &>span {
+    color: $c-p-700;
+  }
+}
+
+.api-keys {
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  justify-items: center;
+  gap: 2.5rem;
+
+  & a {
+    text-decoration: underline;
+    color: $c-w-700;
+  }
+
+  &__group {
+    display: grid;
+    // width: 100%;
+    gap: 0.5rem;
+  }
+}

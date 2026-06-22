@@ -34,20 +34,16 @@
           <div id="group-spinbox">
             <div class="line">
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-deposit' , label:'Available balance' , min: 0 , max: 0 ,
-                  step: formatInfo.tickSize || 0 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-deposit' , label:'Available balance' , min: 0 , max: 0 , step: formatInfo.tickSize || 0, hint:'Retrieving your available balance from the exchange. Click the Long/Short button. You can also reduce your balance. The order grid is calculated based on the balance shown in this field. Do not increase your balance in this field if it is insufficient!' }); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-orderSize' , label:'Order Size' , min: 0 , max: 0 , step:
-                  formatInfo.stepSize || 0 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-orderSize' , label:'Order Size' , min: 0 , max: 0 , step: formatInfo.stepSize || 0, hint:'Size of the first order. It must not be less than the amount specified for the exchange. It is usually set at +5% higher.' }); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-profit' , label:'Profit 0.1 - 0.4' , min: 0.1 , step: 1,
-                  max: 0 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-profit' , label:'Profit 0.1 - 0.4' , min: 0.1 , step: 1, max: 0, hint:'Profit is usually up to 1%. The optimal range is 0.2–0.5%.' }); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-commission' , label:'Exchange commission' , min: 0.2 ,
-                  step: 2, max: 2 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-commission' , label:'Exchange commission' , min: 0.2 , step: 2, max: 2, hint:'Generally, the commission on Binance is 0.25%. However, you may be eligible for a bonus commission of 0.1%. Please keep this in mind.' }); %>
               </div>
             </div>
 
@@ -64,7 +60,7 @@
                   <ul class="UIselect-options" hidden>
                     <li class="UIselect-options__items" aria-hidden="true">
                       <ul role="group">
-                        <li role="option" data-value='progressive'>Progressive</li>
+                        <li role="option" data-value=' progressive'>Progressive</li>
                         <li role="option" data-value='fibonacci'>Fibonacci</li>
                       </ul>
                     </li>
@@ -72,16 +68,13 @@
                 </div>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 50 , max: 150 ,
-                  step: 0 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 20 , max: 150 , step: 0, hint:'The Martingale factor affects the size of the gap in the closing order (final sale). The higher the Martingale factor, the more effectively and frequently the end of the series is triggered. However, this causes the balance to be depleted very quickly. With a low Martingale factor, the order grid is very wide and provides good overlap in percentage terms. However, the final order in the series is located slightly further away than desired. Range: minimum 25-35; optimal 35-80; excellent 80-100+.' }); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0 , max:
-                  0 , step: 1 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0.01 , max: 2 , step: 2, hint:'Progressive Step—allows you to control the percentage of overlap between price drops (Long) and rises (Short). The greater the overlap (>20%), the lower the risk-which is good. At the same time, orders are triggered less frequently-which is bad. You need to find the optimal balance depending on the amount of currency in your exchange account.'}); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step:
-                  2 }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
               </div>
             </div>
           </div>
@@ -92,15 +85,17 @@
                на лету (см. LoadDataCalculator.runtimeParams / Restart). -->
           <div id="group-runtime" class="line">
             <div class="">
-              <%- include('../views/ui/SpinBox', { id:'field-activeOrders' , label:'Active orders' , min:2, max:50,
-                step:0 }); %>
+              <%- include('../views/ui/SpinBox', { id:'field-activeOrders' , label:'Active orders' , min:2, max:50, step:0, hint:'Number of active orders. Can be changed while the bot is running' }); %>
             </div>
             <div class="">
-              <%- include('../views/ui/SpinBox', { id:'field-requestFrequency' , label:'Request frequency' , min:1000,
-                max:5000, step:0 }); %>
+              <%- include('../views/ui/SpinBox', { id:'field-requestFrequency' , label:'Request frequency' , min:500, max:5000, step:0, hint:'The polling frequency for the entire series of orders. This can be changed while the robot is running.' }); %>
             </div>
             <div class="UIsw info lg r-1 label-top" role="switch" tabindex="0" id="settings-calculate-restart">
-              <label class="UIsw-label" for="restart">Restart</label>
+              <label class="UIsw-label" for="restart">Restart
+                <span class="UIql" tabindex="0">
+                  <span class="UIql__text">Restart after the current series. This can be changed while the robot is running.</span>
+                </span>
+              </label>
               <input type="checkbox" id="restart" name="btn3" checked hidden>
               <span class="UIsw-slider"></span>
               <span class="UIsw-slider__on">on</span>
@@ -121,8 +116,7 @@
             </button>
 
             <div class="-line-line">
-              <button data-value='{"base":"<%= base %>", "quote":"<%= quote %>"}' id="startBtn" type="button"
-                class="UIb lg g-1 success">
+              <button data-value='{"base":"<%= base %>", "quote":"<%= quote %>"}' id="startBtn" type="button" class="UIb lg g-1 success">
                 Start
                 <svg class="icon">
                   <use href="/sprite.svg#play"></use>
@@ -156,20 +150,21 @@
 
         <div class="row">
           <div class="col">
-            <div class="mb-1">
-              <button href="#" data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb lg g-1 danger"
-                type="button">
-                Cancel all <%= base + quote %> pairs
+            <div class="line line-press">
+              <button data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb lg g-1 danger" type="button">
+                Check and Cancel all <%= base + quote %> pairs
                   <svg class="icon">
                     <use href="/sprite.svg#close"></use>
                   </svg>
+              </button>
+              <button data-value="<%= base + quote %>" id="delete-current-series" class="UIb lg" type="button" disabled>
+                Delete current series
               </button>
             </div>
           </div>
         </div>
       </main>
       <%- include('../views/footer'); %>
-        <div id="notifications"></div>
     </div>
   </body>
   <script>

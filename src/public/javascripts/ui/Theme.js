@@ -4,23 +4,31 @@ export class Theme {
     const icon = document.getElementById('themeIcon');
     const html = document.documentElement;
 
+    // SVG-иконка темы (sun/moon) из спрайта вместо эмодзи: меняем ссылку <use>.
+    const setIcon = (dark) => {
+      const use = icon && icon.querySelector('use');
+      if (use) use.setAttribute('href', dark ? '/sprite.svg#moon' : '/sprite.svg#sun');
+    };
+
     // Загружаем тему из localStorage
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
       html.setAttribute('data-theme', 'dark');
       toggle.checked = true;
-      icon.textContent = '🌘';
+      setIcon(true);
     }
 
     toggle.addEventListener('change', () => {
       if (toggle.checked) {
         html.setAttribute('data-theme', 'dark');
         localStorage.setItem('theme', 'dark');
-        icon.textContent = '🌘';
+        setIcon(true);
       } else {
-        html.removeAttribute('data-theme');
+        // Явный 'light', а не removeAttribute: иначе ui-elements 0.4.0
+        // включит авто-тёмную тему по ОС (prefers-color-scheme).
+        html.setAttribute('data-theme', 'light');
         localStorage.setItem('theme', 'light');
-        icon.textContent = '☀️';
+        setIcon(false);
       }
     });
 

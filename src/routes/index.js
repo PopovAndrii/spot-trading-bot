@@ -4,6 +4,7 @@ const router = express.Router();
 const { InvokeApi } = require('../lib/invokeAPI');
 const { getPublicIp } = require('../lib/serverIp');
 const { getKeysInfo, checkKeys } = require('../lib/checkKeys');
+const { DONATIONS } = require('../lib/donations');
 
 const apiMethod = new InvokeApi();
 
@@ -17,6 +18,7 @@ router.get('/', async function (req, res, next) {
     info: result.success ? result.message : { symbols: [] },
     serverIp,
     keys: getKeysInfo(),
+    donations: DONATIONS,
   });
 });
 
