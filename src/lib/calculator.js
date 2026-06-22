@@ -1,7 +1,15 @@
 // CommonJS, как и весь остальной бэкенд (ANALYSIS п.14): раньше файл был
 // единственным ESM-модулем и работал только благодаря require(esm) в Node ≥22.
 class Calculator {
-  constructor(constructorData, strategy = 'long') {
+  // The grid is built by a factory, not the constructor: `new Calculator()` now
+  // returns a normal instance (instanceof works); the entry point is the static
+  // build(). Previously the constructor returned an array (return this.factory()),
+  // so `new Calculator()` yielded a non-Calculator — a classic antipattern.
+  static build(constructorData, strategy = 'long') {
+    return new Calculator(constructorData).factory(strategy);
+  }
+
+  constructor(constructorData) {
     const params = this.parseNumbers(constructorData);
 
     // BTCUSDT
@@ -24,8 +32,6 @@ class Calculator {
     this.data = Object.assign(defaultData, params);
     // this.data = defaultData;
     // console.log(this.data)
-
-    return this.factory(strategy);
   }
 
   factory = (strategy) => {

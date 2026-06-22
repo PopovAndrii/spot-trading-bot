@@ -412,7 +412,7 @@ router.post('/calculator/result', async (req, res, next) => {
 
     let calc;
     try {
-      calc = new Calculator(settings, message);
+      calc = Calculator.build(settings, message);
     } catch (err) {
       console.error('Calculator constructor error:', err);
       return res.status(400).json({

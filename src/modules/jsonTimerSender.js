@@ -596,7 +596,7 @@ class JsonTimerSender extends EventEmitter {
         'field-indent': "0",
       }
 
-      const calc = new Calculator(settings, this.strategy);
+      const calc = Calculator.build(settings, this.strategy);
 
       const tmp = this.#config(calc);
       tmp.param = settings;
