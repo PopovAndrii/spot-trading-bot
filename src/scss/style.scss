@@ -11,6 +11,7 @@
 @use 'input-btn';
 @use 'line';
 @use 'login';
+@use 'modal';
 @use 'nav';
 @use 'switch';
 @use 'table';
@@ -25,9 +26,6 @@ html {
 
 body {
   padding: 0px;
-  // Страница сама не скроллится — прокручивается только .content. Так скроллбар
-  // страницы не появляется и не накладывается на фиксированную консоль; её
-  // собственный скролл остаётся доступен.
   height: 100vh;
   overflow: hidden;
   background-color: var.$c-g-50;

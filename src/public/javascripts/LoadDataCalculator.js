@@ -1,3 +1,11 @@
+import { confirmDialog } from './ui/confirmDialog.js';
+
+// Item 10 safety gate: while false, the per-order cancel button only confirms
+// and toasts — it does NOT send a cancel to the exchange. Keeps a live testnet
+// cycle from being broken during UI testing. Flip to true (and wire the API)
+// once manual cancel is ready to go live.
+const ORDER_CANCEL_ENABLED = false;
+
 export class LoadDataCalculator {
   constructor(notifications, colors = {}) {
     this.listenerStatus = true;
@@ -103,10 +111,6 @@ export class LoadDataCalculator {
     });
   }
 
-  // Active orders / Request frequency: эти спинбоксы вынесены из #group-spinbox и
-  // НЕ блокируются во время работы. Любое изменение пишется в файл на лету —
-  // робот перечитывает конфиг на каждом проходе readLoop, поэтому новые значения
-  // подхватываются на следующем тике. На таблицу-расчёт они не влияют (см. calculator.js).
   runtimeParams() {
     const keys = ['field-activeOrders', 'field-requestFrequency'];
     document.addEventListener('ui-spinbox-change', (e) => {
@@ -209,6 +213,42 @@ export class LoadDataCalculator {
       + `<svg class="icon"><use href="/sprite.svg#close"></use></svg></button></span>`;
   }
 
+  // Item 10: one delegated 'ui-button-change' listener for the per-order cancel
+  // buttons. The buttons are re-created on every table re-render, but the event
+  // bubbles, so a single listener on the table stays valid without rebinding
+  // each row. Called once at startup (spotMain).
+  rowActions() {
+    const table = document.getElementById('settings-table');
+    table?.addEventListener('ui-button-change', async (e) => {
+      const btn = e.target.closest('.UIb[data-value]');
+      if (!btn) return;
+
+      let payload;
+      try { payload = JSON.parse(btn.dataset.value); } catch { return; }
+      if (payload.action !== 'cancel') return;
+
+      const ok = await confirmDialog({
+        title: 'Cancel this order?',
+        message: `${payload.side} order #${payload.index + 1} will be cancelled on the exchange.`,
+        confirmLabel: 'Cancel order',
+        danger: true,
+      });
+      if (!ok) return;
+
+      if (!ORDER_CANCEL_ENABLED) {
+        this.notifications.showNotification(
+          `🧪 Stub: ${payload.side} #${payload.index + 1} not cancelled (manual cancel disabled)`,
+          'warning',
+          6000
+        );
+        return;
+      }
+
+      // TODO(Item 10): real cancel — POST the orderId to a cancel endpoint here
+      // once ORDER_CANCEL_ENABLED is turned on.
+    });
+  }
+
   async calculator(obj = {}) {
     // Bump the token for this call. If a newer call starts while we await the
     // fetch, ours becomes stale and must not touch the DOM (prevents the
@@ -278,6 +318,11 @@ export class LoadDataCalculator {
       });
 
       document.querySelector('#settings-table tbody').innerHTML = html; // single DOM write
+
+      // Re-bind the ui-elements buttons (Item 10 per-order cancel) freshly
+      // rendered into the new rows. scan() skips already-bound nodes, so this is
+      // cheap and idempotent on every tick.
+      UiElements.getButtonManager().scan();
     } catch (err) {
       console.error('❌ calculator():', err);
       return null;
@@ -286,10 +331,6 @@ export class LoadDataCalculator {
 
   async settingsSave() {
     orders.param = this.defaultData;
-
-    // Текущее состояние свитча Restart → в сохраняемый конфиг. Иначе Save пишет
-    // файл без поля restart, и автоповтор не включится, пока свитч не тронут
-    // вручную (отдельный POST /calculator/restart).
     const restartInput = document
       .getElementById('settings-calculate-restart')
       ?.querySelector('input');

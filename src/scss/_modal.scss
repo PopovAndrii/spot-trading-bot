@@ -1,0 +1,41 @@
+@use './var' as *;
+
+// Confirmation dialog (Item 10): centered modal over a dimmed backdrop.
+.UIconfirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.UIconfirm {
+  min-width: 18rem;
+  max-width: 90vw;
+  padding: 1.25rem;
+  border-radius: $border-radius;
+  background: $c-g-50;
+  color: $c-g-950;
+  border: 1px solid $c-g-300;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.3);
+}
+
+.UIconfirm__title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.UIconfirm__msg {
+  margin-bottom: 1rem;
+  color: $c-g-700;
+}
+
+.UIconfirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

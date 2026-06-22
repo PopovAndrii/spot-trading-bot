@@ -29,6 +29,7 @@ const loadDataCalculator = new LoadDataCalculator(notifications, colors);
 loadDataCalculator.save();
 loadDataCalculator.restart();
 loadDataCalculator.runtimeParams();
+loadDataCalculator.rowActions();
 
 const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
   sl,
