@@ -6,7 +6,7 @@ const { getPublicIp } = require('../lib/serverIp');
 const { getKeysInfo, checkKeys } = require('../lib/checkKeys');
 const { DONATIONS } = require('../lib/donations');
 
-const apiMethod = new InvokeApi();
+const apiMethod = InvokeApi.getInstance();
 
 router.get('/', async function (req, res, next) {
   const [result, serverIp] = await Promise.all([

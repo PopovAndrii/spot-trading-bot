@@ -11,7 +11,7 @@ const { archiveIfActive } = require('../lib/cycleArchive');
 const { decimalCount, roundToStep } = require('../lib/format');
 const logBus = require('../lib/logBus');
 
-const API = new InvokeApi();
+const API = InvokeApi.getInstance();
 
 router.get('/:currency', async function (req, res, next) {
   const currency = req.params.currency; // BNBUSDT

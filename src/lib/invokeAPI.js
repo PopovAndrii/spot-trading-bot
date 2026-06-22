@@ -5,14 +5,19 @@ const { isTestnet } = require('./runMode');
 const logBus = require('./logBus');
 
 class InvokeApi {
-  static instance = null;
+  static #instance = null;
+
+  // Single entry point for the client: a singleton without the "constructor
+  // returns a different instance" antipattern. Previously `new InvokeApi()`
+  // returned an already-existing object — instanceof survived it, but the
+  // behavior was non-obvious. Now the constructor always builds a new object,
+  // and the shared client is obtained via getInstance() (all callers switched).
+  static getInstance() {
+    if (!InvokeApi.#instance) InvokeApi.#instance = new InvokeApi();
+    return InvokeApi.#instance;
+  }
 
   constructor() {
-    if (InvokeApi.instance) {
-      // console.log('❕ InvokeApi already exists, returning it ❕');
-      return InvokeApi.instance;
-    }
-
     // isTestnet() already accounts for a safe fallback (real without keys → testnet).
     const testnet = isTestnet();
 
@@ -32,8 +37,6 @@ class InvokeApi {
     }
 
     this.client = new Spot(api_key || '', api_secret || '', { baseURL: baseURL });
-
-    InvokeApi.instance = this;
   }
 
   /**

@@ -90,7 +90,7 @@ class JsonTimerSender extends EventEmitter {
     this.baseAsset = ''; // имена активов для уведомления об орфан-остатке (Шаг 2)
     this.quoteAsset = '';
 
-    this.API = new InvokeApi();
+    this.API = InvokeApi.getInstance();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
 
     this.onExecReport = null; // слушатель user data stream (снимается в stop)
@@ -469,7 +469,7 @@ class JsonTimerSender extends EventEmitter {
       this.apiFailStreak = 0;
       this.apiOutageNotified = false;
 
-      const api = new InvokeApi();
+      const api = InvokeApi.getInstance();
 
       // Биржевые лимиты для реконсиляции орфан-остатка (Шаг 2) + имена активов
       // для уведомления. Сбой не критичен: лимиты останутся 0 → #belowMin не
