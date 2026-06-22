@@ -153,6 +153,11 @@ class Job {
           }
 
           if (obj['SELL'][i].status === null || obj['SELL'][i].status === state.CANCELED) {
+            // Manual pull (Item 10): user cancelled this close — do NOT re-place
+            // it; the position stays open until they re-place (their choice).
+            if (obj['SELL'][i].manual) {
+              return { status: 'pass', method: false, side: null, id: i, data: {} };
+            }
             const reb = rebalancedClose(obj, i, 'long'); // null → предрасчёт
             const quantity = reb ? reb.quantity : obj['SELL'][i].quantity;
             const price = reb ? reb.price : obj['SELL'][i].price;
@@ -233,6 +238,11 @@ class Job {
           };
 
         default:
+          // Manual pull (Item 10): user cancelled this entry — leave it alone,
+          // do not re-place. Without the flag a null/CANCELED entry is re-placed.
+          if (el.manual) {
+            return { status: 'pass', method: false, side: null, id: i, data: {} };
+          }
           return {
             status: null,
             method: 'newOrder',
@@ -346,6 +356,11 @@ class Job {
           }
 
           if (obj['BUY'][i].status === null || obj['BUY'][i].status === state.CANCELED) {
+            // Manual pull (Item 10): user cancelled this close — do NOT re-place
+            // it; the position stays open until they re-place (their choice).
+            if (obj['BUY'][i].manual) {
+              return { status: 'pass', method: false, side: null, id: i, data: {} };
+            }
             const reb = rebalancedClose(obj, i, 'short'); // null → предрасчёт
             const quantity = reb ? reb.quantity : obj['BUY'][i].quantity;
             const price = reb ? reb.price : obj['BUY'][i].price;
@@ -425,6 +440,11 @@ class Job {
           };
 
         default:
+          // Manual pull (Item 10): user cancelled this entry — leave it alone,
+          // do not re-place. Without the flag a null/CANCELED entry is re-placed.
+          if (el.manual) {
+            return { status: 'pass', method: false, side: null, id: i, data: {} };
+          }
           return {
             status: null,
             method: 'newOrder',

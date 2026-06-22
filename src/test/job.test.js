@@ -404,3 +404,67 @@ test('test mode: both strategies always return pass (no API calls)', () => {
   assert.equal(testJob.long(obj, 0, obj.BUY[0]).status, 'pass');
   assert.equal(testJob.short(obj, 0, obj.SELL[0]).status, 'pass');
 });
+
+// ===== manual pull (Item 10): engine must NOT re-place a user-cancelled order =====
+// A CANCELED order is normally treated as "re-place me". The `manual: true` flag
+// (set by a manual single-order cancel) makes the engine leave it alone (pass).
+
+test('long: manual-pulled BUY entry → pass, NOT re-placed', () => {
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'CANCELED', { manual: true, orderId: 11 })],
+    sells: [mkOrder('SELL', null)],
+  });
+  const r = job.long(obj, 0, obj.BUY[0]);
+  assert.equal(r.status, 'pass');
+  assert.equal(r.method, false);
+});
+
+test('control: CANCELED BUY entry without manual → re-placed (newOrder)', () => {
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'CANCELED', { orderId: 11 })],
+    sells: [mkOrder('SELL', null)],
+  });
+  const r = job.long(obj, 0, obj.BUY[0]);
+  assert.equal(r.method, 'newOrder');
+  assert.equal(r.side, 'BUY');
+});
+
+test('long: manual-pulled SELL close (entry FILLED) → pass, NOT re-placed', () => {
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 })],
+    sells: [mkOrder('SELL', 'CANCELED', { manual: true, orderId: 22 })],
+  });
+  const r = job.long(obj, 0, obj.BUY[0]);
+  assert.equal(r.status, 'pass');
+  assert.equal(r.method, false);
+});
+
+test('control: CANCELED SELL close without manual (entry FILLED) → re-placed', () => {
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 })],
+    sells: [mkOrder('SELL', 'CANCELED', { orderId: 22 })],
+  });
+  const r = job.long(obj, 0, obj.BUY[0]);
+  assert.equal(r.method, 'newOrder');
+  assert.equal(r.side, 'SELL');
+});
+
+test('short: manual-pulled SELL entry → pass, NOT re-placed', () => {
+  const obj = mkObj({
+    sells: [mkOrder('SELL', 'CANCELED', { manual: true, orderId: 33 })],
+    buys: [mkOrder('BUY', null)],
+  });
+  const r = job.short(obj, 0, obj.SELL[0]);
+  assert.equal(r.status, 'pass');
+  assert.equal(r.method, false);
+});
+
+test('short: manual-pulled BUY close (entry FILLED) → pass, NOT re-placed', () => {
+  const obj = mkObj({
+    sells: [mkOrder('SELL', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 })],
+    buys: [mkOrder('BUY', 'CANCELED', { manual: true, orderId: 44 })],
+  });
+  const r = job.short(obj, 0, obj.SELL[0]);
+  assert.equal(r.status, 'pass');
+  assert.equal(r.method, false);
+});
