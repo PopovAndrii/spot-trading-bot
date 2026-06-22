@@ -185,6 +185,30 @@ export class LoadDataCalculator {
     return `<span class="fill-badge" title="real ${kind}">${out}</span>`;
   }
 
+  // Per-order manual action (Item 10): a hover-revealed "cancel" button (UIb) in
+  // the Buy/Sell currency cell, shown ONLY on orders currently live on the
+  // exchange (status NEW or PARTIALLY_FILLED). This is the manual-move tool —
+  // pull an active order. FILLED / CANCELED / not-placed get nothing.
+  //
+  // Re-place is intentionally NOT offered here: the exchange CANCELED status
+  // mixes bot-canceled orders (active window slid / no longer needed) with
+  // user-canceled ones, so it can't tell which the user actually pulled.
+  // Re-place needs a persisted "manually pulled" marker (data/*.json schema
+  // change) — deferred until that's designed.
+  //
+  // data-value carries the JSON payload; the Button manager emits
+  // 'ui-button-change'. Markup only — handlers are wired separately.
+  #rowAction(obj, type, index) {
+    const o = obj?.[type]?.[index];
+    if (!o) return '';
+    if (o.status !== 'NEW' && o.status !== 'PARTIALLY_FILLED') return '';
+
+    const payload = JSON.stringify({ action: 'cancel', side: type, index, orderId: o.orderId ?? null });
+    return `<span class="row-actions"><button type="button" class="UIb sm g-0 danger"`
+      + ` data-value='${payload}' title="Cancel order">`
+      + `<svg class="icon"><use href="/sprite.svg#close"></use></svg></button></span>`;
+  }
+
   async calculator(obj = {}) {
     // Bump the token for this call. If a newer call starts while we await the
     // fetch, ours becomes stale and must not touch the DOM (prevents the
@@ -217,13 +241,15 @@ export class LoadDataCalculator {
       // of the lag. One assignment also atomically replaces the old rows (no flash).
       let html = '';
       data['calculator'].forEach((el, index) => {
+        const buyAct = this.#rowAction(obj, 'BUY', index);
+        const sellAct = this.#rowAction(obj, 'SELL', index);
         html += `<tr>
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
-              <td><span class="fill-cell">${el.buyCurrency}${this.#fillBadge(obj, 'BUY', index, 'price')}</span></td>
+              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
               <td class="${this.#backlight(obj, 'BUY', index)}"><span class="fill-cell">${el.buy}${this.#fillBadge(obj, 'BUY', index, 'qty')}</span></td>
               <td class="${this.#backlight(obj, 'SELL', index)}"><span class="fill-cell">${el.totalSell}${this.#fillBadge(obj, 'SELL', index, 'qty')}</span></td>
-              <td><span class="fill-cell">${el.sellCurrency}${this.#fillBadge(obj, 'SELL', index, 'price')}</span></td>
+              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${el.sellCurrency}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
               <td>${el.didBuy}</td>
               <td>${el.calcBalance}</td>
           </tr>`;

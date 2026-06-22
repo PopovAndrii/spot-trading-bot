@@ -74,6 +74,38 @@
   text-align: center;
 }
 
+// Per-order manual actions (Item 10): hover-revealed cancel/replace buttons
+// (ui-elements UIb) inside the Buy/Sell currency cells. The cell reserves right
+// padding so the floating button overlays the empty space without shifting the
+// number; the button's own look/colors come from the ui-elements package.
+.t .act-cell {
+  position: relative;
+  padding-right: 3rem;
+}
+
+.row-actions {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  gap: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+
+  // until the package ships an `xsm` size, trim the `sm` button down for the
+  // dense table row (icon-only, no text).
+  .UIb {
+    padding: 0.1rem 0.35rem;
+  }
+}
+
+.t tbody tr:hover .row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 // Responsive collapse: on tablet/phone (<=768px) hide the first two columns
 // (#, %) and the last two (Spent, Balance), keeping the 4 trading columns
 // (Buy currency, BUY, SELL, Sell currency). tr > * targets both th and td.
