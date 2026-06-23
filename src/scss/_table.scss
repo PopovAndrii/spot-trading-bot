@@ -2,7 +2,7 @@
 
 .t {
   width: 100%;
-  margin: 1rem 0;
+  margin: 1rem 0 0 0;
   background-color: $c-g-50;
   border-spacing: 0;
   border-collapse: collapse;
@@ -89,6 +89,17 @@
 .t .act-cell {
   position: relative;
   padding-right: 3rem;
+}
+
+// Expert Mode gate (Item 10): the cancel/replace controls are rendered every
+// tick but stay hidden until the table gets .expert-on from the Expert switch.
+// Without it, drop the reserved right padding so the numbers don't get pushed.
+.t:not(.expert-on) .row-actions {
+  display: none;
+}
+
+.t:not(.expert-on) .act-cell {
+  padding-right: 0.25rem;
 }
 
 .row-actions {

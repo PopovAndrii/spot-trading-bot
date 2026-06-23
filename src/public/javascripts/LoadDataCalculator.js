@@ -113,6 +113,30 @@ export class LoadDataCalculator {
     });
   }
 
+  // Item 10: Expert Mode gate. The per-order cancel (✕) / re-place (＋) controls
+  // in the grid table are hidden until the Expert switch is on. The switch only
+  // toggles an .expert-on class on the table; the buttons themselves are still
+  // rendered every tick, so CSS — not per-render JS — does the show/hide (the
+  // class lives on the stable table node, surviving the re-render).
+  expertMode() {
+    const sw = document.getElementById('settings-expert-mode');
+    const input = document.getElementById('expert');
+    const table = document.getElementById('settings-table');
+    if (!sw || !table) return;
+
+    const apply = (on) => {
+      const isOn = Boolean(on);
+      table.classList.toggle('expert-on', isOn);
+      // danger accent on the switch itself while the controls are unlocked
+      sw.classList.toggle('danger', isOn);
+    };
+
+    apply(input?.checked);
+    sw.addEventListener('ui-switch-change', (e) => {
+      apply(String(e.detail?.value) === 'true');
+    });
+  }
+
   // Change button restart
   restart() {
     document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {

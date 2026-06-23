@@ -30,6 +30,7 @@ loadDataCalculator.save();
 loadDataCalculator.restart();
 loadDataCalculator.runtimeParams();
 loadDataCalculator.rowActions();
+loadDataCalculator.expertMode();
 
 const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
   sl,
