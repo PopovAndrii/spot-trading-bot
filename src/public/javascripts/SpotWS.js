@@ -116,6 +116,11 @@ export class SpotWS {
               message.data?.success ? 'success' : 'warning',
               5000
             );
+            // failed cancel → release the held ✕ so the order can be retried
+            // (on success the ＋ render clears the hold itself)
+            if (message.data && message.data.success === false) {
+              this.loadDataCalculator.clearPendingCancel(message.data.side, message.data.index);
+            }
             break;
           case 'replaceOrderResult':
             // Item 10: result of a manual single-order re-place

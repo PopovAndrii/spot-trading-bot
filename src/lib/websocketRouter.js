@@ -239,7 +239,11 @@ class WebSocketRouter {
               orderId: data.orderId,
             })
               .then((result) =>
-                this.safeSend(ws, { event: 'cancelOrderResult', data: result })
+                // echo side/index so the client can release the held ✕ on failure
+                this.safeSend(ws, {
+                  event: 'cancelOrderResult',
+                  data: { ...result, side: data.side, index: Number(data.index) },
+                })
               )
               .catch((err) => {
                 console.error('❌ cancelOrder WS:', err);

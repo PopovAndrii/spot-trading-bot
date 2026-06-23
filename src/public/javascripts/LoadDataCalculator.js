@@ -18,6 +18,12 @@ export class LoadDataCalculator {
     this.onReplaceOrder = null; // set by SpotWS — sends a 'replaceOrder' WS message
     this._calcSeq = 0; // sequence token: drop stale async calculator() renders
 
+    // Item 10: orders whose manual cancel is in flight ("side:index"). The table
+    // re-renders every tick and recreates the ✕ button, so a one-off node.disabled
+    // is lost; we re-render ✕ disabled while the key is here, until the order turns
+    // CANCELED+manual (✕ becomes ＋) and the key is dropped.
+    this._pendingCancel = new Set();
+
     // Change any button settings param
     document.querySelector('#group-spinbox').addEventListener('ui-spinbox-change', (e) => {
       if (this.getListenerStatus()) {
@@ -225,10 +231,12 @@ export class LoadDataCalculator {
   #rowAction(obj, type, index, gridPrice) {
     const o = obj?.[type]?.[index];
     if (!o) return '';
+    const key = `${type}:${index}`;
 
     // user-pulled order → ＋ opens the price editor (prefilled with this price,
     // showing the planned price as the "was" reference; step = one tick).
     if (o.status === 'CANCELED' && o.manual) {
+      this._pendingCancel.delete(key); // cancel landed → stop holding the ✕
       const tick = parseInt(obj.param?.['field-tickSize'], 10);
       const dec = Number.isFinite(tick) ? tick : 2;
       const replace = JSON.stringify({
@@ -242,6 +250,17 @@ export class LoadDataCalculator {
         + `</span>`;
     }
 
+    // manual cancel in flight → hold a DISABLED ✕ until ＋ appears. Held through
+    // every transient state in between (NEW still live, CANCELED before `manual`
+    // is stamped, engine blips), so the per-tick re-render never shows a clickable
+    // ✕ mid-cancel. Cleared only by the ＋ branch above, or by clearPendingCancel
+    // on a failed cancel (SpotWS).
+    if (this._pendingCancel.has(key)) {
+      return `<span class="row-actions"><button type="button" class="UIb sm g-0 danger"`
+        + ` disabled title="Cancelling…">`
+        + `<svg class="icon"><use href="/sprite.svg#close"></use></svg></button></span>`;
+    }
+
     // active order → hover cancel pill
     if (o.status === 'NEW' || o.status === 'PARTIALLY_FILLED') {
       const cancel = JSON.stringify({ action: 'cancel', side: type, index, orderId: o.orderId ?? null });
@@ -251,6 +270,15 @@ export class LoadDataCalculator {
     }
 
     return '';
+  }
+
+  // Item 10: release a held ✕ when its manual cancel FAILED (SpotWS calls this on
+  // a cancelOrderResult with success:false) — the order is still live, so the
+  // next render must show a clickable ✕ again for a retry. On success we do NOT
+  // clear here: the ＋ branch clears it when CANCELED+manual renders, avoiding a
+  // clickable-✕ flash in the gap before the status flips.
+  clearPendingCancel(side, index) {
+    this._pendingCancel.delete(`${side}:${index}`);
   }
 
   // Item 10: one delegated 'ui-button-change' listener for the per-order cancel
@@ -267,6 +295,9 @@ export class LoadDataCalculator {
       try { payload = JSON.parse(btn.dataset.value); } catch { return; }
 
       if (payload.action === 'cancel') {
+        // already cancelling this one (button held disabled across re-renders)
+        if (this._pendingCancel.has(`${payload.side}:${payload.index}`)) return;
+
         const ok = await confirmDialog({
           title: 'Cancel this order?',
           message: `${payload.side} order #${payload.index + 1} will be cancelled on the exchange.`,
@@ -286,10 +317,11 @@ export class LoadDataCalculator {
         // callback). The bot cancels on the exchange and marks the order
         // manual:true so the engine won't re-place it.
         this.onCancelOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId });
-        // Hold the button until the next table render swaps ✕ for ＋ (the order
-        // turns CANCELED+manual): avoids a double cancel and signals "pending".
+        // Hold the ✕ disabled until the order turns CANCELED+manual (✕ → ＋):
+        // the key survives the per-tick re-render (node.disabled would not), and
+        // the current node is disabled too for instant feedback before re-render.
+        this._pendingCancel.add(`${payload.side}:${payload.index}`);
         btn.setAttribute('disabled', '');
-        btn.style.opacity = '0.5';
         return;
       }
 
