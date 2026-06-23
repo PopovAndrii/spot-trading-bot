@@ -1,10 +1,11 @@
 import { confirmDialog } from './ui/confirmDialog.js';
+import { priceDialog } from './ui/priceDialog.js';
 
 // Item 10 safety gate: while false, the per-order cancel button only confirms
 // and toasts — it does NOT send a cancel to the exchange. Keeps a live testnet
 // cycle from being broken during UI testing. Flip to true (and wire the API)
 // once manual cancel is ready to go live.
-const ORDER_CANCEL_ENABLED = false;
+const ORDER_CANCEL_ENABLED = true;
 
 export class LoadDataCalculator {
   constructor(notifications, colors = {}) {
@@ -191,34 +192,52 @@ export class LoadDataCalculator {
     return `<span class="fill-badge" title="real ${kind}">${out}</span>`;
   }
 
+  // Item 10: a live order may rest at a price different from the planned grid
+  // price — a manual re-place. The column shows the plan (el.buyCurrency), so
+  // surface the order's ACTUAL resting price as a badge; otherwise the table
+  // lies (old price visible while the engine polls the new one). Only for live
+  // orders (NEW/PARTIALLY_FILLED), compared at tick precision so an unchanged
+  // order shows no badge.
+  #currentPriceBadge(obj, type, index, gridPrice) {
+    const o = obj?.[type]?.[index];
+    if (!o || o.price == null) return '';
+    if (o.status !== 'NEW' && o.status !== 'PARTIALLY_FILLED') return '';
+    const tick = parseInt(obj.param?.['field-tickSize'], 10);
+    const dec = Number.isFinite(tick) ? tick : 2;
+    const actual = Number(o.price);
+    const grid = Number(gridPrice);
+    if (!Number.isFinite(actual) || !Number.isFinite(grid)) return '';
+    if (actual.toFixed(dec) === grid.toFixed(dec)) return ''; // unchanged → no badge
+    return `<span class="fill-badge price-badge" title="current price (re-placed)">${actual.toFixed(dec)}</span>`;
+  }
+
   // Per-order manual action (Item 10) in the Buy/Sell currency cell:
   //   NEW / PARTIALLY_FILLED        → hover ✕ cancel (pull the live order)
-  //   CANCELED + manual (user pull) → price-edit SpinBox + ＋ re-place
+  //   CANCELED + manual (user pull) → ＋ re-place (opens a price-editor popup)
   //   FILLED / bot-CANCELED / null  → nothing
   // Re-place only appears on a USER-pulled order (manual flag), never on a
   // bot-cancelled one — those are indistinguishable by status alone, which is
-  // exactly why the manual marker exists.
+  // exactly why the manual marker exists. The new price is entered in a popup
+  // (priceDialog), NOT inline: the table re-renders every tick and would reset an
+  // in-row SpinBox mid-edit. The button only carries the data the popup needs.
   // data-value carries the JSON payload; the Button manager emits
   // 'ui-button-change'. Markup only — handlers are wired separately.
-  #rowAction(obj, type, index) {
+  #rowAction(obj, type, index, gridPrice) {
     const o = obj?.[type]?.[index];
     if (!o) return '';
 
-    // user-pulled order → SpinBox (prefilled with its price) + re-place. + lifts
-    // / − drops the rate by one tick. Wide min/max so the package doesn't clamp
-    // the value (per the "always clamps" SpinBox behaviour) — no real bound.
+    // user-pulled order → ＋ opens the price editor (prefilled with this price,
+    // showing the planned price as the "was" reference; step = one tick).
     if (o.status === 'CANCELED' && o.manual) {
       const tick = parseInt(obj.param?.['field-tickSize'], 10);
       const dec = Number.isFinite(tick) ? tick : 2;
-      const step = (10 ** -dec).toFixed(dec);
-      const replace = JSON.stringify({ action: 'replace', side: type, index, orderId: o.orderId ?? null });
+      const replace = JSON.stringify({
+        action: 'replace', side: type, index,
+        orderId: o.orderId ?? null,
+        price: o.price ?? '', grid: gridPrice ?? '', dec,
+      });
       return `<span class="row-actions row-actions--edit">`
-        + `<span class="UIsp sm round" data-step="${step}" data-min="0" data-max="100000000" data-decimals="${dec}" role="spinbutton" tabindex="0" aria-label="New price">`
-        +   `<button class="UIsp__btn" type="button" aria-label="Decrease value">−</button>`
-        +   `<input class="UIsp__input" type="text" value="${o.price ?? ''}" inputmode="decimal">`
-        +   `<button class="UIsp__btn" type="button" aria-label="Increase value">+</button>`
-        + `</span>`
-        + `<button type="button" class="UIb sm g-0 success" data-value='${replace}' title="Re-place at this price">`
+        + `<button type="button" class="UIb sm g-0 success" data-value='${replace}' title="Re-place at a new price">`
         +   `<svg class="icon"><use href="/sprite.svg#plus"></use></svg></button>`
         + `</span>`;
     }
@@ -267,21 +286,29 @@ export class LoadDataCalculator {
         // callback). The bot cancels on the exchange and marks the order
         // manual:true so the engine won't re-place it.
         this.onCancelOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId });
+        // Hold the button until the next table render swaps ✕ for ＋ (the order
+        // turns CANCELED+manual): avoids a double cancel and signals "pending".
+        btn.setAttribute('disabled', '');
+        btn.style.opacity = '0.5';
         return;
       }
 
       if (payload.action === 'replace') {
-        // new price comes from the row's SpinBox (prefilled with the old price,
-        // adjusted by the user with +/-)
-        const input = btn.closest('.row-actions')?.querySelector('.UIsp__input');
-        const price = input ? input.value : '';
-
-        const ok = await confirmDialog({
-          title: 'Re-place this order?',
-          message: `${payload.side} order #${payload.index + 1} will be placed on the exchange at ${price}.`,
+        // New price is entered in a popup (not inline): the table re-renders each
+        // tick and would reset an in-row SpinBox. Prefilled with the order price,
+        // step = one tick, planned price shown as the "was" reference.
+        const dec = Number.isFinite(payload.dec) ? payload.dec : 2;
+        const step = (10 ** -dec).toFixed(dec);
+        const price = await priceDialog({
+          title: `Re-place ${payload.side} #${payload.index + 1}`,
+          message: 'Set a new price for this order.',
+          price: payload.price,
+          originalPrice: payload.grid,
+          step,
+          decimals: dec,
           confirmLabel: 'Re-place',
         });
-        if (!ok) return;
+        if (price == null) return; // dismissed
 
         if (!ORDER_CANCEL_ENABLED) {
           this.notifications.showNotification(
@@ -328,15 +355,15 @@ export class LoadDataCalculator {
       // of the lag. One assignment also atomically replaces the old rows (no flash).
       let html = '';
       data['calculator'].forEach((el, index) => {
-        const buyAct = this.#rowAction(obj, 'BUY', index);
-        const sellAct = this.#rowAction(obj, 'SELL', index);
+        const buyAct = this.#rowAction(obj, 'BUY', index, el.buyCurrency);
+        const sellAct = this.#rowAction(obj, 'SELL', index, el.sellCurrency);
         html += `<tr>
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
-              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
+              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${this.#currentPriceBadge(obj, 'BUY', index, el.buyCurrency)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
               <td class="${this.#backlight(obj, 'BUY', index)}"><span class="fill-cell">${el.buy}${this.#fillBadge(obj, 'BUY', index, 'qty')}</span></td>
               <td class="${this.#backlight(obj, 'SELL', index)}"><span class="fill-cell">${el.totalSell}${this.#fillBadge(obj, 'SELL', index, 'qty')}</span></td>
-              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${el.sellCurrency}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
+              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${el.sellCurrency}${this.#currentPriceBadge(obj, 'SELL', index, el.sellCurrency)}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
               <td>${el.didBuy}</td>
               <td>${el.calcBalance}</td>
           </tr>`;

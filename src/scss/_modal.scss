@@ -34,6 +34,27 @@
   color: $c-g-700;
 }
 
+// Price editor (priceDialog): the SpinBox + the muted starting price reference.
+.UIconfirm__field {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.UIconfirm__orig {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: $c-g-700;
+  white-space: nowrap;
+
+  &::before {
+    content: 'was ';
+    opacity: 0.7;
+  }
+}
+
 .UIconfirm__actions {
   display: flex;
   justify-content: flex-end;

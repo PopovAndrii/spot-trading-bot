@@ -74,6 +74,14 @@
   text-align: center;
 }
 
+// Current resting price of a manually re-placed order (Item 10): the column
+// keeps the planned grid price; this accent badge is the live price the order
+// actually rests at. Warning accent = "you changed this from the plan".
+.price-badge {
+  background: $c-w-100;
+  color: $c-w-900;
+}
+
 // Per-order manual actions (Item 10): hover-revealed cancel/replace buttons
 // (ui-elements UIb) inside the Buy/Sell currency cells. The cell reserves right
 // padding so the floating button overlays the empty space without shifting the
@@ -106,15 +114,15 @@
   pointer-events: auto;
 }
 
-// Re-place edit state (Item 10): a user-pulled order turns the cell into a price
-// editor — an inline SpinBox (prefilled with the order's price) + ＋ re-place,
-// always visible (not hover). The stale number is hidden; the SpinBox replaces it.
+// Re-place state (Item 10): a user-pulled order (CANCELED+manual) shows the ＋
+// re-place button ALWAYS (not hover) next to its price — the row is waiting for a
+// manual re-place. Clicking ＋ opens the price-editor popup (priceDialog); the
+// new price is NOT edited inline, since the table re-renders every tick.
 .t .act-cell:has(.row-actions--edit) {
   padding-right: 0.5rem;
-}
-
-.t .act-cell:has(.row-actions--edit) > .fill-cell {
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .row-actions--edit {
@@ -122,7 +130,6 @@
   transform: none;
   opacity: 1;
   pointer-events: auto;
-  gap: 0.3rem;
 }
 
 // Responsive collapse: on tablet/phone (<=768px) hide the first two columns
