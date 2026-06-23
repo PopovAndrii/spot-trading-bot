@@ -101,19 +101,6 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
-
-  // until the package ships an `xsm` size, trim the `sm` button down for the
-  // dense table row (icon-only, no text).
-  .UIb {
-    padding: 0.1rem 0.35rem;
-  }
-
-  // manual cancel in flight (Item 10): held until the row re-renders as ＋
-  .UIb:disabled {
-    opacity: 0.4;
-    pointer-events: none;
-    cursor: default;
-  }
 }
 
 .t tbody tr:hover .row-actions {

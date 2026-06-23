@@ -245,8 +245,8 @@ export class LoadDataCalculator {
         price: o.price ?? '', grid: gridPrice ?? '', dec,
       });
       return `<span class="row-actions row-actions--edit">`
-        + `<button type="button" class="UIb sm g-0 success" data-value='${replace}' title="Re-place at a new price">`
-        +   `<svg class="icon"><use href="/sprite.svg#plus"></use></svg></button>`
+        + `<button type="button" class="UIb xsm r-round success" data-value='${replace}' title="Re-place at a new price">`
+        + `+</button>`
         + `</span>`;
     }
 
@@ -256,17 +256,17 @@ export class LoadDataCalculator {
     // ✕ mid-cancel. Cleared only by the ＋ branch above, or by clearPendingCancel
     // on a failed cancel (SpotWS).
     if (this._pendingCancel.has(key)) {
-      return `<span class="row-actions"><button type="button" class="UIb sm g-0 danger"`
+      return `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"`
         + ` disabled title="Cancelling…">`
-        + `<svg class="icon"><use href="/sprite.svg#close"></use></svg></button></span>`;
+        + `x</button></span>`;
     }
 
     // active order → hover cancel pill
     if (o.status === 'NEW' || o.status === 'PARTIALLY_FILLED') {
       const cancel = JSON.stringify({ action: 'cancel', side: type, index, orderId: o.orderId ?? null });
-      return `<span class="row-actions"><button type="button" class="UIb sm g-0 danger"`
+      return `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"`
         + ` data-value='${cancel}' title="Cancel order">`
-        + `<svg class="icon"><use href="/sprite.svg#close"></use></svg></button></span>`;
+        + `x</button></span>`;
     }
 
     return '';
