@@ -202,6 +202,26 @@ router.post('/calculator/save', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
 
+    // Орфан-гард: после ручного Stop цикл не идёт (isRunning=false) и сервер не
+    // рестартовал (needsAttention=false), но снятые лимитки НЕ отменяются — они
+    // продолжают висеть на бирже. Save поверх такой сетки затёр бы их orderId:
+    // при следующем Start окно выставит ещё столько же поверх живых → дубли на
+    // бирже (3 в настройках → 6 на счёте). Спрашиваем БИРЖУ, а не файл: статусы в
+    // файле могут врать (Cancel all orders снимает ордера, но файл не переписывает
+    // — там остаётся NEW). openOrders read-only, отмену не дёргает. Тот же приём,
+    // что в /series/delete. Сбой запроса → не рискуем затереть, отказываем.
+    const open = await API.openOrders({ symbol });
+    if (!open.success) {
+      return res.status(502).json({
+        message: 'Cannot verify the exchange has no live orders — try again, or stop the cycle first',
+      });
+    }
+    if (open.message > 0) {
+      return res.status(409).json({
+        message: `${open.message} live order(s) still resting on the exchange — press "Start" to resume, or cancel them before saving`,
+      });
+    }
+
     // история циклов: прожитый цикл (есть ордера с orderId) снапшотится в
     // {timestamp}-SYMBOL-binance.json перед перезаписью новым расчётом
     const archived = await archiveIfActive(filePath);
