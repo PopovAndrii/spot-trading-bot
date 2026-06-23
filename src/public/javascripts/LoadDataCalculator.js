@@ -14,6 +14,7 @@ export class LoadDataCalculator {
     this._ignoreSelectChange = false;
     this.onRestartChange = null;
     this.onCancelOrder = null; // set by SpotWS — sends a 'cancelOrder' WS message
+    this.onReplaceOrder = null; // set by SpotWS — sends a 'replaceOrder' WS message
     this._calcSeq = 0; // sequence token: drop stale async calculator() renders
 
     // Change any button settings param
@@ -190,28 +191,47 @@ export class LoadDataCalculator {
     return `<span class="fill-badge" title="real ${kind}">${out}</span>`;
   }
 
-  // Per-order manual action (Item 10): a hover-revealed "cancel" button (UIb) in
-  // the Buy/Sell currency cell, shown ONLY on orders currently live on the
-  // exchange (status NEW or PARTIALLY_FILLED). This is the manual-move tool —
-  // pull an active order. FILLED / CANCELED / not-placed get nothing.
-  //
-  // Re-place is intentionally NOT offered here: the exchange CANCELED status
-  // mixes bot-canceled orders (active window slid / no longer needed) with
-  // user-canceled ones, so it can't tell which the user actually pulled.
-  // Re-place needs a persisted "manually pulled" marker (data/*.json schema
-  // change) — deferred until that's designed.
-  //
+  // Per-order manual action (Item 10) in the Buy/Sell currency cell:
+  //   NEW / PARTIALLY_FILLED        → hover ✕ cancel (pull the live order)
+  //   CANCELED + manual (user pull) → price-edit SpinBox + ＋ re-place
+  //   FILLED / bot-CANCELED / null  → nothing
+  // Re-place only appears on a USER-pulled order (manual flag), never on a
+  // bot-cancelled one — those are indistinguishable by status alone, which is
+  // exactly why the manual marker exists.
   // data-value carries the JSON payload; the Button manager emits
   // 'ui-button-change'. Markup only — handlers are wired separately.
   #rowAction(obj, type, index) {
     const o = obj?.[type]?.[index];
     if (!o) return '';
-    if (o.status !== 'NEW' && o.status !== 'PARTIALLY_FILLED') return '';
 
-    const payload = JSON.stringify({ action: 'cancel', side: type, index, orderId: o.orderId ?? null });
-    return `<span class="row-actions"><button type="button" class="UIb sm g-0 danger"`
-      + ` data-value='${payload}' title="Cancel order">`
-      + `<svg class="icon"><use href="/sprite.svg#close"></use></svg></button></span>`;
+    // user-pulled order → SpinBox (prefilled with its price) + re-place. + lifts
+    // / − drops the rate by one tick. Wide min/max so the package doesn't clamp
+    // the value (per the "always clamps" SpinBox behaviour) — no real bound.
+    if (o.status === 'CANCELED' && o.manual) {
+      const tick = parseInt(obj.param?.['field-tickSize'], 10);
+      const dec = Number.isFinite(tick) ? tick : 2;
+      const step = (10 ** -dec).toFixed(dec);
+      const replace = JSON.stringify({ action: 'replace', side: type, index, orderId: o.orderId ?? null });
+      return `<span class="row-actions row-actions--edit">`
+        + `<span class="UIsp sm round" data-step="${step}" data-min="0" data-max="100000000" data-decimals="${dec}" role="spinbutton" tabindex="0" aria-label="New price">`
+        +   `<button class="UIsp__btn" type="button" aria-label="Decrease value">−</button>`
+        +   `<input class="UIsp__input" type="text" value="${o.price ?? ''}" inputmode="decimal">`
+        +   `<button class="UIsp__btn" type="button" aria-label="Increase value">+</button>`
+        + `</span>`
+        + `<button type="button" class="UIb sm g-0 success" data-value='${replace}' title="Re-place at this price">`
+        +   `<svg class="icon"><use href="/sprite.svg#plus"></use></svg></button>`
+        + `</span>`;
+    }
+
+    // active order → hover cancel pill
+    if (o.status === 'NEW' || o.status === 'PARTIALLY_FILLED') {
+      const cancel = JSON.stringify({ action: 'cancel', side: type, index, orderId: o.orderId ?? null });
+      return `<span class="row-actions"><button type="button" class="UIb sm g-0 danger"`
+        + ` data-value='${cancel}' title="Cancel order">`
+        + `<svg class="icon"><use href="/sprite.svg#close"></use></svg></button></span>`;
+    }
+
+    return '';
   }
 
   // Item 10: one delegated 'ui-button-change' listener for the per-order cancel
@@ -226,33 +246,53 @@ export class LoadDataCalculator {
 
       let payload;
       try { payload = JSON.parse(btn.dataset.value); } catch { return; }
-      if (payload.action !== 'cancel') return;
 
-      const ok = await confirmDialog({
-        title: 'Cancel this order?',
-        message: `${payload.side} order #${payload.index + 1} will be cancelled on the exchange.`,
-        confirmLabel: 'Cancel order',
-        danger: true,
-      });
-      if (!ok) return;
+      if (payload.action === 'cancel') {
+        const ok = await confirmDialog({
+          title: 'Cancel this order?',
+          message: `${payload.side} order #${payload.index + 1} will be cancelled on the exchange.`,
+          confirmLabel: 'Cancel order',
+          danger: true,
+        });
+        if (!ok) return;
 
-      if (!ORDER_CANCEL_ENABLED) {
-        this.notifications.showNotification(
-          `🧪 Stub: ${payload.side} #${payload.index + 1} not cancelled (manual cancel disabled)`,
-          'warning',
-          6000
-        );
+        if (!ORDER_CANCEL_ENABLED) {
+          this.notifications.showNotification(
+            `🧪 Stub: ${payload.side} #${payload.index + 1} not cancelled (manual cancel disabled)`,
+            'warning', 6000
+          );
+          return;
+        }
+        // Real cancel: send to this symbol's bot via WS (SpotWS sets the
+        // callback). The bot cancels on the exchange and marks the order
+        // manual:true so the engine won't re-place it.
+        this.onCancelOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId });
         return;
       }
 
-      // Real cancel: send to this symbol's bot via WS (SpotWS sets the callback).
-      // The bot cancels on the exchange and marks the order manual:true, so the
-      // engine won't re-place it. Enabled only when ORDER_CANCEL_ENABLED is true.
-      this.onCancelOrder?.({
-        side: payload.side,
-        index: payload.index,
-        orderId: payload.orderId,
-      });
+      if (payload.action === 'replace') {
+        // new price comes from the row's SpinBox (prefilled with the old price,
+        // adjusted by the user with +/-)
+        const input = btn.closest('.row-actions')?.querySelector('.UIsp__input');
+        const price = input ? input.value : '';
+
+        const ok = await confirmDialog({
+          title: 'Re-place this order?',
+          message: `${payload.side} order #${payload.index + 1} will be placed on the exchange at ${price}.`,
+          confirmLabel: 'Re-place',
+        });
+        if (!ok) return;
+
+        if (!ORDER_CANCEL_ENABLED) {
+          this.notifications.showNotification(
+            `🧪 Stub: ${payload.side} #${payload.index + 1} not re-placed at ${price} (manual cancel disabled)`,
+            'warning', 6000
+          );
+          return;
+        }
+        this.onReplaceOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, price });
+        return;
+      }
     });
   }
 
@@ -326,10 +366,11 @@ export class LoadDataCalculator {
 
       document.querySelector('#settings-table tbody').innerHTML = html; // single DOM write
 
-      // Re-bind the ui-elements buttons (Item 10 per-order cancel) freshly
-      // rendered into the new rows. scan() skips already-bound nodes, so this is
-      // cheap and idempotent on every tick.
+      // Re-bind the ui-elements buttons + SpinBoxes (Item 10 cancel/re-place)
+      // freshly rendered into the new rows. scan() skips already-bound nodes, so
+      // this is cheap and idempotent on every tick.
       UiElements.getButtonManager().scan();
+      UiElements.getSpinBoxManager().scan();
     } catch (err) {
       console.error('❌ calculator():', err);
       return null;

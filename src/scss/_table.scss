@@ -106,6 +106,25 @@
   pointer-events: auto;
 }
 
+// Re-place edit state (Item 10): a user-pulled order turns the cell into a price
+// editor — an inline SpinBox (prefilled with the order's price) + ＋ re-place,
+// always visible (not hover). The stale number is hidden; the SpinBox replaces it.
+.t .act-cell:has(.row-actions--edit) {
+  padding-right: 0.5rem;
+}
+
+.t .act-cell:has(.row-actions--edit) > .fill-cell {
+  display: none;
+}
+
+.row-actions--edit {
+  position: static;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  gap: 0.3rem;
+}
+
 // Responsive collapse: on tablet/phone (<=768px) hide the first two columns
 // (#, %) and the last two (Spent, Balance), keeping the 4 trading columns
 // (Buy currency, BUY, SELL, Sell currency). tr > * targets both th and td.
