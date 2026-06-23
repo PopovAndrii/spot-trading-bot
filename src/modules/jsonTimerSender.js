@@ -324,7 +324,19 @@ class JsonTimerSender extends EventEmitter {
         // стоп нажат во время прохода — прерываем итератор, не дёргаем API дальше
         if (!this.running[this.symbol]) return;
 
-        if (obj[strategy.side][key]['status'] === "NEW" || obj[strategy.side][key]['status'] === null) {
+        // Окно активных ордеров (field-activeOrders) должно гейтить ВСЁ, что
+        // приводит к живому ордеру на бирже, а не только NEW/null. CANCELED и
+        // PARTIALLY_FILLED job переставляет/опрашивает (default → newOrder для
+        // CANCELED не-manual), и если их не считать — лимит молча превышается:
+        // глубокие CANCELED-уровни ниже окна переставлялись сверх лимита
+        // (3 в настройках → 6 на бирже). Считаем их как занятый слот.
+        const cellStatus = obj[strategy.side][key]['status'];
+        if (
+          cellStatus === 'NEW' ||
+          cellStatus === null ||
+          cellStatus === 'CANCELED' ||
+          cellStatus === 'PARTIALLY_FILLED'
+        ) {
           if (i === parseFloat(obj['param']['field-activeOrders'])) {
             return;
           }
