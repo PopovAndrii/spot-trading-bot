@@ -228,11 +228,13 @@ class JsonTimerSender extends EventEmitter {
     return { success: true, message: `${side} #${index + 1} cancelled` };
   }
 
-  // Item 10: наносит ручные переустановки этой сессии (this.manualReplaces) на
-  // сетку — статус NEW, новый orderId и цену пользователя, снимая manual, чтобы
-  // движок дальше опрашивал ордер как обычный. Источник — память бота, не файл.
-  // Зовётся вместе с #applyManualPulls (чтение readLoop и запись #mergeLiveEdits).
+  // Item 10: наносит ручные переустановки (this.manualReplaces) на сетку — статус
+  // NEW, новый orderId и цену пользователя, снимая manual, чтобы движок дальше вёл
+  // ордер как обычный. ОДНОРАЗОВО: readLoop после нанесения персистит файл и чистит
+  // карту (постоянный override затирал бы будущее исполнение). Возвращает true,
+  // если что-то применили (нужно ли персистить).
   #applyManualReplaces(obj) {
+    let applied = false;
     for (const side of ['BUY', 'SELL']) {
       for (const [i, repl] of this.manualReplaces[side]) {
         const cell = obj[side]?.[i];
@@ -241,8 +243,10 @@ class JsonTimerSender extends EventEmitter {
         cell.orderId = repl.orderId;
         cell.price = repl.price;
         delete cell.manual; // переустановлен — это снова обычный ордер движка
+        applied = true;
       }
     }
+    return applied;
   }
 
   // Item 10: ручная ПЕРЕустановка снятого ордера по новой цене (через WS → этот
@@ -335,10 +339,10 @@ class JsonTimerSender extends EventEmitter {
       // файла нет/битый — пишем что есть; writeFileAtomic не даст битого JSON
     }
 
-    // in-memory ручные отмены/переустановки этой сессии — наносим перед записью
-    // (на случай, если файл их ещё не содержит до первого тика после действия)
+    // in-memory ручные отмены этой сессии — наносим перед записью (на случай,
+    // если файл их ещё не содержит до первого тика после отмены). Переустановки
+    // (manualReplaces) сюда НЕ наносим: они одноразовые и персистятся в readLoop.
     this.#applyManualPulls(obj);
-    this.#applyManualReplaces(obj);
   }
 
   /**
@@ -566,17 +570,31 @@ class JsonTimerSender extends EventEmitter {
       const content = await fs.readFile(this.#filePath(), 'utf8');
       const data = JSON.parse(content);
 
-      // ручные отмены/переустановки этой сессии (Item 10) — наносим до итератора,
-      // чтобы job сразу видел manual (снятый — не переставлять) и NEW+orderId
-      // (переустановленный — опрашивать как обычный)
+      // ручные отмены этой сессии (Item 10) — наносим до итератора, чтобы job
+      // сразу видел manual и не переставлял снятый ордер (липкий флаг)
       this.#applyManualPulls(data);
-      this.#applyManualReplaces(data);
 
       // один проход за раз: если предыдущий ещё идёт — пропускаем тик, но
       // планировщик не блокируем (устойчиво к медленным/зависшим запросам).
       // stop() реагирует через guard внутри #jobIterator (this.running).
       if (!this.busy) {
         this.busy = true;
+
+        // Ручные ПЕРЕустановки (Item 10) — ОДНОРАЗОВО: наносим на свежую data и
+        // сразу персистим в файл, затем забываем. В отличие от manualPulls это
+        // НЕ липкое: постоянный override держал бы статус NEW и затирал бы будущее
+        // исполнение переустановленного ордера. getOrder(NEW)→NEW статус не меняет
+        // и сам файл не пишет, поэтому без явного персиста /spotbot/table (Stop,
+        // перезагрузка) читал устаревший CANCELED+manual → «фантомный» SpinBox.
+        if (this.#applyManualReplaces(data)) {
+          try {
+            await writeFileAtomic(this.#filePath(), JSON.stringify(data, null, 2));
+            this.manualReplaces = { BUY: new Map(), SELL: new Map() };
+          } catch (err) {
+            console.error('persist manual re-place:', err); // оставляем в памяти — повтор на след. тике
+          }
+        }
+
         this.#jobIterator(data)
           .catch((err) => console.error('jobIterator:', err))
           .finally(() => { this.busy = false; });
