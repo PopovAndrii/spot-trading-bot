@@ -31,6 +31,13 @@ export class SpotWS {
       }
     };
 
+    // Item 10: manual re-place of a pulled order at a new price → tell the bot.
+    this.loadDataCalculator.onReplaceOrder = ({ side, index, price }) => {
+      if (this.#isWebSocketOpen(this.ws)) {
+        this.ws.send(JSON.stringify({ type: 'replaceOrder', symbol: base + quote, side, index, price }));
+      }
+    };
+
     window.addEventListener('load', () => {
       this.connectWebSocket();
     });
@@ -106,6 +113,14 @@ export class SpotWS {
             // Item 10: result of a manual single-order cancel
             this.notifications.showNotification(
               message.data?.message || 'Cancel result',
+              message.data?.success ? 'success' : 'warning',
+              5000
+            );
+            break;
+          case 'replaceOrderResult':
+            // Item 10: result of a manual single-order re-place
+            this.notifications.showNotification(
+              message.data?.message || 'Re-place result',
               message.data?.success ? 'success' : 'warning',
               5000
             );

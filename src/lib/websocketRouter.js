@@ -5,7 +5,7 @@ const { UserStreamAPI } = require('./UserStreamApi.js');
 
 // Валидация входящих сообщений (ANALYSIS.md п.1.1): авторизованный клиент с
 // битым payload не должен ронять процесс вместе с торговыми циклами.
-const MESSAGE_TYPES = new Set(['subscribe', 'start', 'restartSync', 'stop', 'cancelOrder']);
+const MESSAGE_TYPES = new Set(['subscribe', 'start', 'restartSync', 'stop', 'cancelOrder', 'replaceOrder']);
 const SYMBOL_RE = /^[A-Z0-9]{3,20}$/;
 const STRATEGIES = new Set(['short', 'long']);
 
@@ -244,6 +244,27 @@ class WebSocketRouter {
               .catch((err) => {
                 console.error('❌ cancelOrder WS:', err);
                 this.safeSend(ws, { error: 'cancel failed' });
+              });
+          }
+
+          // Item 10: ручная переустановка одного снятого ордера по новой цене.
+          // Тот же инстанс бота — сериализовано с тиком (без файловой гонки).
+          if (data.type === 'replaceOrder' && currentSymbol) {
+            const ts = this.timerSenders.get(currentSymbol);
+            if (!ts) {
+              return this.safeSend(ws, { error: 'no active cycle' });
+            }
+            ts.replaceManualOrder({
+              side: data.side,
+              index: Number(data.index),
+              price: data.price,
+            })
+              .then((result) =>
+                this.safeSend(ws, { event: 'replaceOrderResult', data: result })
+              )
+              .catch((err) => {
+                console.error('❌ replaceOrder WS:', err);
+                this.safeSend(ws, { error: 'replace failed' });
               });
           }
 

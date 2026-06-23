@@ -99,6 +99,11 @@ class JsonTimerSender extends EventEmitter {
     // cancelManualOrder() кладёт сюда после отмены на бирже; #applyManualPulls
     // штампует manual:true на сетку при чтении и записи — без файловой гонки.
     this.manualPulls = { BUY: new Set(), SELL: new Set() };
+
+    // Item 10: ручные переустановки { BUY: Map<index,{status,orderId,price}>, ... }.
+    // replaceManualOrder() кладёт сюда после размещения на бирже; #applyManualReplaces
+    // наносит NEW+orderId+price и снимает manual — та же бесфайловая модель.
+    this.manualReplaces = { BUY: new Map(), SELL: new Map() };
   }
 
   getSpotStatus(symbol) {
@@ -223,6 +228,85 @@ class JsonTimerSender extends EventEmitter {
     return { success: true, message: `${side} #${index + 1} cancelled` };
   }
 
+  // Item 10: наносит ручные переустановки этой сессии (this.manualReplaces) на
+  // сетку — статус NEW, новый orderId и цену пользователя, снимая manual, чтобы
+  // движок дальше опрашивал ордер как обычный. Источник — память бота, не файл.
+  // Зовётся вместе с #applyManualPulls (чтение readLoop и запись #mergeLiveEdits).
+  #applyManualReplaces(obj) {
+    for (const side of ['BUY', 'SELL']) {
+      for (const [i, repl] of this.manualReplaces[side]) {
+        const cell = obj[side]?.[i];
+        if (!cell) continue;
+        cell.status = repl.status;
+        cell.orderId = repl.orderId;
+        cell.price = repl.price;
+        delete cell.manual; // переустановлен — это снова обычный ордер движка
+      }
+    }
+  }
+
+  // Item 10: ручная ПЕРЕустановка снятого ордера по новой цене (через WS → этот
+  // инстанс, сериализовано с тиком). Размещает ордер на бирже с тем же объёмом
+  // слота и ценой пользователя, затем помечает индекс в памяти; движок подхватит
+  // его как обычный NEW. Гард: переустанавливать можно ТОЛЬКО ранее снятый вручную
+  // в этой сессии слот (manualPulls) — иначе риск двойного размещения поверх живого.
+  async replaceManualOrder({ side, index, price } = {}) {
+    if (!this.running[this.symbol]) {
+      return { success: false, message: 'cycle is not running' };
+    }
+    const priceNum = Number(price);
+    if (
+      (side !== 'BUY' && side !== 'SELL') ||
+      !Number.isInteger(index) ||
+      !Number.isFinite(priceNum) ||
+      priceNum <= 0
+    ) {
+      return { success: false, message: 'invalid replace request' };
+    }
+    // только слот, снятый вручную в этой сессии: его ордер точно отменён на бирже,
+    // повторное размещение не задвоит живой ордер.
+    if (!this.manualPulls[side].has(index)) {
+      return { success: false, message: 'order was not manually pulled' };
+    }
+
+    // объём берём из слота сетки, не из клиента (денежная величина — серверная).
+    let slot;
+    try {
+      const obj = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
+      slot = obj[side]?.[index];
+    } catch {
+      return { success: false, message: 'grid file unreadable' };
+    }
+    if (!slot || slot.quantity == null) {
+      return { success: false, message: 'order slot not found' };
+    }
+
+    const res = await this.#runToApi({
+      method: 'newOrder',
+      data: {
+        id: index,
+        symbol: this.symbol,
+        side,
+        type: 'LIMIT',
+        timeInForce: 'GTC',
+        quantity: slot.quantity,
+        price: String(price),
+      },
+    });
+    if (!res || res.success === false) {
+      return res || { success: false, message: 'replace failed' };
+    }
+
+    // размещён → больше не «снятый», движок опрашивает его как обычный NEW
+    this.manualPulls[side].delete(index);
+    this.manualReplaces[side].set(index, {
+      status: 'NEW',
+      orderId: res.message.orderId,
+      price: String(price),
+    });
+    return { success: true, message: `${side} #${index + 1} re-placed @ ${priceNum}` };
+  }
+
   async #mergeLiveEdits(obj) {
     try {
       const fresh = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
@@ -251,9 +335,10 @@ class JsonTimerSender extends EventEmitter {
       // файла нет/битый — пишем что есть; writeFileAtomic не даст битого JSON
     }
 
-    // in-memory ручные отмены этой сессии — наносим перед записью (на случай,
-    // если файл их ещё не содержит до первого тика после отмены)
+    // in-memory ручные отмены/переустановки этой сессии — наносим перед записью
+    // (на случай, если файл их ещё не содержит до первого тика после действия)
     this.#applyManualPulls(obj);
+    this.#applyManualReplaces(obj);
   }
 
   /**
@@ -481,9 +566,11 @@ class JsonTimerSender extends EventEmitter {
       const content = await fs.readFile(this.#filePath(), 'utf8');
       const data = JSON.parse(content);
 
-      // ручные отмены этой сессии (Item 10) — наносим до итератора, чтобы job
-      // сразу видел manual и не переставлял снятый ордер
+      // ручные отмены/переустановки этой сессии (Item 10) — наносим до итератора,
+      // чтобы job сразу видел manual (снятый — не переставлять) и NEW+orderId
+      // (переустановленный — опрашивать как обычный)
       this.#applyManualPulls(data);
+      this.#applyManualReplaces(data);
 
       // один проход за раз: если предыдущий ещё идёт — пропускаем тик, но
       // планировщик не блокируем (устойчиво к медленным/зависшим запросам).
@@ -548,8 +635,9 @@ class JsonTimerSender extends EventEmitter {
       this.apiFailStreak = 0;
       this.apiOutageNotified = false;
 
-      // новый цикл = свежая сетка, ручные отмены прошлого цикла неактуальны
+      // новый цикл = свежая сетка, ручные отмены/переустановки прошлого неактуальны
       this.manualPulls = { BUY: new Set(), SELL: new Set() };
+      this.manualReplaces = { BUY: new Map(), SELL: new Map() };
 
       const api = InvokeApi.getInstance();
 
