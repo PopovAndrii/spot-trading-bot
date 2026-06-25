@@ -418,14 +418,19 @@ export class LoadDataCalculator {
         SELL: [],
       };
 
-      // Build the whole tbody as one string, then write it once. `innerHTML += row`
+      // Build each row indexed by its logical order index, then join once. `innerHTML += row`
       // per iteration re-parses the entire tbody every time (O(n²)) and is the cause
       // of the lag. One assignment also atomically replaces the old rows (no flash).
-      let html = '';
+      // Short strategy: the grid reads top-down as a fall (safety buys) on long, but
+      // unnaturally so on short — flip the VISUAL row order only (rows.reverse()) so the
+      // first order sits at the bottom and safety sells climb upward. Data binding stays
+      // keyed by `index` (order number, badges, status backlight, cancel/replace
+      // side:index), so only the DOM order changes — numbering keeps index+1 (№1 bottom).
+      const rows = [];
       data['calculator'].forEach((el, index) => {
         const buyAct = this.#rowAction(obj, 'BUY', index, el.buyCurrency);
         const sellAct = this.#rowAction(obj, 'SELL', index, el.sellCurrency);
-        html += `<tr>
+        rows[index] = `<tr>
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
               <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${this.#currentPriceBadge(obj, 'BUY', index, el.buyCurrency)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
@@ -459,7 +464,9 @@ export class LoadDataCalculator {
         };
       });
 
-      document.querySelector('#settings-table tbody').innerHTML = html; // single DOM write
+      // Short: flip visual order so №1 ends up at the bottom (safety sells climb up).
+      if (this.strategy === 'short') rows.reverse();
+      document.querySelector('#settings-table tbody').innerHTML = rows.join(''); // single DOM write
 
       // Re-bind the ui-elements buttons + SpinBoxes (Item 10 cancel/re-place)
       // freshly rendered into the new rows. scan() skips already-bound nodes, so
