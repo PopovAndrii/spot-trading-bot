@@ -216,15 +216,23 @@ class JsonTimerSender extends EventEmitter {
       return { success: false, message: 'invalid cancel request' };
     }
 
+    // Оптимистично помечаем слот manual ДО ответа биржи. Флаг ставится в памяти
+    // синхронно, поэтому ближайший тик readLoop (#applyManualPulls) уже видит его.
+    // Иначе при медленном REST-ответе отмены окно: итератор своим getOrder видит
+    // CANCELED раньше, чем сюда вернётся ответ и поставит флаг → job по default
+    // переставляет (newOrder) только что снятый юзером ордер — «воскрешение».
+    // Откатываем флаг, если отмена не прошла (ордер остался жив на бирже).
+    this.manualPulls[side].add(index);
+
     const res = await this.#runToApi({
       method: 'cancelOrder',
       data: { symbol: this.symbol, orderId },
     });
     if (!res || res.success === false) {
+      this.manualPulls[side].delete(index);
       return res || { success: false, message: 'cancel failed' };
     }
 
-    this.manualPulls[side].add(index);
     return { success: true, message: `${side} #${index + 1} cancelled` };
   }
 

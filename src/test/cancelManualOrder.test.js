@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 
 // DEEP_ANALYSIS_PLAN.md Item 10 — manual single-order cancel (cancelManualOrder).
-// Contract: cancel on the exchange FIRST, and only then record the pull in
-// this.manualPulls (so the engine skips re-placing it). A failed/invalid cancel
-// must NOT mark the order manual — otherwise a still-live order would be skipped.
+// Contract: mark the pull in this.manualPulls OPTIMISTICALLY (before the exchange
+// responds) so the very next readLoop tick already sees `manual` and the engine
+// never re-places ("resurrects") an order whose cancel ACK lagged. A failed/invalid
+// cancel must roll the flag back — otherwise a still-live order would be skipped.
 // Pure unit: the exchange call is mocked, nothing touches a real API.
 
 function setup() {
@@ -55,7 +56,7 @@ test('cancelManualOrder: invalid side / index / orderId → fail, no API call', 
   assert.equal(sender.manualPulls.BUY.size, 0);
 });
 
-test('cancelManualOrder: exchange cancel fails → NOT marked manual', async () => {
+test('cancelManualOrder: exchange cancel fails → flag rolled back, NOT marked manual', async () => {
   const { sender } = setup();
   sender.API.cancelOrder = async () => ({ success: false, message: 'order already filled' });
 
@@ -63,4 +64,22 @@ test('cancelManualOrder: exchange cancel fails → NOT marked manual', async () 
 
   assert.equal(r.success, false);
   assert.equal(sender.manualPulls.SELL.has(3), false); // must not skip a live order
+});
+
+test('cancelManualOrder: flag is set WHILE the exchange cancel is still in flight', async () => {
+  const { sender } = setup();
+  // Capture manualPulls state at the moment the (slow) exchange call runs — this
+  // is the window in which a lagging ACK previously let the engine resurrect the
+  // order. The optimistic mark must already be visible here.
+  let flagDuringCall = null;
+  sender.API.cancelOrder = async (data) => {
+    flagDuringCall = sender.manualPulls.BUY.has(4);
+    return { success: true, message: { orderId: data.orderId, status: 'CANCELED' } };
+  };
+
+  const r = await sender.cancelManualOrder({ side: 'BUY', index: 4, orderId: 7 });
+
+  assert.equal(flagDuringCall, true); // marked before the ACK, not after
+  assert.equal(r.success, true);
+  assert.equal(sender.manualPulls.BUY.has(4), true);
 });
