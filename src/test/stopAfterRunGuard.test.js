@@ -6,20 +6,21 @@ const path = require('path');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 const { Status } = require('../lib/job');
 
-// DEEP_ANALYSIS_PLAN.md §B.3 — «лишняя» запись файла после stop().
-// Инвариант: если Stop нажат, пока #jobIterator ждёт ответа биржи в #runToApi,
-// после резолва итератор НЕ должен трогать файл сетки (guard перед записью).
+// DEEP_ANALYSIS_PLAN.md §B.3 — a "spurious" file write after stop().
+// Invariant: if Stop is pressed while #jobIterator is awaiting the exchange in
+// #runToApi, after the resolve the iterator must NOT touch the grid file (guard
+// before the write).
 //
-// #jobIterator приватный, поэтому гоняем его через публичный readLoop(): он
-// читает файл сетки и запускает итератор. #filePath() жёстко указывает в
-// src/data, поэтому перенаправляем запись во временную папку через относительный
-// symbol (path.join(src/data, symbol) === tmp/<name>). Мокаем API.getOrder и job
-// — биржа и расчёт здесь ни при чём, проверяем только момент записи.
+// #jobIterator is private, so we drive it via the public readLoop(): it reads the
+// grid file and runs the iterator. #filePath() points hard into src/data, so we
+// redirect the write to a temp folder via a relative symbol (path.join(src/data,
+// symbol) === tmp/<name>). We mock API.getOrder and job — the exchange and the
+// calculation are irrelevant here, we only check the moment of the write.
 
 const DATA_DIR = path.join(__dirname, '../data');
 
-// obj сетки: long, набор не исчерпан (не все BUY FILLED) → recovery-консолидация
-// не срабатывает, идём в обычную ветку обработки ордера.
+// grid obj: long, entry not exhausted (not all BUY FILLED) → recovery
+// consolidation doesn't trigger, we go down the normal order-processing branch.
 const gridObj = () => ({
   status: Status.READY,
   pair: 'TESTUSDT',
@@ -28,8 +29,8 @@ const gridObj = () => ({
   SELL: [{ status: null, symbol: 'TESTUSDT', side: 'SELL', orderId: null }],
 });
 
-// getOrder-ответ, который двигает статус NEW → FILLED (currentOrder.status='NEW',
-// message.status='FILLED' → не партиал, идём к Object.assign + записи).
+// a getOrder reply that moves the status NEW → FILLED (currentOrder.status='NEW',
+// message.status='FILLED' → not a partial, we go to Object.assign + write).
 const filledReply = () => ({
   success: true,
   message: {
@@ -38,12 +39,12 @@ const filledReply = () => ({
   },
 });
 
-// Поднимает sender с перенаправлением файла в tmp и моками API/job.
-// flipStopDuringCall=true → API.getOrder выставляет running=false (Stop во время
-// ожидания биржи).
+// Spins up a sender with the file redirected to tmp and API/job mocks.
+// flipStopDuringCall=true → API.getOrder sets running=false (Stop while waiting
+// on the exchange).
 async function setup(flipStopDuringCall) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'stopguard-'));
-  // symbol такой, что path.join(DATA_DIR, `${symbol}-binance.json`) === tmp-файл
+  // symbol such that path.join(DATA_DIR, `${symbol}-binance.json`) === the tmp file
   const symbol = path.join(path.relative(DATA_DIR, dir), 'TESTUSDT');
   const file = path.join(dir, 'TESTUSDT-binance.json');
 
@@ -60,7 +61,7 @@ async function setup(flipStopDuringCall) {
   sender.API = {
     getOrder: async () => {
       flags.apiCalled = true;
-      if (flipStopDuringCall) sender.running[symbol] = false; // Stop во время await
+      if (flipStopDuringCall) sender.running[symbol] = false; // Stop during the await
       return filledReply();
     },
   };
@@ -85,12 +86,12 @@ const waitUntil = async (fn, ms = 2000) => {
 test('stop during #runToApi → file NOT written after stop (frozen)', async () => {
   const ctx = await setup(true);
   try {
-    ctx.sender.readLoop(); // запускает #jobIterator (busy=true)
-    // ждём, пока биржу опросили (внутри итератора) и проход завершился
+    ctx.sender.readLoop(); // starts #jobIterator (busy=true)
+    // wait until the exchange was polled (inside the iterator) and the pass finished
     await waitUntil(() => ctx.flags.apiCalled && ctx.sender.busy === false);
 
     const saved = JSON.parse(await fs.readFile(ctx.file, 'utf8'));
-    // guard сработал до Object.assign/записи — файл остался исходным
+    // the guard fired before Object.assign/write — the file stayed as the original
     assert.equal(saved.BUY[0].status, 'NEW');
     assert.equal(saved.BUY[0].orderId, null);
     assert.equal('executedQty' in saved.BUY[0], false);
@@ -106,7 +107,7 @@ test('control: running stays true → file IS written (status persisted)', async
     await waitUntil(() => ctx.flags.apiCalled && ctx.sender.busy === false);
 
     const saved = JSON.parse(await fs.readFile(ctx.file, 'utf8'));
-    // без stop guard пропускает — запись проходит как обычно
+    // without a stop the guard passes — the write goes through as usual
     assert.equal(saved.BUY[0].status, 'FILLED');
     assert.equal(saved.BUY[0].orderId, 777);
     assert.equal(saved.BUY[0].executedQty, 1);

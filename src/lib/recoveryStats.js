@@ -1,17 +1,18 @@
-// Read-only статистика возврата средств по прожитой сессии.
+// Read-only fund-recovery stats for a lived session.
 //
-// По окончании цикла часть позиции может остаться невыкупленной (сетка не
-// успела закрыть остаток — см. testnet-фитили / отставание тейк-профита).
-// Эта функция по РЕАЛЬНЫМ исполнениям из архива считает два показателя и
-// одну фразу: сколько осталось на руках и по какому курсу его продать
-// (long) / выкупить (short), чтобы ВСЯ серия вышла не в убыток.
+// When a cycle ends, part of the position may stay un-bought-back (the grid
+// didn't manage to close the leftover — see testnet wicks / take-profit lag).
+// From the ACTUAL fills in the archive this function computes two metrics and one
+// phrase: how much is left on hand and at what price to sell it (long) / buy it
+// back (short) so the WHOLE series ends without a loss.
 //
-// Ничего не размещает на бирже и схему data/*.json не меняет — только читает.
+// Places nothing on the exchange and doesn't change the data/*.json schema —
+// read-only.
 //
-// Переиспользует rebalanceClose: remainingBase = Σ entry.executedQty −
-// Σ close.executedQty (зависший объём), remainingQuote = Σ entry.quote −
-// Σ close.quote (застрявшие деньги). Комиссия передаётся БЕЗ profit — нам
-// нужен безубыток серии, а не целевая прибыль закрытия.
+// Reuses rebalanceClose: remainingBase = Σ entry.executedQty − Σ close.executedQty
+// (the stranded quantity), remainingQuote = Σ entry.quote − Σ close.quote (the
+// stranded money). Commission is passed WITHOUT profit — we need the series
+// break-even, not the close's target profit.
 const { rebalanceClose } = require('./rebalanceClose');
 
 function recoveryStats(session) {
@@ -23,21 +24,21 @@ function recoveryStats(session) {
   const pricePrec = Number(param['field-tickSize']) || 2;
   const qtyPrec = Number(param['field-stepSize']) || 3;
 
-  // long: набор BUY, закрытие SELL. short — зеркально.
+  // long: build with BUY, close with SELL. short is mirrored.
   const entries = strategy === 'short' ? session.SELL : session.BUY;
   const closes = strategy === 'short' ? session.BUY : session.SELL;
   if (!Array.isArray(entries)) return null;
 
   const r = rebalanceClose(entries, closes, strategy, commission);
-  if (!r) return null; // позиция закрыта целиком — возвращать нечего
+  if (!r) return null; // position fully closed — nothing to return
 
   const strandedQty = Number(r.quantity.toFixed(qtyPrec));
-  if (strandedQty <= 0) return null; // остаток в пределах пыли
+  if (strandedQty <= 0) return null; // leftover within dust
 
   const base = (session.pair || '').replace(/(USDT|USDC|BUSD|FDUSD)$/i, '') || 'base';
 
-  // avgEntryPrice <= 0 → закрывающая часть уже вернула все вложенные деньги,
-  // серия в плюсе даже с остатком на руках.
+  // avgEntryPrice <= 0 → the closing part already returned all invested money,
+  // the series is in profit even with a leftover on hand.
   if (r.avgEntryPrice <= 0) {
     return {
       strategy,
@@ -52,7 +53,7 @@ function recoveryStats(session) {
   const breakevenPrice = Number(r.price.toFixed(pricePrec));
   const side = strategy === 'short' ? 'buy' : 'sell';
   const bound = strategy === 'short' ? 'no more than' : 'no less than';
-  // разовость: после восстановления цикл закончен — обратной сделки не нужно
+  // one-shot: after recovery the cycle is done — no reverse trade is needed
   const tail =
     strategy === 'short'
       ? "This is a one-time buy — you don't need to sell it again afterwards."

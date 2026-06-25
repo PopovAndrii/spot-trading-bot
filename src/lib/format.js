@@ -1,10 +1,10 @@
-// Числовое форматирование под биржевые фильтры (tickSize/stepSize).
-// Вынесено из двух копий в routes/spotbot.js (ANALYSIS п.14).
+// Numeric formatting for exchange filters (tickSize/stepSize).
+// Extracted from two copies in routes/spotbot.js (ANALYSIS item 14).
 
 /**
- * Количество знаков после запятой у значения фильтра (0.001 → 3).
- * toExponential устойчив к малым числам (0.0000001 → "1e-7"), которые ломают
- * наивный split('.') из-за экспоненциальной записи.
+ * Number of decimal places in a filter value (0.001 → 3).
+ * toExponential is robust to small numbers (0.0000001 → "1e-7"), which break the
+ * naive split('.') because of exponential notation.
  */
 function decimalCount(value) {
   const n = Number(value);
@@ -15,8 +15,8 @@ function decimalCount(value) {
 }
 
 /**
- * Округление к ближайшему шагу. mode='floor' (default) для остатков,
- * 'ceil' для минимумов (чтобы не упасть ниже биржевого порога).
+ * Round to the nearest step. mode='floor' (default) for leftovers,
+ * 'ceil' for minimums (so we don't drop below the exchange threshold).
  */
 function roundToStep(value, step, mode = 'floor') {
   if (typeof value !== 'number' || isNaN(value) || !step) return 0;

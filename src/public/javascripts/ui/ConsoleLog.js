@@ -15,15 +15,15 @@ export class ConsoleLog {
 
     this.es = null;
     this.watchdog = null;
-    this.lastId = 0; // id последней показанной записи — для replay/дедупа после reconnect
+    this.lastId = 0; // id of the last shown entry — for replay/dedup after reconnect
 
     this.#restoreOpen();
     this.#setupToggle();
     this.#renderFilters();
     this.#connect();
 
-    // Пара отменена/удалена (CancelAllOrders) — убрать её вкладку-фильтр и записи
-    // из консоли, как она уходит из меню навигации.
+    // Pair canceled/deleted (CancelAllOrders) — remove its filter tab and entries
+    // from the console, as it leaves the navigation menu.
     window.addEventListener('pair-removed', (e) => this.#removeSymbol(e.detail?.symbol));
   }
 
@@ -31,8 +31,8 @@ export class ConsoleLog {
     if (!symbol || !this.symbols.has(symbol)) return;
     this.symbols.delete(symbol);
     this.entries = this.entries.filter((e) => e.symbol !== symbol);
-    // если активен фильтр удалённого символа — вернуться на ALL; иначе сохранить
-    // текущий. #setFilter перерисует и кнопки-фильтры, и содержимое.
+    // if the removed symbol's filter is active — go back to ALL; otherwise keep the
+    // current one. #setFilter re-renders both the filter buttons and the content.
     this.#setFilter(this.filter === symbol ? null : this.filter);
   }
 
@@ -44,20 +44,20 @@ export class ConsoleLog {
 
   #setupToggle() {
     this.toggleEl?.addEventListener('click', (e) => {
-      // клик по инфо о git-сборке только выделяет текст, не трогает консоль
+      // a click on the git-build info only selects text, doesn't toggle the console
       if (e.target.closest('#app-version')) return;
       const isOpen = this.consoleEl.classList.toggle('console--open');
       localStorage.setItem(LS_OPEN, isOpen);
     });
   }
 
-  // Liveness: 45с = 3 пропущенных heartbeat'а (сервер шлёт ping каждые 15с).
+  // Liveness: 45s = 3 missed heartbeats (the server sends ping every 15s).
   #WATCHDOG_MS = 45000;
 
   #connect() {
-    // ручной reconnect создаёт новый EventSource — браузер НЕ шлёт Last-Event-ID
-    // (это делает только его внутренний reconnect того же объекта). Передаём id
-    // сами в query, чтобы сервер реплеил лишь новое.
+    // a manual reconnect creates a new EventSource — the browser does NOT send
+    // Last-Event-ID (only its own internal reconnect of the same object does).
+    // We pass the id ourselves in the query so the server replays only what's new.
     const url = this.lastId ? `/api/logs?lastEventId=${this.lastId}` : '/api/logs';
     const es = new EventSource(url);
     this.es = es;
@@ -67,12 +67,12 @@ export class ConsoleLog {
       try { this.#add(JSON.parse(e.data)); } catch { }
     };
 
-    // heartbeat виден как именованное событие — данных не несёт, только
-    // подтверждает, что канал жив, и сбрасывает watchdog.
+    // the heartbeat shows up as a named event — it carries no data, only confirms
+    // the channel is alive and resets the watchdog.
     es.addEventListener('ping', () => this.#kickWatchdog());
 
-    // штатный обрыв: EventSource сам переподключается, пока readyState !== CLOSED.
-    // Если он сдался (CLOSED) — пересоздаём вручную.
+    // normal drop: EventSource reconnects on its own while readyState !== CLOSED.
+    // If it gave up (CLOSED) — recreate manually.
     es.onerror = () => {
       if (es.readyState === EventSource.CLOSED) this.#reconnect();
     };
@@ -80,10 +80,10 @@ export class ConsoleLog {
     this.#kickWatchdog();
   }
 
-  // Полуоткрытый сокет (sleep ноутбука, рециклинг upstream прокси) браузер не
-  // замечает: readyState остаётся OPEN, onerror не стреляет, авто-reconnect не
-  // запускается. Сторожим сами: нет ни лога, ни ping дольше WATCHDOG_MS —
-  // принудительно рвём и пересоздаём соединение.
+  // A half-open socket (laptop sleep, upstream proxy recycling) goes unnoticed by
+  // the browser: readyState stays OPEN, onerror doesn't fire, auto-reconnect doesn't
+  // kick in. We guard it ourselves: no log and no ping for longer than WATCHDOG_MS —
+  // force-drop and recreate the connection.
   #kickWatchdog() {
     clearTimeout(this.watchdog);
     this.watchdog = setTimeout(() => this.#reconnect(), this.#WATCHDOG_MS);
@@ -96,9 +96,9 @@ export class ConsoleLog {
   }
 
   #add(entry) {
-    // replay истории после reconnect может прислать уже показанные записи —
-    // дедуплицируем по монотонному id (см. lib/logBus). lastId двигаем только
-    // вперёд, чтобы следующий reconnect просил продолжение, а не дубли.
+    // a history replay after reconnect may send already-shown entries — dedup by
+    // the monotonic id (see lib/logBus). We move lastId forward only, so the next
+    // reconnect asks for the continuation, not duplicates.
     if (entry.id != null) {
       if (this.lastId && entry.id <= this.lastId) return;
       this.lastId = entry.id;
@@ -155,7 +155,7 @@ export class ConsoleLog {
     const btn = document.createElement('button');
     btn.className = 'console__filter console__clear';
     btn.textContent = 'Clear';
-    btn.title = 'Очистить логи текущего фильтра';
+    btn.title = 'Clear logs for the current filter';
     btn.addEventListener('click', () => this.#clearCurrent());
     this.filtersEl.appendChild(btn);
   }

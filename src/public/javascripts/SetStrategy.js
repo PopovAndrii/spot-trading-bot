@@ -12,10 +12,10 @@ export class SetStrategy {
 
       this.notifications.showNotification(`The strategy chosen is: <b>${id}</b>`, 'success', 15000);
 
-      // base/quote — глобальные константы страницы (рендерятся сервером в
-      // spotbot.ejs), как уже делает LoadDataFromFileCalculator. Раньше они
-      // брались из query-параметров URL: переход по ссылке без ?base=&quote=
-      // (navbar) давал строки "undefined" и 500 на фетче.
+      // base/quote — page-global constants (rendered by the server in spotbot.ejs),
+      // as LoadDataFromFileCalculator already does. They used to be taken from URL
+      // query params: following a link without ?base=&quote= (navbar) produced the
+      // strings "undefined" and a 500 on the fetch.
       this.strategyName = id;
       this.#getStrategyData(base, quote);
     });
@@ -103,8 +103,8 @@ export class SetStrategy {
     if (depositSpin) depositSpin.setAttribute('data-step', data['balanceFormat']);
 
     // Reload the SpinBox, otherwise the modified data-step won't take effect.
-    // Пересоздание (destroy + new) заново сканирует все .UIsp и в scan() вызывает
-    // state() по каждому — стрелки +/- синхронизируются сами, ручной sync не нужен.
+    // Recreation (destroy + new) re-scans all .UIsp and in scan() calls state() on
+    // each — the +/- arrows sync themselves, no manual sync needed.
     this.onFormatChange?.();
   }
 

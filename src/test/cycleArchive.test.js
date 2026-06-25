@@ -5,8 +5,8 @@ const path = require('path');
 const os = require('os');
 const { archiveIfActive } = require('../lib/cycleArchive');
 
-// История циклов: прожитый цикл архивируется перед перезаписью Save,
-// нетронутый расчёт — нет.
+// Cycle history: a lived cycle is archived before a Save overwrite,
+// an untouched calculation is not.
 
 async function withTmpDir(fn) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'archive-test-'));
@@ -34,7 +34,7 @@ test('cycle with placed orders → archived copy with same content', async () =>
     assert.ok(archived, 'archive path returned');
     assert.match(path.basename(archived), /^\d+-BNBUSDT-binance\.json$/);
     assert.equal(await fs.readFile(archived, 'utf8'), config);
-    // основной файл не тронут — его перезапишет writeFileAtomic после
+    // the main file is untouched — writeFileAtomic overwrites it afterwards
     assert.equal(await fs.readFile(filePath, 'utf8'), config);
   });
 });
@@ -48,7 +48,7 @@ test('never-started config (no orderId) → no archive', async () => {
     );
 
     assert.equal(await archiveIfActive(filePath), null);
-    // в каталоге только исходный файл, архив не появился
+    // only the source file is in the directory, no archive appeared
     assert.deepEqual(await fs.readdir(dir), ['BNBUSDT-binance.json']);
   });
 });

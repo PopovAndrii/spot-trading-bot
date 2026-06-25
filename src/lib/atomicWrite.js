@@ -2,28 +2,28 @@ const fs = require('fs/promises');
 const path = require('path');
 
 /**
- * Атомарная запись файла: пишем во временный файл в той же директории, затем
- * fs.rename (атомарен на одной ФС). Падение/рестарт ровно в момент записи не
- * оставит битый JSON в основном файле — он остаётся либо старым целиком, либо
- * новым целиком. Защищает единственный источник правды об открытых ордерах.
- * См. REQUIREMENTS.md п.22.
+ * Atomic file write: write to a temp file in the same directory, then fs.rename
+ * (atomic within one filesystem). A crash/restart exactly at write time won't
+ * leave broken JSON in the main file — it stays either fully old or fully new.
+ * Protects the single source of truth about open orders.
+ * See REQUIREMENTS.md item 22.
  *
- * @param {string} filePath - целевой путь.
- * @param {string|Buffer} data - содержимое.
- * @param {string} [encoding='utf8'] - кодировка.
+ * @param {string} filePath - target path.
+ * @param {string|Buffer} data - contents.
+ * @param {string} [encoding='utf8'] - encoding.
  */
 async function writeFileAtomic(filePath, data, encoding = 'utf8') {
   const dir = path.dirname(filePath);
-  // temp в той же директории (rename атомарен только в пределах одной ФС);
-  // лидирующая точка + pid + время → не пересекается с конфигами/архивами.
+  // temp in the same directory (rename is atomic only within one filesystem);
+  // leading dot + pid + time → won't collide with configs/archives.
   const tmp = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
 
   try {
     await fs.writeFile(tmp, data, encoding);
     await fs.rename(tmp, filePath);
   } catch (err) {
-    // подчистить хвост, если rename не случился (иначе копятся .tmp)
-    try { await fs.unlink(tmp); } catch (_) { /* уже нет — ок */ }
+    // clean up the leftover if rename didn't happen (otherwise .tmp files pile up)
+    try { await fs.unlink(tmp); } catch (_) { /* already gone — ok */ }
     throw err;
   }
 }

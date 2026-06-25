@@ -3,7 +3,7 @@ class MomentumIndicator {
     this.period = period;
     this.momentum = 0;
 
-    // Дефолтные веса или пользовательские
+    // Default weights or user-provided ones
     this.weights = weights || {
       price: 0.4,
       volume: 0.2,
@@ -11,7 +11,7 @@ class MomentumIndicator {
       volatility: 0.1,
     };
 
-    // Проверка суммы весов
+    // Validate the sum of weights
     const sum = Object.values(this.weights).reduce((a, b) => a + b);
     if (Math.abs(sum - 1.0) > 0.01) {
       console.warn(`⚠️ Sum of weights = ${sum}, recommended = 1.0`);
@@ -25,20 +25,20 @@ class MomentumIndicator {
       throw new Error(`Need at least ${this.period} candles`);
     }
 
-    // Компоненты
+    // Components
     const priceScore = this.calculatePriceScore(recent);
     const volumeScore = this.calculateVolumeScore(recent);
     const trendScore = this.calculateTrendScore(recent);
     const volatilityScore = this.calculateVolatilityScore(recent);
 
-    // Взвешенная комбинация с ВАШИМИ весами
+    // Weighted combination with the configured weights
     this.momentum = 0;
-    this.momentum += priceScore * this.weights.price; // - цена
-    this.momentum += volumeScore * this.weights.volume; //  - объем
-    this.momentum += trendScore * this.weights.trend; // - тренд
-    this.momentum += volatilityScore * this.weights.volatility; // - волатильность
+    this.momentum += priceScore * this.weights.price; // - price
+    this.momentum += volumeScore * this.weights.volume; // - volume
+    this.momentum += trendScore * this.weights.trend; // - trend
+    this.momentum += volatilityScore * this.weights.volatility; // - volatility
 
-    // Нормализация через tanh
+    // Normalize via tanh
     this.momentum = Math.tanh(this.momentum * 2);
 
     return {
@@ -62,10 +62,10 @@ class MomentumIndicator {
    * @returns -1 to +1
    */
   calculateByPrices(startPrice, endPrice, currentPrice = null) {
-    // Если текущая цена не передана, используем endPrice
+    // If the current price isn't passed, use endPrice
     const current = currentPrice !== null ? currentPrice : endPrice;
 
-    // Проверяем что currentPrice между start и end
+    // Check that currentPrice is between start and end
     const min = Math.min(startPrice, endPrice);
     const max = Math.max(startPrice, endPrice);
 
@@ -73,21 +73,21 @@ class MomentumIndicator {
       console.warn(`⚠️ ${currentPrice} should be between ${startPrice} and ${endPrice}`);
     }
 
-    // Общий диапазон
+    // Total range
     const totalRange = endPrice - startPrice;
 
-    // Где находится текущая цена в этом диапазоне
+    // Where the current price sits within that range
     const currentPosition = current - startPrice;
 
-    // Прогресс от 0 до 1 (линейная шкала)
+    // Progress from 0 to 1 (linear scale)
     let momentum;
     if (totalRange === 0) {
-      momentum = 0; // цены равны
+      momentum = 0; // prices are equal
     } else if (totalRange > 0) {
-      // Рост: от 0 до +1
+      // Rising: from 0 to +1
       momentum = currentPosition / totalRange;
     } else {
-      // Падение: от 0 до -1
+      // Falling: from 0 to -1
       momentum = currentPosition / totalRange;
     }
 
@@ -108,11 +108,11 @@ class MomentumIndicator {
     const volumes = candles.map((c) => parseFloat(c[5]));
     const avgVolume = volumes.reduce((a, b) => a + b) / volumes.length;
 
-    // Объем последних 10% свечей
+    // Volume of the last 10% of candles
     const recentVolumes = volumes.slice(-Math.floor(volumes.length * 0.1));
     const recentAvg = recentVolumes.reduce((a, b) => a + b) / recentVolumes.length;
 
-    return recentAvg / avgVolume - 1; // Отклонение от среднего
+    return recentAvg / avgVolume - 1; // Deviation from the mean
   }
 
   calculateTrendScore(candles) {
@@ -121,7 +121,7 @@ class MomentumIndicator {
     for (let i = 0; i < candles.length; i++) {
       const open = parseFloat(candles[i][1]);
       const close = parseFloat(candles[i][4]);
-      const weight = (i + 1) / candles.length; // больший вес последним
+      const weight = (i + 1) / candles.length; // more weight on the latest
 
       if (close > open) {
         score += weight;
@@ -148,7 +148,7 @@ class MomentumIndicator {
     const avgTR = totalTR / (candles.length - 1);
     const currentPrice = parseFloat(candles[candles.length - 1][4]);
 
-    return (avgTR / currentPrice) * 10; // нормализация
+    return (avgTR / currentPrice) * 10; // normalization
   }
 
   #getSignal(momentum) {
@@ -176,8 +176,8 @@ class MomentumIndicator {
     let timestamp = Date.now() - count * 60000;
 
     for (let i = 0; i < count; i++) {
-      // Если trend задан, добавляем его к случайному изменению
-      // trend: 0.005 = +0.5% рост, -0.005 = -0.5% падение, 0 = случайно
+      // If trend is set, add it to the random change
+      // trend: 0.005 = +0.5% rise, -0.005 = -0.5% fall, 0 = random
       const randomChange = (Math.random() - 0.5) * 0.01;
       const change = randomChange + trend;
       const volatility = Math.random() * 0.003;

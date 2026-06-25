@@ -22,7 +22,7 @@ router.get('/', async function (req, res, next) {
   });
 });
 
-// Проверка пары ключей (real | test) подписанным запросом к Binance
+// Check a key pair (real | test) with a signed request to Binance
 router.post('/check-keys', async function (req, res, next) {
   const env = req.body?.env;
   if (env !== 'real' && env !== 'test') {

@@ -1,19 +1,19 @@
 const fs = require('fs/promises');
 const path = require('path');
 
-// Ордер «живой» = размещён на бирже и не дошёл до финального статуса.
+// An order is "live" = placed on the exchange and not yet at a final status.
 const LIVE_STATES = new Set(['NEW', 'PARTIALLY_FILLED']);
 
-// Архивы вида {timestamp}-SYMBOL-exchange.json пишет autoRestart — не сканируем.
+// Archives like {timestamp}-SYMBOL-exchange.json are written by autoRestart — skip.
 const ARCHIVE_RE = /^\d+-/;
 
 /**
- * Сканирует каталог data/ на конфиги с живыми ордерами (NEW/PARTIALLY_FILLED
- * с orderId). Такие ордера висят на бирже, но после рестарта сервера цикл по
- * ним не ходит, а write-lock Save не действует — файл с живыми orderId можно
- * молча перезаписать (ANALYSIS.md п.1.5).
+ * Scans the data/ directory for configs with live orders (NEW/PARTIALLY_FILLED
+ * with an orderId). Such orders hang on the exchange, but after a server restart
+ * the cycle doesn't walk them and the Save write-lock isn't in effect — a file
+ * with live orderIds could be silently overwritten (ANALYSIS.md item 1.5).
  *
- * @param {string} dataDir - абсолютный путь к каталогу data/.
+ * @param {string} dataDir - absolute path to the data/ directory.
  * @returns {Promise<Array<{symbol:string, file:string, liveOrders:number}>>}
  */
 async function scanLiveCycles(dataDir) {
@@ -21,7 +21,7 @@ async function scanLiveCycles(dataDir) {
   try {
     files = await fs.readdir(dataDir);
   } catch {
-    return []; // каталога нет — нечего восстанавливать
+    return []; // no directory — nothing to recover
   }
 
   const found = [];
@@ -32,10 +32,10 @@ async function scanLiveCycles(dataDir) {
     try {
       const data = JSON.parse(await fs.readFile(path.join(dataDir, file), 'utf8'));
 
-      // Завершённый цикл (Status.DONE) живым не считается: финальный
-      // cancelOpenOrders уже снял страховочные ордера на бирже. В старых
-      // файлах их статусы могли остаться NEW (до фикса markOpenAsCanceled) —
-      // не поднимать по ним ложный ATTENTION.
+      // A finished cycle (Status.DONE) doesn't count as live: the final
+      // cancelOpenOrders already pulled the safety orders on the exchange. In old
+      // files their statuses might have stayed NEW (before the markOpenAsCanceled
+      // fix) — don't raise a false ATTENTION for them.
       if (data.status === 3 /* Status.DONE */) continue;
 
       const orders = [...(data.BUY || []), ...(data.SELL || [])];
@@ -44,12 +44,12 @@ async function scanLiveCycles(dataDir) {
       );
 
       if (live.length > 0) {
-        // symbol из поля pair либо из имени файла SYMBOL-exchange.json
+        // symbol from the pair field or from the file name SYMBOL-exchange.json
         const symbol = String(data.pair || file.split('-')[0]).toUpperCase();
         found.push({ symbol, file, liveOrders: live.length });
       }
     } catch {
-      // битый/недочитанный файл не должен валить старт сервера
+      // a corrupt/partially-read file must not crash server startup
     }
   }
 

@@ -126,8 +126,8 @@ export class SpotWS {
             break;
           case 'notification':
             // generic server-side notification (e.g. price stream lost/restored).
-            // persist:true → несхлопываемый тост (duration false), как у STOP —
-            // напр. статистика возврата средств при остановке цикла.
+            // persist:true → a non-dismissing toast (duration false), like STOP —
+            // e.g. the fund-recovery stats when a cycle is stopped.
             this.notifications.showNotification(
               message.data.message,
               message.data.type || 'info',

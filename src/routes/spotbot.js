@@ -138,7 +138,7 @@ router.post('/:symbol', async function (req, res, next) {
       stepSize: decimalCount(stepSize), // accuracy of quantity
       // Balance precision for SpinBox: long → balance in quote (tickSize), short → in base (stepSize)
       balanceFormat: decimalCount(strategy === 'long' ? tickSize : stepSize),
-      balance: roundToStep(balance, strategy === 'long' ? tickSize : stepSize), // free balance (округляем вниз)
+      balance: roundToStep(balance, strategy === 'long' ? tickSize : stepSize), // free balance (round down)
       minQuoteAsset: roundToStep(minNotional, tickSize, 'ceil'), // min. rate quote currency
       minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize, 'ceil') : 0, // min. base currency rate
       price: ticker,
@@ -304,7 +304,7 @@ router.post('/calculator/param', async (req, res, next) => {
 
     await writeFileAtomic(filePath, jsonString, 'utf8');
 
-    // value, а не msg.value: показать фактически сохранённое (после clamp)
+    // value, not msg.value: show what was actually saved (after clamp)
     res.json({ message: `${msg.key} = <b>${value}</b> saved for ${symbol}` });
   } catch (err) {
     console.error('Error saving param:', err);

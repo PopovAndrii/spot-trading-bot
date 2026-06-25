@@ -10,22 +10,22 @@ const { writeFileAtomic } = require('../lib/atomicWrite');
 const { recoveryStats } = require('../lib/recoveryStats');
 
 /**
- * Решает, нужно ли персистить рост частичного исполнения ордера.
- * Чистая функция — тестируется без биржи (REQUIREMENTS.md п.20).
+ * Decides whether the growth of an order's partial fill should be persisted.
+ * Pure function — testable without the exchange (REQUIREMENTS.md item 20).
  *
- * @param {Object} stored - сохранённый в конфиге ордер (obj[side][id]).
- * @param {Object} message - ответ API (getOrder) по этому ордеру.
+ * @param {Object} stored - the order stored in config (obj[side][id]).
+ * @param {Object} message - the API response (getOrder) for this order.
  * @returns {{executedQty:number, cummulativeQuoteQty:number}|null}
- *   поля для записи, либо null если писать нечего (статус не PARTIALLY_FILLED
- *   или объём исполнения не вырос с прошлого опроса).
+ *   fields to write, or null if there's nothing to write (status isn't
+ *   PARTIALLY_FILLED, or the filled quantity hasn't grown since the last poll).
  */
 /**
- * Помечает в конфиге CANCELED все ордера, реально размещённые на бирже
- * (orderId) и не дошедшие до финального статуса. Вызывается после финального
- * cancelOpenOrders в DONE-ветке: биржа ордера сняла, но в таблице они
- * оставались NEW — recovery-скан после рестарта считал завершённый цикл
- * «живым» (ложный ATTENTION + заблокированный Save).
- * Чистая функция — тестируется без биржи.
+ * Marks as CANCELED in the config every order actually placed on the exchange
+ * (with an orderId) that hasn't reached a final status. Called after the final
+ * cancelOpenOrders in the DONE branch: the exchange pulled the orders, but in the
+ * table they stayed NEW — after a restart the recovery scan treated a finished
+ * cycle as "live" (false ATTENTION + a locked Save).
+ * Pure function — testable without the exchange.
  */
 function markOpenAsCanceled(obj) {
   for (const side of ['BUY', 'SELL']) {
@@ -110,10 +110,10 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
-   * Внеочередной тик readLoop — реакция на executionReport (ANALYSIS п.10).
-   * 50 мс — дебаунс на случай шквала отчётов (серия частичных исполнений).
-   * Если проход уже идёт (busy) — ничего не делаем: он подхватит свежие
-   * статусы через getOrder, а следующий тик запланирует readLoop как обычно.
+   * Out-of-band readLoop tick — a reaction to executionReport (ANALYSIS item 10).
+   * 50 ms is a debounce in case of a burst of reports (a series of partial fills).
+   * If a pass is already running (busy) — do nothing: it'll pick up the fresh
+   * statuses via getOrder, and the next tick schedules readLoop as usual.
    */
   #kickTick() {
     if (!this.running[this.symbol]) return;
@@ -123,13 +123,13 @@ class JsonTimerSender extends EventEmitter {
     this.timer = setTimeout(() => this.readLoop(), 50);
   }
 
-  // периодическое напоминание о слотах, снятых вручную и не
-  // переустановленных — позиция по ним висит открытой, пока человек не решит.
-  // Первое срабатывание — сразу при обнаружении (в т.ч. после рестарта сервера,
-  // когда manual переживает в файле), затем не чаще REMIND_MS. Канал — logBus,
-  // как у прочих операционных алертов (обрыв сети, орфан-остаток).
+  // periodic reminder about slots pulled manually and not re-placed — the position
+  // on them stays open until the person decides. The first trigger fires
+  // immediately on detection (including after a server restart, when manual
+  // survives in the file), then no more often than REMIND_MS. The channel is
+  // logBus, like other operational alerts (network drop, orphan leftover).
   #remindManualStuck(obj) {
-    const REMIND_MS = 10 * 60 * 1000; // 10 минут
+    const REMIND_MS = 10 * 60 * 1000; // 10 minutes
     const stuck = manualStuckSlots(obj, this.manualReplaces);
     if (stuck.length === 0) {
       this.manualReminderAt = 0;
@@ -143,8 +143,8 @@ class JsonTimerSender extends EventEmitter {
     const line = `⏸️ ${this.symbol}: ${stuck.length} order(s) pulled manually and not re-placed (${list}) — position stays open until you re-place or sell.`;
     console.log(line);
     logBus.log(line);
-    // Тост поверх UI — заметно при свёрнутой консоли. Самосхлопывающийся
-    // (persist не ставим) — это лишь напоминание, не блокирующее событие.
+    // A toast over the UI — visible when the console is collapsed. Self-dismissing
+    // (we don't set persist) — it's just a reminder, not a blocking event.
     this.emit('manualStuck', { symbol: this.symbol, text: line });
   }
 
@@ -165,11 +165,11 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
-   * При сетевом обрыве все вызовы к бирже возвращают
-   * { success:false }, итератор делает continue — состояние не двигается, но
-   * лимитки на бирже тем временем матчатся сами. Считаем подряд идущие неудачи
-   * и ОДИН раз пишем в консоль, что цикл идёт вслепую; на первом успехе после
-   * серии — сообщаем о восстановлении. Торговую логику не трогаем.
+   * On a network drop, every call to the exchange returns { success:false }, the
+   * iterator does continue — state doesn't move, but the limit orders on the
+   * exchange keep matching by themselves in the meantime. We count consecutive
+   * failures and write ONCE to the console that the cycle is running blind; on the
+   * first success after a streak — report recovery. We don't touch trading logic.
    */
   #trackApiHealth(result) {
     const ALERT_AT = 5;
@@ -210,12 +210,12 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
-   * Подмешивает в obj свежие live-правки из файла перед записью итератора.
-   * Проход #jobIterator долгий (sleep на каждый ордер) и пишет ВЕСЬ obj целиком:
-   * без мерджа правка param (/calculator/param) или restart (/calculator/restart),
-   * сделанная во время прохода, молча терялась — lost update (ANALYSIS.md п.1.3).
-   * Ордера (BUY/SELL) не трогаем: их единственный писатель во время цикла — сам
-   * итератор (Save заблокирован write-lock'ом, пока пара running).
+   * Mixes fresh live edits from the file into obj before the iterator writes.
+   * A #jobIterator pass is long (a sleep per order) and writes the WHOLE obj: without
+   * the merge, a param edit (/calculator/param) or restart (/calculator/restart) made
+   * during the pass would be silently lost — a lost update (ANALYSIS.md item 1.3).
+   * We don't touch orders (BUY/SELL): their only writer during a cycle is the
+   * iterator itself (Save is held by a write-lock while the pair is running).
    */
   #applyManualPulls(obj) {
     for (const side of ['BUY', 'SELL']) {
@@ -318,7 +318,7 @@ class JsonTimerSender extends EventEmitter {
       return res || { success: false, message: 'replace failed' };
     }
 
-    // размещён → больше не «снятый», движок опрашивает его как обычный NEW
+    // placed → no longer "pulled", the engine polls it as a normal NEW
     this.manualPulls[side].delete(index);
     this.manualReplaces[side].set(index, {
       status: 'NEW',
@@ -356,24 +356,25 @@ class JsonTimerSender extends EventEmitter {
         });
       }
     } catch {
-      // файла нет/битый — пишем что есть; writeFileAtomic не даст битого JSON
+      // file missing/corrupt — write what we have; writeFileAtomic won't emit broken JSON
     }
 
-    // in-memory ручные отмены этой сессии — наносим перед записью (на случай,
-    // если файл их ещё не содержит до первого тика после отмены). Переустановки
-    // (manualReplaces) сюда НЕ наносим: они одноразовые и персистятся в readLoop.
+    // in-memory manual cancels of this session — apply before writing (in case the
+    // file doesn't contain them yet before the first tick after the cancel).
+    // Re-places (manualReplaces) are NOT applied here: they're one-shot and persisted in readLoop.
     this.#applyManualPulls(obj);
   }
 
   /**
-   * Шаг 3: сетка набора исчерпана (все entry FILLED) и закрытия перекрылись
-   * (≥2 живых NEW — залповый залив по фитилю). Усредняться больше нечем, а
-   * несколько закрытий висят на куски одной позиции. Действие: снять перекрытые
-   * закрытия на бирже, записать ОДНО закрытие на самый глубокий индекс набора
-   * (объём/цена по rebalancedClose = avg×(1+profit+comm) — ровно то, что job
-   * поставит при Start), остановить цикл и уведомить. Лимитку сами НЕ дёргаем:
-   * через минуту обычно отскок, и человек решает — Start (бот выставит этот
-   * close) или продать вручную выше. Возвращает true, если подготовка сделана.
+   * Step 3: the entry grid is exhausted (all entries FILLED) and the closes
+   * overlapped (≥2 live NEW — a burst fill on a wick). There's nothing left to
+   * average into, while several closes hang on pieces of one position. Action:
+   * pull the overlapping closes on the exchange, write ONE close at the deepest
+   * entry index (quantity/price via rebalancedClose = avg×(1+profit+comm) — exactly
+   * what job would place on Start), stop the cycle and notify. We don't poke the
+   * limit order ourselves: there's usually a bounce within a minute, and the person
+   * decides — Start (the bot places this close) or sell manually higher. Returns
+   * true if the preparation was done.
    */
   async #maybePrepareRecoveryClose(obj, strategy) {
     if (!needsRecoveryConsolidation(obj, strategy.method)) return false;
@@ -386,7 +387,7 @@ class JsonTimerSender extends EventEmitter {
 
     const res = await this.#runToApi({ method: 'cancelOpenOrders', data: { symbol: this.symbol } });
     if (!res || res.success === false) return false;
-    markOpenAsCanceled(obj); // снятые NEW → CANCELED в таблице
+    markOpenAsCanceled(obj); // pulled NEWs → CANCELED in the table
 
     obj[closeSide][k] = {
       ...obj[closeSide][k],
@@ -398,7 +399,7 @@ class JsonTimerSender extends EventEmitter {
     obj.date_modified = new Date().toISOString();
     await this.#mergeLiveEdits(obj);
     await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
-    this.emit('tableData', obj); // обновить таблицу в UI сразу
+    this.emit('tableData', obj); // refresh the UI table immediately
 
     const line = `🧰 ${this.symbol}: grid fully filled — consolidated to one ${closeSide} of ${reb.quantity} ${this.baseAsset || ''} @ ${reb.price}. Stopped: press Start to place it, or sell manually.`;
     console.log(line);
@@ -631,7 +632,7 @@ class JsonTimerSender extends EventEmitter {
         };
 
         userStream.on('executionReport', this.onExecReport);
-        userStream.start(); // повторный start() — no-op (isStarted)
+        userStream.start(); // a repeated start() is a no-op (isStarted)
       }
 
       const streamAPI = api.getPublicStream(symbol);

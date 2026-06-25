@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { partialFillDelta } = require('../modules/jsonTimerSender');
 
-// REQUIREMENTS.md п.20 — persist a partial fill while the status stays unchanged.
+// REQUIREMENTS.md item 20 — persist a partial fill while the status stays unchanged.
 // PARTIALLY_FILLED is hard to reproduce on the exchange, so we check the pure
 // function with synthetic getOrder responses.
 
@@ -50,8 +50,8 @@ test('invalid executedQty → treated as 0', () => {
   });
 });
 
-// Финальный cancelOpenOrders снимает страховочные ордера на бирже; их отмена
-// должна фиксироваться в таблице (иначе вечные NEW + ложный ATTENTION).
+// The final cancelOpenOrders pulls the safety orders on the exchange; their
+// cancellation must be recorded in the table (otherwise eternal NEW + false ATTENTION).
 const { markOpenAsCanceled } = require('../modules/jsonTimerSender');
 
 test('markOpenAsCanceled: placed NEW/PARTIALLY_FILLED → CANCELED, finals untouched', () => {
@@ -59,7 +59,7 @@ test('markOpenAsCanceled: placed NEW/PARTIALLY_FILLED → CANCELED, finals untou
     BUY: [
       { status: 'FILLED', orderId: 1 },
       { status: 'NEW', orderId: 2 },
-      { status: null, orderId: null }, // не размещался — не трогаем
+      { status: null, orderId: null }, // never placed — leave it
     ],
     SELL: [
       { status: 'PARTIALLY_FILLED', orderId: 3 },

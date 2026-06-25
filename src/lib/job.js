@@ -8,19 +8,19 @@ const Status = Object.freeze({
 });
 
 const state = Object.freeze({
-  NEW: 'NEW', // Ордер создан, но ещё не исполнен
-  CANCELED: 'CANCELED', // Ордер был отменён пользователем до исполнения
-  PARTIALLY_FILLED: 'PARTIALLY_FILLED', // Ордер частично исполнен, но ещё не завершён полностью.
-  FILLED: 'FILLED', // Ордер полностью исполнен
-  PENDING_CANCEL: 'PENDING_CANCEL', // Идёт процесс отмены ордера (редко используется)
-  REJECTED: 'REJECTED', // Ордер был отклонён системой Binance (например, из-за ошибок)
-  EXPIRED: 'EXPIRED', // Ордер истёк по времени (например, LIMIT GTC может быть отменён по тайм-ауту или из-за сетевых сбоев)
+  NEW: 'NEW', // Order created but not yet executed
+  CANCELED: 'CANCELED', // Order was canceled by the user before execution
+  PARTIALLY_FILLED: 'PARTIALLY_FILLED', // Order partially executed, not yet fully complete
+  FILLED: 'FILLED', // Order fully executed
+  PENDING_CANCEL: 'PENDING_CANCEL', // Cancellation in progress (rarely used)
+  REJECTED: 'REJECTED', // Order rejected by the Binance system (e.g. due to errors)
+  EXPIRED: 'EXPIRED', // Order expired by time (e.g. a LIMIT GTC may be canceled on timeout or network failures)
 });
 
-// Самый глубокий индекс ордера со статусом FILLED (или -1). Для long это buy,
-// для short — sell: индекс, до которого реально набрана позиция. Нужен, чтобы
-// не объявить цикл завершённым, пока ниже исполнившегося закрытия остались
-// залитые ордера набора (орфан-инвентарь после «слепого» окна).
+// Deepest index of an order with status FILLED (or -1). For long this is buy,
+// for short it is sell: the index up to which a position is actually held. Needed
+// so we do not declare the cycle complete while filled entry orders remain below
+// an executed close (orphan inventory after a "blind" window).
 function deepestFilledIndex(arr) {
   if (!Array.isArray(arr)) return -1;
   for (let j = arr.length - 1; j >= 0; j--) {
@@ -29,41 +29,41 @@ function deepestFilledIndex(arr) {
   return -1;
 }
 
-// Этап 3c: объём/цена закрывающего ордера с учётом реально проданного/выкупленного
-// в частично исполненных и отменённых закрытиях за цикл.
-// Возвращает { quantity, price } (строки, округлённые по step/tick) либо null —
-// тогда вызывающий использует предрасчётные значения из конфига.
+// Stage 3c: quantity/price of the closing order, accounting for what was actually
+// sold/bought back across partially filled and canceled closes during the cycle.
+// Returns { quantity, price } (strings, rounded by step/tick) or null — in which
+// case the caller uses the precomputed values from config.
 function rebalancedClose(obj, i, strategy) {
-  const entrySide = strategy === 'long' ? 'BUY' : 'SELL'; // чем набирали позицию
-  const closeSide = strategy === 'long' ? 'SELL' : 'BUY'; // чем закрываем
+  const entrySide = strategy === 'long' ? 'BUY' : 'SELL'; // what we built the position with
+  const closeSide = strategy === 'long' ? 'SELL' : 'BUY'; // what we close with
 
-  // Набор позиции: реально исполненные ордера 0..i.
+  // Position entry: actually filled orders 0..i.
   const entries = [];
   for (let k = 0; k <= i; k++) {
     const e = obj[entrySide][k];
     if (!e || e.status !== state.FILLED) continue;
     if (e.executedQty === undefined || e.cummulativeQuoteQty === undefined) {
-      return null; // неполные данные (старый конфиг) → фолбэк на предрасчёт
+      return null; // incomplete data (old config) → fall back to precompute
     }
     entries.push(e);
   }
 
-  // Закрытия, реально что-то закрывшие (частичные/отменённые с исполнением).
+  // Closes that actually closed something (partial/canceled-with-fill).
   const closes = (obj[closeSide] || []).filter((c) => (Number(c.executedQty) || 0) > 0);
-  if (closes.length === 0) return null; // партиалов не было → предрасчёт
+  if (closes.length === 0) return null; // no partials → precompute
 
   const profit = parseFloat(obj['param']['field-profit']) || 0;
   const commission = parseFloat(obj['param']['field-commission']) || 0;
 
   const res = rebalanceClose(entries, closes, strategy, profit + commission);
-  if (!res) return null; // позиция уже закрыта целиком
+  if (!res) return null; // position already fully closed
 
   const stepSize = parseInt(obj['param']['field-stepSize'], 10) || 0;
   const tickSize = parseInt(obj['param']['field-tickSize'], 10) || 0;
   const stepPow = 10 ** stepSize;
 
   return {
-    // floor по объёму — чтобы не пытаться закрыть больше, чем реально держим
+    // floor the quantity — so we don't try to close more than we actually hold
     quantity: (Math.floor(res.quantity * stepPow) / stepPow).toFixed(stepSize),
     price: res.price.toFixed(tickSize),
   };
@@ -72,15 +72,15 @@ function rebalancedClose(obj, i, strategy) {
 class Job {
   constructor(test = false) {
     this.test = test;
-    // Биржевые лимиты для реконсиляции орфан-остатка. Прокидываются из
-    // jsonTimerSender при старте цикла (exchangeInfo). 0 = неизвестны (тест или
-    // сбой запроса) → #belowMin не срабатывает, поведение как раньше.
+    // Exchange limits for reconciling the orphan leftover. Passed in from
+    // jsonTimerSender at cycle start (exchangeInfo). 0 = unknown (test or a
+    // failed request) → #belowMin never triggers, behavior stays as before.
     this.minQty = 0;
     this.minNotional = 0;
   }
 
-  // Остаток меньше биржевых лимитов (LOT_SIZE.minQty / NOTIONAL.minNotional)?
-  // Если лимиты неизвестны (0) — считаем, что проходит (не блокируем закрытие).
+  // Is the leftover below exchange limits (LOT_SIZE.minQty / NOTIONAL.minNotional)?
+  // If the limits are unknown (0) — treat it as passing (don't block the close).
   #belowMin(qty, price) {
     const q = parseFloat(qty) || 0;
     const p = parseFloat(price) || 0;
@@ -92,14 +92,14 @@ class Job {
   long = (obj, i, el) => {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-    // Закрытие всей позиции висит на ОДНОМ sell верхнего исполненного buy-индекса;
-    // нижние sell отменяются (CANCELED) или вовсе не выставлялись (null) как
-    // устаревшие — для них pass правилен, ПОКА закрытие делегировано вверх, т.е.
-    // buy[i+1] тоже FILLED. null здесь — орфан после «слепого» окна: несколько
-    // buy залились разом, а sell нижнего индекса исполнился раньше, чем закрытие
-    // успело переползти вниз; нижние закрытия так и не выставились. Без higherFilled
-    // (верхний sell CANCELED, а buy[i+1] не исполнился) позиция осталась бы без
-    // закрытия — тогда переставляем.
+    // The whole-position close hangs on ONE sell at the topmost filled buy index;
+    // lower sells are canceled (CANCELED) or were never placed (null) as stale —
+    // pass is correct for them WHILE the close is delegated upward, i.e. buy[i+1]
+    // is also FILLED. null here is an orphan after a "blind" window: several buys
+    // filled at once and a lower-index sell executed before the close could crawl
+    // down; the lower closes were never placed. Without higherFilled (the upper
+    // sell is CANCELED and buy[i+1] did not fill) the position would be left with
+    // no close — then we re-place.
     const higherFilled = obj['BUY'][i + 1]?.status === state.FILLED;
     if (
       el.status === state.FILLED &&
@@ -126,11 +126,11 @@ class Job {
     if (obj['SELL'][i].status !== state.FILLED) {
       switch (el.status) {
         case state.FILLED:
-          // Отменить ЛЮБОЕ живое нижнее закрытие, не только i-1. При залповом
-          // заливе промежуточные индексы проходят как «делегировано вверх»
-          // (guard выше), и активное закрытие может остаться на индексе < i-1.
-          // Оно резервирует базовый баланс → новый close упрётся в -2010
-          // insufficient balance. Отменяем по одному за проход, пока есть живые.
+          // Cancel ANY live lower close, not just i-1. During a burst fill the
+          // intermediate indices pass as "delegated upward" (guard above), and the
+          // active close may remain at an index < i-1. It reserves the base balance
+          // → a new close hits -2010 insufficient balance. Cancel one per pass while
+          // live ones remain.
           for (let j = i - 1; j >= 0; j--) {
             const prev = obj['SELL'][j];
             if (
@@ -158,14 +158,14 @@ class Job {
             if (obj['SELL'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
             }
-            const reb = rebalancedClose(obj, i, 'long'); // null → предрасчёт
+            const reb = rebalancedClose(obj, i, 'long'); // null → precompute
             const quantity = reb ? reb.quantity : obj['SELL'][i].quantity;
             const price = reb ? reb.price : obj['SELL'][i].price;
 
-            // Орфан-инвентарь: часть позиции уже продал исполнившийся нижний
-            // sell, остаток меньше биржевого минимума — закрытие не выставить.
-            // Завершаем цикл и помечаем leftover: итератор уведомит, что мелочь
-            // осталась на балансе (решение за пользователем).
+            // Orphan inventory: part of the position was already sold by a filled
+            // lower sell, and the leftover is below the exchange minimum — the close
+            // can't be placed. End the cycle and mark leftover: the iterator notifies
+            // that dust is left on the balance (the user decides what to do).
             if (this.#belowMin(quantity, price)) {
               return {
                 status: Status.DONE,
@@ -275,12 +275,12 @@ class Job {
       }
 
       if (obj['SELL'][i].status === state.FILLED) {
-        // Закрытие на индексе i исполнилось. DONE правомерен ТОЛЬКО если i —
-        // самый глубокий залитый buy. Если ниже есть исполненные buy (k>i) —
-        // орфан после «слепого» окна (sell проскочил между падением и отскоком):
-        // позиция закрыта лишь частично. Не завершаем цикл — pass отдаёт ход
-        // нижним индексам, которые доставят закрытие на остаток (guard выше +
-        // case FILLED с rebalancedClose).
+        // The close at index i executed. DONE is valid ONLY if i is the deepest
+        // filled buy. If there are filled buys below (k>i) — an orphan after a
+        // "blind" window (the sell slipped through between the drop and the bounce):
+        // the position is only partially closed. Don't end the cycle — pass yields
+        // to the lower indices, which deliver a close for the leftover (guard above
+        // + case FILLED with rebalancedClose).
         if (deepestFilledIndex(obj['BUY']) > i) {
           return { status: 'pass', method: false, side: null, id: i, data: {} };
         }
@@ -302,10 +302,10 @@ class Job {
   short = (obj, i, el) => {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
-    // Зеркально long: закрытие short висит на ОДНОМ buy верхнего исполненного
-    // sell-индекса. pass по нижнему buy (CANCELED или ещё не выставленному null —
-    // орфан после слепого окна) допустим только когда закрытие делегировано вверх
-    // (sell[i+1] тоже FILLED); иначе переставляем.
+    // Mirror of long: the short close hangs on ONE buy at the topmost filled
+    // sell index. pass on a lower buy (CANCELED, or a not-yet-placed null — an
+    // orphan after a blind window) is allowed only when the close is delegated
+    // upward (sell[i+1] is also FILLED); otherwise we re-place.
     const higherFilled = obj['SELL'][i + 1]?.status === state.FILLED;
     if (
       el.status === state.FILLED &&
@@ -332,9 +332,9 @@ class Job {
     if (obj['BUY'][i].status !== state.FILLED) {
       switch (el.status) {
         case state.FILLED:
-          // Зеркально long: отменить ЛЮБОЕ живое нижнее закрытие (buy), не только
-          // i-1 — при залповом заливе активное закрытие может застрять ниже и
-          // резервировать quote-баланс → -2010 на новом close.
+          // Mirror of long: cancel ANY live lower close (buy), not just i-1 —
+          // during a burst fill the active close may get stuck lower and reserve
+          // the quote balance → -2010 on the new close.
           for (let j = i - 1; j >= 0; j--) {
             const prev = obj['BUY'][j];
             if (
@@ -361,13 +361,13 @@ class Job {
             if (obj['BUY'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
             }
-            const reb = rebalancedClose(obj, i, 'short'); // null → предрасчёт
+            const reb = rebalancedClose(obj, i, 'short'); // null → precompute
             const quantity = reb ? reb.quantity : obj['BUY'][i].quantity;
             const price = reb ? reb.price : obj['BUY'][i].price;
 
-            // Орфан-инвентарь: часть позиции уже выкупил исполнившийся нижний buy,
-            // остаток меньше биржевого минимума — закрытие не выставить. Завершаем
-            // цикл и помечаем leftover для уведомления.
+            // Orphan inventory: part of the position was already bought back by a
+            // filled lower buy, and the leftover is below the exchange minimum — the
+            // close can't be placed. End the cycle and mark leftover for notification.
             if (this.#belowMin(quantity, price)) {
               return {
                 status: Status.DONE,
@@ -477,8 +477,8 @@ class Job {
       }
 
       if (obj['BUY'][i].status === state.FILLED) {
-        // Зеркально long: DONE правомерен только если i — самый глубокий залитый
-        // sell. Ниже остался исполненный sell (k>i) → орфан, цикл не завершаем.
+        // Mirror of long: DONE is valid only if i is the deepest filled sell. A
+        // filled sell remains below (k>i) → orphan, don't end the cycle.
         if (deepestFilledIndex(obj['SELL']) > i) {
           return { status: 'pass', method: false, side: null, id: i, data: {} };
         }

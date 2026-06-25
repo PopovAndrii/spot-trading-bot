@@ -3,8 +3,8 @@ export class LoadDataFromFileCalculator {
     this.selectObjectElement = select;
     this.notifications = notifications;
     this.loadDataCalculator = loadDataCalculator;
-    // Геттер текущего инстанса SpinBox: он пересоздаётся при смене стратегии
-    // (setStrategy → destroy + new), поэтому держим функцию, а не прямую ссылку.
+    // Getter for the current SpinBox instance: it's recreated on a strategy change
+    // (setStrategy → destroy + new), so we keep a function, not a direct reference.
     this.getSpinBox = getSpinBox;
 
     this.orderType = colors;
@@ -37,9 +37,9 @@ export class LoadDataFromFileCalculator {
   }
 
   /**
-   * Применяет конфиг пары к UI (стратегия, свитч Restart, спинбоксы, таблица).
-   * Единый путь для начального fetch (getStateCalculator) и push-обновлений
-   * 'tableData' по WebSocket (SpotWS) — поллинг /spotbot/table больше не нужен.
+   * Applies a pair's config to the UI (strategy, Restart switch, spinboxes, table).
+   * A single path for the initial fetch (getStateCalculator) and 'tableData' push
+   * updates over WebSocket (SpotWS) — polling /spotbot/table is no longer needed.
    */
   applyState(data) {
     if (!data || !data.param) return;
@@ -79,21 +79,21 @@ export class LoadDataFromFileCalculator {
 
     document.querySelectorAll('[id^="field-"]').forEach((el) => {
       const value = obj.param[el.id] ?? '';
-      // Пишем значение НАПРЯМУЮ, без spinBox.setValue: пакет всегда клампит к
-      // data-min/max (SpinBox.d.ts: «always clamped to min/max»). Сохранённый
-      // field-indent="0" (его пишет restartCycle) клампился к min 0.01 и сдвигал
-      // пересчёт сетки в /calculator/result (606.36 → 606.30) — таблица расходилась
-      // с файлом и реально выставленными ордерами. Прямое присваивание .value НЕ
-      // эмитит ui-spinbox-change, поэтому лишних пересчётов/live-записей нет —
-      // ровно поведение v1.0.4. Стрелки +/- во время цикла залочены (params-locked),
-      // их синхронизация тут косметическая.
+      // Write the value DIRECTLY, without spinBox.setValue: the package always
+      // clamps to data-min/max (SpinBox.d.ts: "always clamped to min/max"). A saved
+      // field-indent="0" (written by restartCycle) was clamped to min 0.01 and
+      // shifted the grid recompute in /calculator/result (606.36 → 606.30) — the
+      // table diverged from the file and the actually placed orders. A direct .value
+      // assignment does NOT emit ui-spinbox-change, so there are no extra
+      // recomputes/live writes — exactly the v1.0.4 behavior. The +/- arrows are
+      // locked during a cycle (params-locked), so syncing them here is cosmetic.
       el.value = value;
     });
 
-    // Таблицу НЕ строим здесь: её авторитетно рендерит loadDataCalculator.calculate()
-    // (вызывается сразу после в getStateCalculator) одним `tbody.innerHTML = html` —
-    // со статус-цветами и бейджами реального исполнения. Дублирующий рендер тут
-    // дописывал строки `innerHTML += row` без очистки tbody → «двойная» таблица
-    // мелькала при каждом автоопросе робота (REQUIREMENTS.md п.26).
+    // We do NOT build the table here: it's authoritatively rendered by
+    // loadDataCalculator.calculate() (called right after in getStateCalculator) with
+    // a single `tbody.innerHTML = html` — with status colors and real-fill badges.
+    // A duplicate render here appended rows `innerHTML += row` without clearing
+    // tbody → a "double" table flickered on every robot auto-poll (REQUIREMENTS.md item 26).
   }
 }

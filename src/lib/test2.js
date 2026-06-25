@@ -233,28 +233,28 @@ let conf = {
 };
 
 let next = null;
-// инициализация цикла
+// cycle initialization
 const DM = new DynamicMartingail(conf, true);
 console.log(DM.getOrderInsufficient());
 
-// 0 ордер. если он не установлен, установить
+// order 0. if it isn't placed, place it
 next = DM.calculateCurrentOrderParams();
 
 console.log(`🟢 ${JSON.stringify(next)}\n`);
 DM.addExecutedOrder(conf.price); // or next.price after first order
 
-// если 0 ордер исполнен - получить его цену из файла или из конфига так как это старт цена
+// if order 0 is filled — get its price from the file or config, since it's the start price
 next = DM.calculateCurrentOrderParams(conf.price);
 console.log(`🟢 ${JSON.stringify(next)}\n`);
-// если не исполнен, прервать цикл. слушать
+// if not filled, break the cycle and listen
 DM.addExecutedOrder(next.priceBuy);
 
-// если 1 ордер исполнен - получить его цену сохраненного ордера 1 из файла
+// if order 1 is filled — get the saved order-1 price from the file
 next = DM.calculateCurrentOrderParams(next.priceBuy - 0.5);
 console.log(`🟢 ${JSON.stringify(next)}\n`);
 DM.addExecutedOrder(next.priceBuy);
 
-// если 2 ордер исполнен - получить его цену сохраненного ордера 2 из файла
+// if order 2 is filled — get the saved order-2 price from the file
 next = DM.calculateCurrentOrderParams(next.priceBuy);
 console.log(`🟢 ${JSON.stringify(next)}\n`);
 DM.addExecutedOrder(next.priceBuy);

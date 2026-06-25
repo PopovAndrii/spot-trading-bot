@@ -1,6 +1,6 @@
-// Проверка пары API key+secret через подписанный запрос к приватному
-// эндпоинту аккаунта. Проверить можно только ПАРУ (секрет подписывает запрос),
-// и только против «своего» baseURL: real → api.binance.com, test → testnet.
+// Validate an API key+secret pair via a signed request to the private account
+// endpoint. Only the PAIR can be checked (the secret signs the request), and only
+// against its "own" baseURL: real → api.binance.com, test → testnet.
 const { Spot } = require('@binance/connector');
 
 const ENVS = {
@@ -16,10 +16,10 @@ const ENVS = {
   },
 };
 
-// Первые 5 символов ключа (для превью) или null, если не задан.
+// First 5 characters of the key (for preview), or null if not set.
 const preview = (value) => (value ? value.slice(0, 5) : null);
 
-// Превью и факт наличия обеих пар — для серверного рендера страницы.
+// Preview and presence of both pairs — for server-side rendering of the page.
 function getKeysInfo() {
   const build = (env) => {
     const { keyVar, secretVar } = ENVS[env];
@@ -34,7 +34,7 @@ function getKeysInfo() {
   return { real: build('real'), test: build('test') };
 }
 
-// Реальная проверка пары: signed-запрос account(). Валидно → 200 + права.
+// Real pair check: a signed account() request. Valid → 200 + permissions.
 async function checkKeys(env) {
   const cfg = ENVS[env];
   if (!cfg) return { success: false, message: 'Unknown environment' };

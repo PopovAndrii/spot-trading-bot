@@ -1,9 +1,9 @@
 <head>
   <script>
     (function () {
-      // Всегда выставляем явный data-theme: в ui-elements 0.4.0 без него
-      // включается авто-тёмная тема по ОС (prefers-color-scheme), что
-      // рассинхронит компоненты со светлой страницей проекта.
+      // Always set an explicit data-theme: in ui-elements 0.4.0, without it the
+      // OS auto-dark theme (prefers-color-scheme) kicks in, which desyncs the
+      // components from the project's light page.
       try {
         var t = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', t);

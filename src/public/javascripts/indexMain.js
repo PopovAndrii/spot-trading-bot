@@ -27,9 +27,9 @@ btn?.addEventListener('ui-button-change', () => {
   if (navigateUrl) window.location.href = navigateUrl;
 });
 
-// Донат: копирование адреса в буфер обмена (всё локально, без сети).
-// navigator.clipboard есть только в защищённом контексте (https/localhost);
-// по http://<IP> его нет, поэтому держим запасной путь через execCommand.
+// Donation: copy the address to the clipboard (all local, no network).
+// navigator.clipboard exists only in a secure context (https/localhost);
+// over http://<IP> it's absent, so we keep a fallback via execCommand.
 async function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
     await navigator.clipboard.writeText(text);
@@ -66,8 +66,8 @@ document.querySelectorAll('.donate-card__copy').forEach((button) => {
   });
 });
 
-// Инфо-блоки на главной: кнопка "yes" помечает блок прочитанным (localStorage)
-// и скрывает его; при повторном заходе прочитанные блоки не показываем.
+// Info blocks on the home page: the "yes" button marks a block as read (localStorage)
+// and hides it; on a return visit we don't show read blocks.
 (() => {
   const STORE_KEY = 'index-massege-read';
   const section = document.querySelector('.index-massege');
@@ -109,7 +109,7 @@ document.querySelectorAll('.donate-card__copy').forEach((button) => {
   syncSection();
 })();
 
-// Проверка пары ключей (real | test): подписанный запрос делает сервер.
+// Check a key pair (real | test): the server makes the signed request.
 document.querySelectorAll('[data-check]').forEach((button) => {
   button.addEventListener('ui-button-change', async (e) => {
     const env = e.detail.value;

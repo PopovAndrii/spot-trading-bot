@@ -1,12 +1,12 @@
-// Инактивити-гард сессии: индикатор обратного отсчёта + авто-логаут.
-// При активности пользователя продлевает rolling-сессию пингом на сервер.
+// Session inactivity guard: a countdown indicator + auto-logout.
+// On user activity it extends the rolling session with a ping to the server.
 export class SessionGuard {
   constructor() {
     this.maxAgeMs = null;
     this.lastActivity = Date.now();
     this.lastPing = 0;
-    this.pingThrottleMs = 5 * 60 * 1000; // не чаще раза в 5 минут
-    this.warnBeforeMs = 5 * 60 * 1000; // подсветка за 5 минут до конца
+    this.pingThrottleMs = 5 * 60 * 1000; // no more than once every 5 minutes
+    this.warnBeforeMs = 5 * 60 * 1000; // highlight 5 minutes before the end
     this.indicator = document.getElementById('session-timer');
 
     this.#init();
@@ -16,13 +16,13 @@ export class SessionGuard {
     let info;
     try {
       const res = await fetch('/api/session', { headers: { Accept: 'application/json' } });
-      if (!res.ok) return; // не авторизован / редирект на /login
+      if (!res.ok) return; // not authorized / redirect to /login
       info = await res.json();
     } catch {
       return;
     }
 
-    if (!info.enabled || !info.maxAge) return; // логин отключён
+    if (!info.enabled || !info.maxAge) return; // login disabled
 
     this.maxAgeMs = info.maxAge;
 

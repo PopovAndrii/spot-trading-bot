@@ -80,10 +80,10 @@
             </div>
           </div>
 
-          <!-- Эти параметры остаются доступными во время работы робота: Active orders /
-               Request frequency / Restart. Поэтому они вынесены ИЗ #group-spinbox, который
-               блокируется (.params-locked) на время цикла. Их изменения пишутся в файл
-               на лету (см. LoadDataCalculator.runtimeParams / Restart). -->
+          <!-- These params stay available while the robot is running: Active orders /
+               Request frequency / Restart. That's why they're kept OUT of #group-spinbox,
+               which is locked (.params-locked) during a cycle. Their changes are written
+               to the file on the fly (see LoadDataCalculator.runtimeParams / Restart). -->
           <div id="group-runtime" class="line">
             <div class="">
               <%- include('../views/ui/SpinBox', { id:'field-activeOrders' , label:'Active orders' , min:2, max:50, step:0, hint:'Number of active orders. Can be changed while the bot is running' }); %>
