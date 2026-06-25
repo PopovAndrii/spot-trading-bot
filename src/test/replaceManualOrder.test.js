@@ -75,6 +75,34 @@ test('replaceManualOrder: places slot qty at user price, records the replace', a
   assert.ok(sender.timer, 'kicked an out-of-band tick to persist the re-place'); // shrink crash window
 });
 
+test('replaceManualOrder: snaps price to tickSize decimals (PRICE_FILTER)', async () => {
+  const { sender, calls } = await setup();
+  // grid carrying price precision (tickSize = 2 decimals) in param
+  await fs.writeFile(filePath, JSON.stringify({
+    param: { 'field-tickSize': 2 },
+    BUY: [{ status: 'CANCELED', orderId: 1, quantity: '0.5', price: '100', manual: true }],
+    SELL: [],
+  }), 'utf8');
+  sender.manualPulls.BUY.add(0);
+
+  const r = await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101.567' });
+
+  assert.equal(r.success, true);
+  assert.equal(calls[0].price, '101.57'); // snapped, not the raw 101.567
+  assert.match(r.message, /101\.57/);
+  assert.equal(sender.manualReplaces.BUY.get(0).price, '101.57');
+});
+
+test('replaceManualOrder: no tickSize in config → sends price as-is', async () => {
+  const { sender, calls } = await setup(); // fixture grid() has no param
+  sender.manualPulls.BUY.add(0);
+
+  const r = await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101.567' });
+
+  assert.equal(r.success, true);
+  assert.equal(calls[0].price, '101.567'); // unchanged fallback
+});
+
 test('replaceManualOrder: persisted manual cancel (after restart) → allowed', async () => {
   // manualPulls empty (fresh process), but the grid file carries CANCELED+manual
   // on slot 0 — reconstruct the pull from the file so ＋ is not a dead button.
