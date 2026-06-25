@@ -55,6 +55,26 @@ function needsRecoveryConsolidation(obj, strategy) {
   return closes.filter((c) => c?.status === 'NEW').length >= 2;
 }
 
+// Item 10 (риск №4): слоты, снятые пользователем вручную (manual) и НЕ
+// переустановленные — движок их не трогает (job manual-guard → pass), поэтому
+// позиция остаётся открытой до решения человека. Возвращает [{side,index}] таких
+// слотов, чтобы readLoop периодически напоминал о них. `pending` (manualReplaces)
+// исключается: его слот уже переустановлен и вот-вот потеряет manual. Чистая
+// функция — тестируется без биржи.
+function manualStuckSlots(obj, pending = { BUY: new Map(), SELL: new Map() }) {
+  const out = [];
+  for (const side of ['BUY', 'SELL']) {
+    const arr = obj?.[side];
+    if (!Array.isArray(arr)) continue;
+    arr.forEach((o, i) => {
+      if (o && o.manual === true && o.status === 'CANCELED' && !pending[side]?.has(i)) {
+        out.push({ side, index: i });
+      }
+    });
+  }
+  return out;
+}
+
 function partialFillDelta(stored, message) {
   if (!message || message.status !== 'PARTIALLY_FILLED') return null;
   if (message.executedQty === undefined) return null;
@@ -104,6 +124,11 @@ class JsonTimerSender extends EventEmitter {
     // replaceManualOrder() кладёт сюда после размещения на бирже; #applyManualReplaces
     // наносит NEW+orderId+price и снимает manual — та же бесфайловая модель.
     this.manualReplaces = { BUY: new Map(), SELL: new Map() };
+
+    // Item 10 (риск №4): время последнего напоминания о застрявшем ручном слоте.
+    // 0 = активного напоминания нет; #remindManualStuck сбрасывает в 0, когда
+    // застрявших слотов не осталось (re-place/новый цикл) — следующий сработает сразу.
+    this.manualReminderAt = 0;
   }
 
   getSpotStatus(symbol) {
@@ -122,6 +147,28 @@ class JsonTimerSender extends EventEmitter {
 
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.readLoop(), 50);
+  }
+
+  // Item 10 (риск №4): периодическое напоминание о слотах, снятых вручную и не
+  // переустановленных — позиция по ним висит открытой, пока человек не решит.
+  // Первое срабатывание — сразу при обнаружении (в т.ч. после рестарта сервера,
+  // когда manual переживает в файле), затем не чаще REMIND_MS. Канал — logBus,
+  // как у прочих операционных алертов (обрыв сети, орфан-остаток).
+  #remindManualStuck(obj) {
+    const REMIND_MS = 10 * 60 * 1000; // 10 минут
+    const stuck = manualStuckSlots(obj, this.manualReplaces);
+    if (stuck.length === 0) {
+      this.manualReminderAt = 0;
+      return;
+    }
+    const now = Date.now();
+    if (now - this.manualReminderAt < REMIND_MS) return;
+    this.manualReminderAt = now;
+
+    const list = stuck.map((s) => `${s.side} #${s.index + 1}`).join(', ');
+    const line = `⏸️ ${this.symbol}: ${stuck.length} order(s) pulled manually and not re-placed (${list}) — position stays open until you re-place or sell.`;
+    console.log(line);
+    logBus.log(line);
   }
 
   async #runToApi(data = {}) {
@@ -625,6 +672,10 @@ class JsonTimerSender extends EventEmitter {
           .finally(() => { this.busy = false; });
       }
 
+      // Напоминание о застрявшем ручном слоте (риск №4). После applyManualReplaces:
+      // только что переустановленный слот уже потерял manual в data и не считается.
+      this.#remindManualStuck(data);
+
       // clamp: битые/отсутствующие параметры дают NaN|0 → setTimeout(…, NaN)
       // сработал бы через 0 мс — тугая петля чтения ФС (ANALYSIS.md п.1.2)
       this.interval = Math.max(
@@ -681,6 +732,7 @@ class JsonTimerSender extends EventEmitter {
       // новый цикл = свежая сетка, ручные отмены/переустановки прошлого неактуальны
       this.manualPulls = { BUY: new Set(), SELL: new Set() };
       this.manualReplaces = { BUY: new Map(), SELL: new Map() };
+      this.manualReminderAt = 0;
 
       const api = InvokeApi.getInstance();
 
@@ -875,3 +927,4 @@ module.exports = JsonTimerSender;
 module.exports.partialFillDelta = partialFillDelta;
 module.exports.markOpenAsCanceled = markOpenAsCanceled;
 module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
+module.exports.manualStuckSlots = manualStuckSlots;
