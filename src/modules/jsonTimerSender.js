@@ -143,6 +143,9 @@ class JsonTimerSender extends EventEmitter {
     const line = `⏸️ ${this.symbol}: ${stuck.length} order(s) pulled manually and not re-placed (${list}) — position stays open until you re-place or sell.`;
     console.log(line);
     logBus.log(line);
+    // Тост поверх UI — заметно при свёрнутой консоли. Самосхлопывающийся
+    // (persist не ставим) — это лишь напоминание, не блокирующее событие.
+    this.emit('manualStuck', { symbol: this.symbol, text: line });
   }
 
   async #runToApi(data = {}) {

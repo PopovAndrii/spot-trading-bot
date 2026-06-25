@@ -145,6 +145,18 @@ class WebSocketRouter {
                 }
               });
 
+              // Напоминание о застрявшем ручном слоте (риск №4): самосхлопывающийся
+              // warning-тост (без persist), как обычное уведомление. Текст посчитан
+              // в jsonTimerSender (#remindManualStuck, read-only).
+              ts.on('manualStuck', (data) => {
+                for (const client of this.clients.get(data.symbol) || []) {
+                  this.safeSend(client, {
+                    event: 'notification',
+                    data: { message: data.text, type: 'warning' },
+                  });
+                }
+              });
+
               ts.on('restarted', (data) => {
                 console.log(`🔄 Cycle restarted for ${data.symbol} at price ${data.price}`);
 
