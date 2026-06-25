@@ -5,9 +5,12 @@ const path = require('node:path');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 
 // DEEP_ANALYSIS_PLAN.md Item 10 — manual single-order re-place (replaceManualOrder).
-// Contract: only a slot pulled THIS session (manualPulls) may be re-placed — its
-// order is surely cancelled, so a new placement can't double the live order. Place
-// on the exchange FIRST with the slot's quantity (server-sourced, not client) and
+// Contract: re-place only a manually-pulled, already-CANCELED slot — its order is
+// surely off the book, so a new placement can't double a live one. "Pulled" means
+// an in-session pull (manualPulls) OR a persisted `manual` flag in the grid file
+// (survives a process restart, when manualPulls is empty). CANCELED is required in
+// both cases because manualPulls is now set optimistically, before the cancel ACK.
+// Place on the exchange with the slot's quantity (server-sourced, not client) and
 // the user's price, then record the replace so the engine adopts it as a normal
 // NEW. A failed/invalid call records nothing and leaves the pull intact (retryable).
 // Pure unit: the exchange call is mocked, the grid file is a throwaway fixture.
@@ -61,14 +64,40 @@ test('replaceManualOrder: places slot qty at user price, records the replace', a
   });
 });
 
-test('replaceManualOrder: slot not pulled this session → fail, no API call', async () => {
-  const { sender, calls } = await setup(); // manualPulls empty
+test('replaceManualOrder: persisted manual cancel (after restart) → allowed', async () => {
+  // manualPulls empty (fresh process), but the grid file carries CANCELED+manual
+  // on slot 0 — reconstruct the pull from the file so ＋ is not a dead button.
+  const { sender, calls } = await setup();
 
   const r = await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101' });
+
+  assert.equal(r.success, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].quantity, '0.5');
+});
+
+test('replaceManualOrder: not manually pulled (no flag, not in set) → fail', async () => {
+  // slot 1 is a live NEW order the user never pulled — must never be re-placed over.
+  const { sender, calls } = await setup(); // manualPulls empty
+
+  const r = await sender.replaceManualOrder({ side: 'BUY', index: 1, price: '99' });
 
   assert.equal(r.success, false);
   assert.equal(calls.length, 0);
   assert.equal(sender.manualReplaces.BUY.size, 0);
+});
+
+test('replaceManualOrder: pulled but not CANCELED yet (optimistic window) → fail', async () => {
+  // manualPulls is set optimistically before the cancel ACK (resurrection fix), so
+  // a slot still NEW on the exchange must be rejected — placing now would double it.
+  const { sender, calls } = await setup();
+  sender.manualPulls.BUY.add(1); // slot 1 is still NEW in the fixture
+
+  const r = await sender.replaceManualOrder({ side: 'BUY', index: 1, price: '99' });
+
+  assert.equal(r.success, false);
+  assert.match(r.message, /not cancelled/);
+  assert.equal(calls.length, 0);
 });
 
 test('replaceManualOrder: not running / invalid price → fail, no API call', async () => {

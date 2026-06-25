@@ -275,12 +275,6 @@ class JsonTimerSender extends EventEmitter {
     ) {
       return { success: false, message: 'invalid replace request' };
     }
-    // только слот, снятый вручную в этой сессии: его ордер точно отменён на бирже,
-    // повторное размещение не задвоит живой ордер.
-    if (!this.manualPulls[side].has(index)) {
-      return { success: false, message: 'order was not manually pulled' };
-    }
-
     // объём берём из слота сетки, не из клиента (денежная величина — серверная).
     let slot;
     try {
@@ -291,6 +285,21 @@ class JsonTimerSender extends EventEmitter {
     }
     if (!slot || slot.quantity == null) {
       return { success: false, message: 'order slot not found' };
+    }
+
+    // Переустанавливать можно только слот, снятый ВРУЧНУЮ и уже отменённый на
+    // бирже — иначе повторное размещение задвоит живой ордер. Источник истины:
+    // in-session pull (manualPulls) ИЛИ persisted-флаг manual в файле — последний
+    // переживает рестарт процесса, когда manualPulls пуст (иначе ＋ в UI висел бы
+    // мёртвой кнопкой). В обоих случаях требуем CANCELED: manualPulls теперь
+    // ставится оптимистично ДО ACK отмены, поэтому сам по себе уже не доказывает,
+    // что ордер снят на бирже.
+    const pulledManually = this.manualPulls[side].has(index) || slot.manual === true;
+    if (!pulledManually) {
+      return { success: false, message: 'order was not manually pulled' };
+    }
+    if (slot.status !== 'CANCELED') {
+      return { success: false, message: 'order is not cancelled yet' };
     }
 
     const res = await this.#runToApi({
