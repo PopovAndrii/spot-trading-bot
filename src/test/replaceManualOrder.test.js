@@ -26,12 +26,18 @@ const grid = () => ({
   SELL: [],
 });
 
+const senders = [];
+
 async function setup() {
   await fs.writeFile(filePath, JSON.stringify(grid()), 'utf8');
 
   const sender = new JsonTimerSender({}, 'long');
   sender.symbol = SYMBOL;
   sender.running[SYMBOL] = true;
+  // A successful re-place kicks an out-of-band tick (#kickTick) to persist soon.
+  // Stub readLoop so that tick is a no-op here — we assert the schedule, not the
+  // full loop (which would reschedule itself and keep the test process alive).
+  sender.readLoop = async () => {};
 
   const calls = [];
   sender.API = {
@@ -40,10 +46,14 @@ async function setup() {
       return { success: true, message: { orderId: 999, status: 'NEW' } };
     },
   };
+  senders.push(sender);
   return { sender, calls };
 }
 
-test.after(() => fs.unlink(filePath).catch(() => {}));
+test.after(() => {
+  for (const s of senders) clearTimeout(s.timer);
+  return fs.unlink(filePath).catch(() => {});
+});
 
 test('replaceManualOrder: places slot qty at user price, records the replace', async () => {
   const { sender, calls } = await setup();
@@ -62,6 +72,7 @@ test('replaceManualOrder: places slot qty at user price, records the replace', a
     orderId: 999,
     price: '101.5',
   });
+  assert.ok(sender.timer, 'kicked an out-of-band tick to persist the re-place'); // shrink crash window
 });
 
 test('replaceManualOrder: persisted manual cancel (after restart) → allowed', async () => {

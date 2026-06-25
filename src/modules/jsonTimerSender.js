@@ -325,6 +325,14 @@ class JsonTimerSender extends EventEmitter {
       orderId: res.message.orderId,
       price: String(price),
     });
+
+    // Ордер уже живёт на бирже, но запись в файл (applyManualReplaces) ждёт
+    // ближайшего тика — до него orderId есть только в памяти, и краш процесса
+    // оставил бы живой ордер без отражения в сетке. Пинаем внеочередной тик
+    // (~50 мс), чтобы persist прошёл почти сразу; прямую запись файла здесь не
+    // делаем — итератор переписывает файл целиком и затёр бы её (lost update).
+    this.#kickTick();
+
     return { success: true, message: `${side} #${index + 1} re-placed @ ${priceNum}` };
   }
 
