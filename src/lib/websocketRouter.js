@@ -3,8 +3,6 @@ const JsonTimerSender = require('../modules/jsonTimerSender.js');
 const { pair, statusPair } = require('./pair.js');
 const { UserStreamAPI } = require('./UserStreamApi.js');
 
-// Валидация входящих сообщений (ANALYSIS.md п.1.1): авторизованный клиент с
-// битым payload не должен ронять процесс вместе с торговыми циклами.
 const MESSAGE_TYPES = new Set(['subscribe', 'start', 'restartSync', 'stop', 'cancelOrder', 'replaceOrder']);
 const SYMBOL_RE = /^[A-Z0-9]{3,20}$/;
 const STRATEGIES = new Set(['short', 'long']);
@@ -21,9 +19,7 @@ class WebSocketRouter {
     this.startHeartbeat();
   }
 
-  // Зомби-сокеты (закрытый ноутбук, обрыв NAT) не эмитят 'close' и висели бы
-  // в комнатах вечно. Стандартный паттерн ws: ping каждые 30 с; кто не ответил
-  // pong к следующему тику — terminate (это уже эмитит 'close' → уборка комнат).
+  // zombie sockets
   startHeartbeat() {
     this.heartbeat = setInterval(() => {
       this.wss.clients.forEach((ws) => {
@@ -58,8 +54,6 @@ class WebSocketRouter {
           return this.safeSend(ws, { error: 'www JSON error' });
         }
 
-        // try/catch вокруг всего тела: TypeError из обработчика — это
-        // uncaughtException и падение процесса со всеми торговыми циклами
         try {
           if (!data || typeof data !== 'object' || !MESSAGE_TYPES.has(data.type)) {
             return this.safeSend(ws, { error: 'unknown message type' });
@@ -73,15 +67,10 @@ class WebSocketRouter {
               return this.safeSend(ws, { error: 'invalid symbol' });
             }
 
-            // strategy на subscribe опциональна: фронт шлёт null, пока конфиг
-            // пары ещё не загружен (LoadDataFromFileCalculator.getStrategyName)
             if (data.strategy != null && !STRATEGIES.has(data.strategy)) {
               return this.safeSend(ws, { error: 'invalid strategy' });
             }
 
-            // resubscribe на другой символ: отписать сокет от прежней комнаты,
-            // иначе он навсегда остаётся в Set старого символа и получает чужие
-            // рассылки (раздел 3 ANALYSIS)
             if (currentSymbol && currentSymbol !== symbol) {
               this.clients.get(currentSymbol)?.delete(ws);
             }
@@ -97,9 +86,6 @@ class WebSocketRouter {
               const ts = new JsonTimerSender(this.wss, data.strategy);
               this.timerSenders.set(currentSymbol, ts);
 
-              // sym — зафиксированный символ этого ts. Обработчики ниже живут
-              // на ts, а closure-переменная currentSymbol принадлежит соединению
-              // и мутирует при resubscribe — рассылка ушла бы не в ту комнату.
               const sym = currentSymbol;
 
               // add symbol at ones
@@ -132,7 +118,6 @@ class WebSocketRouter {
                 this.#maybeCleanup(symbol);
               });
 
-              // полный конфиг каждый тик readLoop — только подписчикам символа
               ts.on('tableData', (tableData) => {
                 for (const client of this.clients.get(sym) || []) {
                   this.safeSend(client, { event: 'tableData', data: tableData });
@@ -151,9 +136,6 @@ class WebSocketRouter {
                 }
               });
 
-              // Статистика возврата при остановке: несхлопываемый тост
-              // (persist:true → duration false на клиенте), как «Pause of Spot
-              // Trading». Сама фраза посчитана в jsonTimerSender (read-only).
               ts.on('recovery', (data) => {
                 for (const client of this.clients.get(data.symbol) || []) {
                   this.safeSend(client, {
@@ -183,7 +165,6 @@ class WebSocketRouter {
             const status = ts.getSpotStatus(currentSymbol);
             this.safeSend(ws, { event: 'spotStatus', data: status });
 
-            // recovery-скан пометил символ: живые ордера на бирже без цикла
             if (pair.needsAttention(currentSymbol)) {
               this.safeSend(ws, {
                 event: 'notification',
@@ -226,9 +207,14 @@ class WebSocketRouter {
             }
           }
 
-          // Item 10: ручная отмена одного ордера. Идёт на инстанс бота этого
-          // символа — отмена сериализована с тиком цикла (без файловой гонки).
           if (data.type === 'cancelOrder' && currentSymbol) {
+            // Expert Mode gate, server-enforced (Item 10, risk #5): manual order
+            // ops require the client to assert expert:true. Defense-in-depth for a
+            // single-user app — guards against a stray/replayed/buggy emission, not
+            // a hostile client (already authenticated).
+            if (data.expert !== true) {
+              return this.safeSend(ws, { error: 'expert mode required' });
+            }
             const ts = this.timerSenders.get(currentSymbol);
             if (!ts) {
               return this.safeSend(ws, { error: 'no active cycle' });
@@ -251,9 +237,11 @@ class WebSocketRouter {
               });
           }
 
-          // Item 10: ручная переустановка одного снятого ордера по новой цене.
-          // Тот же инстанс бота — сериализовано с тиком (без файловой гонки).
           if (data.type === 'replaceOrder' && currentSymbol) {
+            // Expert Mode gate, server-enforced (Item 10, risk #5) — see cancelOrder.
+            if (data.expert !== true) {
+              return this.safeSend(ws, { error: 'expert mode required' });
+            }
             const ts = this.timerSenders.get(currentSymbol);
             if (!ts) {
               return this.safeSend(ws, { error: 'no active cycle' });
@@ -307,9 +295,6 @@ class WebSocketRouter {
     });
   }
 
-  // timerSender жил вечно даже без клиентов и без цикла (утечка + слушатели).
-  // Убираем, когда некому слушать И цикл не работает; следующий subscribe
-  // создаст свежий инстанс, статус пары хранится в pair и переживает уборку.
   #maybeCleanup(symbol) {
     const ts = this.timerSenders.get(symbol);
     if (!ts) return;
@@ -332,9 +317,6 @@ class WebSocketRouter {
     }
   }
 
-  // Graceful shutdown (ANALYSIS п.12): остановить циклы и стримы, закрыть
-  // клиентов. Файлы не трогаем — записи атомарны, recovery-скан пометит
-  // живые ордера при следующем старте.
   shutdown() {
     clearInterval(this.heartbeat);
 
@@ -342,7 +324,6 @@ class WebSocketRouter {
       if (ts.getSpotStatus(symbol)) ts.stop();
     });
 
-    // user data stream один на аккаунт — закрыть и отпустить listenKey
     if (UserStreamAPI.hasInstance()) {
       UserStreamAPI.removeInstance();
     }

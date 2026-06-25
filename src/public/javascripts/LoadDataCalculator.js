@@ -318,6 +318,18 @@ export class LoadDataCalculator {
       let payload;
       try { payload = JSON.parse(btn.dataset.value); } catch { return; }
 
+      // Expert Mode gate is server-enforced, not only CSS: emit a manual order op
+      // only while the switch is on (source of truth = .expert-on on the table).
+      // Buttons are hidden otherwise, so this also drops a stray/replayed event.
+      // The flag travels to the bot, which rejects cancel/replace without it.
+      const expertOn = table.classList.contains('expert-on');
+      if ((payload.action === 'cancel' || payload.action === 'replace') && !expertOn) {
+        this.notifications.showNotification(
+          'Enable Expert Mode to manage individual orders', 'warning', 5000
+        );
+        return;
+      }
+
       if (payload.action === 'cancel') {
         // already cancelling this one (button held disabled across re-renders)
         if (this._pendingCancel.has(`${payload.side}:${payload.index}`)) return;
@@ -340,7 +352,7 @@ export class LoadDataCalculator {
         // Real cancel: send to this symbol's bot via WS (SpotWS sets the
         // callback). The bot cancels on the exchange and marks the order
         // manual:true so the engine won't re-place it.
-        this.onCancelOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId });
+        this.onCancelOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, expert: true });
         // Hold the ✕ disabled until the order turns CANCELED+manual (✕ → ＋):
         // the key survives the per-tick re-render (node.disabled would not), and
         // the current node is disabled too for instant feedback before re-render.
@@ -373,7 +385,7 @@ export class LoadDataCalculator {
           );
           return;
         }
-        this.onReplaceOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, price });
+        this.onReplaceOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, price, expert: true });
         return;
       }
     });

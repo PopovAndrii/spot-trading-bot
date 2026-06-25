@@ -25,16 +25,17 @@ export class SpotWS {
     };
 
     // Item 10: manual single-order cancel → tell this symbol's bot over WS.
-    this.loadDataCalculator.onCancelOrder = ({ side, index, orderId }) => {
+    // `expert` carries the Expert Mode gate to the server (rejected without it).
+    this.loadDataCalculator.onCancelOrder = ({ side, index, orderId, expert }) => {
       if (this.#isWebSocketOpen(this.ws)) {
-        this.ws.send(JSON.stringify({ type: 'cancelOrder', symbol: base + quote, side, index, orderId }));
+        this.ws.send(JSON.stringify({ type: 'cancelOrder', symbol: base + quote, side, index, orderId, expert }));
       }
     };
 
     // Item 10: manual re-place of a pulled order at a new price → tell the bot.
-    this.loadDataCalculator.onReplaceOrder = ({ side, index, price }) => {
+    this.loadDataCalculator.onReplaceOrder = ({ side, index, price, expert }) => {
       if (this.#isWebSocketOpen(this.ws)) {
-        this.ws.send(JSON.stringify({ type: 'replaceOrder', symbol: base + quote, side, index, price }));
+        this.ws.send(JSON.stringify({ type: 'replaceOrder', symbol: base + quote, side, index, price, expert }));
       }
     };
 
@@ -56,7 +57,7 @@ export class SpotWS {
     this.ws = new WebSocket(`${protocol}${location.host}`);
 
     this.ws.onopen = () => {
-      this.reconnectAttempts = 0; // успешное подключение — сбросить backoff
+      this.reconnectAttempts = 0;
       this.notifications.showNotification('Web Socket open', 'success');
       this.ws.send(
         JSON.stringify({
@@ -79,17 +80,13 @@ export class SpotWS {
               this.#btnRule(true);
               this.notifications.showNotification('Table data loaded. Bot in progress.', 'success');
               this.isRunning = true;
-              // начальная отрисовка; дальше таблица приходит push-событием
-              // 'tableData' на каждом тике робота — поллинг не нужен
               this.loadDataFromFileCalculator.getStateCalculator();
             } else {
-              // Бот не запущен (в т.ч. после падения/рестарта сервера) — снять блокировку
               this.#btnRule(false);
               this.isRunning = false;
             }
             break;
           case 'tableData':
-            // push полного конфига от readLoop (только наша комната символа)
             this.loadDataFromFileCalculator.applyState(message.data);
             break;
           case 'updateTableData':
@@ -100,9 +97,6 @@ export class SpotWS {
             if (message.data === 0) {
               this.#btnRule(false);
               this.isRunning = false;
-              // финальное обновление таблицы — показать итоговые статусы/цвета
-              // (синий на закрытом SELL) без перезагрузки страницы; push больше
-              // не придёт (цикл остановлен), поэтому единичный fetch
               this.loadDataFromFileCalculator.getStateCalculator();
             }
             break;
@@ -144,9 +138,6 @@ export class SpotWS {
             const text = document.querySelector('.stream-currency');
 
             if (text) {
-              // Точность цены берём из tickSize пары (число знаков после
-              // запятой), иначе дешёвые пары (DOGE/SHIB) схлопнутся в 0.00.
-              // field-tickSize уже хранит decimalCount (как в LoadDataCalculator).
               const tickEl = document.querySelector('#field-tickSize');
               const tick = parseInt(tickEl?.value, 10);
               const price = parseFloat(message.data.c);
@@ -165,9 +156,6 @@ export class SpotWS {
     this.ws.onclose = (event) => {
       this.notifications.showNotification(`Web Socket closed: ${event.code}`, 'info');
 
-      // Экспоненциальный backoff вместо вечных ретраев каждые 2 с: при 401
-      // (истёкшая сессия отбивает upgrade) клиент спамил нотификациями
-      // бесконечно. После лимита — предложение перелогиниться.
       this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
 
       if (this.reconnectAttempts > 8) {
@@ -264,14 +252,9 @@ export class SpotWS {
 
     const lock = Boolean(status);
 
-    // Блокируем всю область параметров (стратегия + спинбоксы + select прогрессии).
-    // Start и переключатель Restart остаются доступными.
     document.querySelector('.UIbg')?.classList.toggle('params-locked', lock);
     document.getElementById('group-spinbox')?.classList.toggle('params-locked', lock);
 
-    // Блокируем Calculate и Save на время работы. Именно атрибут disabled, а не
-    // класс: пакет UIb гасит клик/события только по :disabled / [aria-disabled],
-    // CSS-правила для класса .disabled у UIb нет.
     const settingsCalculate = document.getElementById('settings-calculate');
     settingsCalculate.disabled = Boolean(status);
 
@@ -281,9 +264,6 @@ export class SpotWS {
     const cancelAllOrders = document.getElementById('cancel-all-orders');
     cancelAllOrders.disabled = Boolean(status);
 
-    // Delete current series доступна только после Cancel all orders. На любой
-    // смене статуса цикла (start/stop) сбрасываем в disabled — заново её активирует
-    // лишь успешная отмена ордеров (CancelAllOrders.enable()).
     const deleteCurrentSeries = document.getElementById('delete-current-series');
     if (deleteCurrentSeries) deleteCurrentSeries.disabled = true;
 
