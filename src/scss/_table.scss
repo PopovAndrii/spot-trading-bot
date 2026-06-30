@@ -2,7 +2,7 @@
 
 .t {
   width: 100%;
-  margin: 1rem 0;
+  margin: 1rem 0 0 0;
   background-color: $c-g-50;
   border-spacing: 0;
   border-collapse: collapse;
@@ -72,6 +72,69 @@
   line-height: 1.2;
   white-space: nowrap;
   text-align: center;
+}
+
+// Current resting price of a manually re-placed order (Item 10): the column
+// keeps the planned grid price; this accent badge is the live price the order
+// actually rests at. Warning accent = "you changed this from the plan".
+.price-badge {
+  background: $c-w-100;
+  color: $c-w-900;
+}
+
+// Per-order manual actions (Item 10): hover-revealed cancel/replace buttons
+// (ui-elements UIb) inside the Buy/Sell currency cells. The cell reserves right
+// padding so the floating button overlays the empty space without shifting the
+// number; the button's own look/colors come from the ui-elements package.
+.t .act-cell {
+  position: relative;
+  padding-right: 3rem;
+}
+
+// Expert Mode gate (Item 10): the cancel/replace controls are rendered every
+// tick but stay hidden until the table gets .expert-on from the Expert switch.
+// Without it, drop the reserved right padding so the numbers don't get pushed.
+.t:not(.expert-on) .row-actions {
+  display: none;
+}
+
+.t:not(.expert-on) .act-cell {
+  padding-right: 0.25rem;
+}
+
+.row-actions {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  gap: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.t tbody tr:hover .row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+// Re-place state (Item 10): a user-pulled order (CANCELED+manual) shows the ＋
+// re-place button ALWAYS (not hover) next to its price — the row is waiting for a
+// manual re-place. Clicking ＋ opens the price-editor popup (priceDialog); the
+// new price is NOT edited inline, since the table re-renders every tick.
+.t .act-cell:has(.row-actions--edit) {
+  padding-right: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.row-actions--edit {
+  position: static;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 // Responsive collapse: on tablet/phone (<=768px) hide the first two columns

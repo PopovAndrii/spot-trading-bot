@@ -1,7 +1,15 @@
-// CommonJS, как и весь остальной бэкенд (ANALYSIS п.14): раньше файл был
-// единственным ESM-модулем и работал только благодаря require(esm) в Node ≥22.
+// CommonJS, like the rest of the backend (ANALYSIS item 14): this file used to be
+// the only ESM module and worked only thanks to require(esm) in Node ≥22.
 class Calculator {
-  constructor(constructorData, strategy = 'long') {
+  // The grid is built by a factory, not the constructor: `new Calculator()` now
+  // returns a normal instance (instanceof works); the entry point is the static
+  // build(). Previously the constructor returned an array (return this.factory()),
+  // so `new Calculator()` yielded a non-Calculator — a classic antipattern.
+  static build(constructorData, strategy = 'long') {
+    return new Calculator(constructorData).factory(strategy);
+  }
+
+  constructor(constructorData) {
     const params = this.parseNumbers(constructorData);
 
     // BTCUSDT
@@ -24,8 +32,6 @@ class Calculator {
     this.data = Object.assign(defaultData, params);
     // this.data = defaultData;
     // console.log(this.data)
-
-    return this.factory(strategy);
   }
 
   factory = (strategy) => {
@@ -92,7 +98,7 @@ class Calculator {
 
       let sellCurrency = ((spentTotal / totalSell) * (100 + this.data['field-profit'] + this.data['field-commission'])) / 100;
 
-      // Потрачено в quote-валюте (деньги = price × qty); точность quote = tickSize цены
+      // Spent in quote currency (money = price × qty); quote precision = price tickSize
       const spentQuote = actualSpent.toFixed(this.data['field-tickSize']);
 
       mainObj.push({
@@ -168,7 +174,7 @@ class Calculator {
 
       let buyPrice = ((spentTotalMoney / sellTotalCoins) * (100 - (this.data['field-profit'] + this.data['field-commission']))) / 100;
 
-      // Потрачено в quote-валюте (деньги = qty × price); точность quote = tickSize цены
+      // Spent in quote currency (money = qty × price); quote precision = price tickSize
       const spentQuote = (currentOrderSell * sellPrice).toFixed(this.data['field-tickSize']);
 
       mainObj.push({

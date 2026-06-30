@@ -5,14 +5,19 @@ const { isTestnet } = require('./runMode');
 const logBus = require('./logBus');
 
 class InvokeApi {
-  static instance = null;
+  static #instance = null;
+
+  // Single entry point for the client: a singleton without the "constructor
+  // returns a different instance" antipattern. Previously `new InvokeApi()`
+  // returned an already-existing object — instanceof survived it, but the
+  // behavior was non-obvious. Now the constructor always builds a new object,
+  // and the shared client is obtained via getInstance() (all callers switched).
+  static getInstance() {
+    if (!InvokeApi.#instance) InvokeApi.#instance = new InvokeApi();
+    return InvokeApi.#instance;
+  }
 
   constructor() {
-    if (InvokeApi.instance) {
-      // console.log('❕ InvokeApi already exists, returning it ❕');
-      return InvokeApi.instance;
-    }
-
     // isTestnet() already accounts for a safe fallback (real without keys → testnet).
     const testnet = isTestnet();
 
@@ -32,15 +37,13 @@ class InvokeApi {
     }
 
     this.client = new Spot(api_key || '', api_secret || '', { baseURL: baseURL });
-
-    InvokeApi.instance = this;
   }
 
   /**
-   * Повтор запроса при rate-limit (ANALYSIS п.2): 429 → ждём Retry-After
-   * (или растущий дефолт) и пробуем снова, максимум 3 ретрая. 418 (бан IP)
-   * НЕ ретраим — продолжать долбить забаненным IP только продлит бан;
-   * ошибка уйдёт в try/catch вызвавшего метода как обычно.
+   * Retry a request on rate-limit (ANALYSIS item 2): 429 → wait Retry-After (or a
+   * growing default) and try again, up to 3 retries. 418 (IP ban) is NOT retried —
+   * hammering with a banned IP would only extend the ban; the error propagates to
+   * the calling method's try/catch as usual.
    */
   async #withRateLimitRetry(fn) {
     const MAX_RETRIES = 3;
@@ -71,7 +74,7 @@ class InvokeApi {
 
     const icon = status ? '✅' : '❌';
 
-    // local time to web terminal ([HH:MM:SS] в ConsoleLog).
+    // local time to web terminal ([HH:MM:SS] in ConsoleLog).
     const msg = `${icon} ${err}`;
     console.log(msg);
     logBus.log(msg);
@@ -79,12 +82,12 @@ class InvokeApi {
 
   getPublicStream(symbol) {
     if (!symbol) return false;
-    return new StreamAPI(symbol);
+    return StreamAPI.getInstance(symbol);
   }
 
   getUserStream(wssUserURL = null) {
     const url = wssUserURL ? wssUserURL : this.wssUserURL;
-    return new UserStreamAPI(this.client, url);
+    return UserStreamAPI.getInstance(this.client, url);
   }
 
   getClientKey() {
@@ -175,10 +178,10 @@ class InvokeApi {
 
   async openOrders(data) {
     try {
-      // REST openOrders(options) ждёт ОБЪЕКТ; строка-symbol игнорировалась и
-      // запрос уходил без symbol → возвращались открытые ордера ВСЕГО аккаунта
-      // (а не только этой пары). Из-за этого count врал, а проверка перед
-      // удалением серии ложно видела «чужие» ордера.
+      // REST openOrders(options) expects an OBJECT; a string symbol was ignored
+      // and the request went without symbol → it returned open orders for the
+      // WHOLE account (not just this pair). Because of that count lied, and the
+      // pre-delete check for a series falsely saw "foreign" orders.
       const res = await this.#withRateLimitRetry(() => this.client.openOrders({ symbol: data.symbol }));
 
       const msg = { count: res.data.length };
@@ -213,10 +216,10 @@ class InvokeApi {
       this.getConsoleMsg(`cancelOpenOrders() ${data.symbol}`);
       return { success: true, message: res.data.length };
     } catch (err) {
-      // -2011 "Unknown order sent": на бирже нечего отменять (ордера уже
-      // исполнены/сняты, либо гонка с openOrders). Для "отменить все" это не
-      // ошибка, а идемпотентный no-op → success (0 отменено), чтобы вызывающий
-      // мог штатно снять recovery-лок и убрать пару из меню.
+      // -2011 "Unknown order sent": nothing to cancel on the exchange (orders
+      // already filled/pulled, or a race with openOrders). For "cancel all" this
+      // isn't an error but an idempotent no-op → success (0 canceled), so the
+      // caller can normally release the recovery lock and drop the pair from the menu.
       if (err.response?.data?.code === -2011) {
         return { success: true, message: 0 };
       }
@@ -292,7 +295,7 @@ class InvokeApi {
       // if data.symbol empty, Binance return arr for all pairs
       const res = await this.#withRateLimitRetry(() => this.client.bookTicker(data.symbol || ''));
 
-      // Проверка на ошибку в ответе (если API вернуло структуру с ошибкой)
+      // Check for an error in the response (if the API returned an error structure)
       if (res.data?.code < 0) {
         this.getConsoleMsg(res.data.msg, false);
         return { success: false, message: res.data.msg };

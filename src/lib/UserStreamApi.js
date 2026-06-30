@@ -7,11 +7,6 @@ class UserStreamAPI extends EventEmitter {
   constructor(client, wssURL = null) {
     super();
 
-    if (UserStreamAPI.instance) {
-      console.log('❕ UserStreamAPI already exists, returning it ❕');
-      return UserStreamAPI.instance;
-    }
-
     this.client = client;
     this.ws = null;
     this.wssURL = wssURL ? wssURL : `wss://stream.binance.com:9443/ws/`;
@@ -22,8 +17,6 @@ class UserStreamAPI extends EventEmitter {
 
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
-
-    UserStreamAPI.instance = this;
   }
 
   async start() {
@@ -50,7 +43,7 @@ class UserStreamAPI extends EventEmitter {
       });
 
       this.ws.on('message', (data) => {
-        // битый кадр не должен ронять процесс (ANALYSIS п.10)
+        // a corrupt frame must not crash the process (ANALYSIS item 10)
         let json;
         try {
           json = JSON.parse(data);
@@ -79,21 +72,21 @@ class UserStreamAPI extends EventEmitter {
           this.keepAliveTimer = null;
         }
 
-        // Неожиданный обрыв (при штатном stop() слушатели уже сняты и сюда
-        // не попадаем) — переподключаемся, как в StreamAPI
+        // Unexpected drop (on a normal stop() the listeners are already removed
+        // and we don't reach here) — reconnect, like StreamAPI
         this.reconnect();
       });
 
       this.ws.on('error', (err) => {
         console.error('❌ User Stream error:', err.message);
-        // emit('error') без слушателей роняет процесс; реконнект делает
-        // обработчик 'close', который ws эмитит следом за сетевой ошибкой
+        // emit('error') with no listeners crashes the process; reconnection is
+        // handled by the 'close' handler, which ws emits right after a network error
         if (this.listenerCount('error') > 0) {
           this.emit('error', err);
         }
       });
 
-      // Keep-alive: Binance требует продлевать listenKey раз в <60 минут
+      // Keep-alive: Binance requires renewing the listenKey every <60 minutes
       this.keepAliveTimer = setInterval(
         async () => {
           try {
@@ -128,8 +121,8 @@ class UserStreamAPI extends EventEmitter {
   reconnect() {
     this.stop();
 
-    // Не сдаёмся навсегда (как StreamAPI, ANALYSIS п.1.4): после
-    // maxReconnectAttempts продолжаем с потолком задержки, один раз сигналим
+    // Never give up (like StreamAPI, ANALYSIS item 1.4): after
+    // maxReconnectAttempts keep going at the delay cap, signal once
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
     this.reconnectAttempts++;
 
@@ -147,7 +140,7 @@ class UserStreamAPI extends EventEmitter {
     setTimeout(() => {
       this.start()
         .then(() => {
-          this.reconnectAttempts = 0; // ← Сброс при успехе
+          this.reconnectAttempts = 0; // ← Reset on success
         })
         .catch((err) => {
           console.error('❌ Reconnect failed:', err.message);
@@ -177,9 +170,9 @@ class UserStreamAPI extends EventEmitter {
 
     // close listenKey (ignore errors 400)
     if (this.listenKey) {
-      // сигнатура connector'а — строка, не объект (раньше ошибка тонула в catch)
+      // the connector's signature is a string, not an object (the error used to sink in catch)
       this.client.closeListenKey(this.listenKey).catch(() => {
-        // Молча игнорируем (ключ уже протух)
+        // Silently ignore (the key already expired)
       });
       this.listenKey = null;
     }
@@ -199,9 +192,9 @@ class UserStreamAPI extends EventEmitter {
    * @param {*} client
    * @returns
    */
-  static getInstance(client) {
+  static getInstance(client, wssURL = null) {
     if (!UserStreamAPI.instance) {
-      UserStreamAPI.instance = new UserStreamAPI(client);
+      UserStreamAPI.instance = new UserStreamAPI(client, wssURL);
     }
     return UserStreamAPI.instance;
   }

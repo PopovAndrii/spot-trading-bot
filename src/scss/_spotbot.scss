@@ -1,0 +1,12 @@
+.spotbot {
+  &-danger-zone {
+    display: grid;
+    gap: 0.25rem;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+
+    >:nth-child(3) {
+      justify-self: end;
+    }
+  }
+}

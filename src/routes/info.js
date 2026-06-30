@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { InvokeApi } = require('../lib/invokeAPI');
 
-const apiMethod = new InvokeApi();
+const apiMethod = InvokeApi.getInstance();
 
 router.get('/', async function (req, res, next) {
   res.render('info', {

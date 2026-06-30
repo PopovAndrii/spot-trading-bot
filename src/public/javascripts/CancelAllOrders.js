@@ -1,3 +1,5 @@
+import { confirmDialog } from './ui/confirmDialog.js';
+
 export class CancelAllOrders {
   constructor(notifications, deleteCurrentSeries) {
     this.listenerStatus = true;
@@ -8,8 +10,17 @@ export class CancelAllOrders {
     new UiElements.Button();
 
     const orders = document.getElementById('cancel-all-orders');
-    orders?.addEventListener('ui-button-change', (e) => {
+    orders?.addEventListener('ui-button-change', async (e) => {
       if (this.getListenerStatus()) {
+        // Cancel-All wipes every active order on the pair — guard with a confirm.
+        const ok = await confirmDialog({
+          title: 'Cancel ALL orders?',
+          message: `Every active order on ${e.target.dataset.value} will be cancelled on the exchange.`,
+          confirmLabel: 'Cancel all',
+          danger: true,
+        });
+        if (!ok) return;
+
         e.target.disabled = false;
         this.cancel(e.target.dataset.value);
       } else {
@@ -44,9 +55,6 @@ export class CancelAllOrders {
 
       if (data.success) {
         this.notifications.showNotification(`${data.message} active orders cancelled per pair ${currency}`, 'success');
-        // Ордера сняты — пару из меню НЕ убираем (файл серии ещё на диске).
-        // Активируем соседнюю кнопку Delete current series: следующим осознанным
-        // нажатием она перепроверит биржу и удалит файл серии → пара уйдёт.
         this.deleteCurrentSeries?.enable();
       } else {
         this.notifications.showNotification(data.message, 'danger');

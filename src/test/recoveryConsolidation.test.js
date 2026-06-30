@@ -2,9 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { needsRecoveryConsolidation } = require('../modules/jsonTimerSender');
 
-// Шаг 3 — детектор «сетка исчерпана + перекрытые закрытия». Чистая функция,
-// проверяется без биржи. true только когда ВСЕ entry FILLED и ≥2 живых NEW
-// закрытия (типовой итог залпового залива по фитилю на testnet).
+// Step 3 — detector for "entry grid exhausted + overlapping closes". Pure function,
+// testable without the exchange. true only when ALL entries are FILLED and there
+// are ≥2 live NEW closes (the typical result of a burst fill on a testnet wick).
 
 const o = (status, over = {}) => ({ status, orderId: null, ...over });
 

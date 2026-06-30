@@ -1,14 +1,14 @@
-// Утилити-классы под пристрелку адаптивной видимости.
-// Держим кучно и в «пакетном» стиле (чистые generic-классы, без привязки к
-// прикладным селекторам) — когда пороги устаканятся, файл переезжает в пакет
-// @popovandrii/ui-elements как opt-in dist/utils.css по образцу base.css.
+// Utility classes for dialing in responsive visibility.
+// Kept together in a "package" style (pure generic classes, not tied to app
+// selectors) — once the thresholds settle, the file moves into the
+// @popovandrii/ui-elements package as an opt-in dist/utils.css, like base.css.
 //
-// !important здесь оправдан (не атавизм): ui-elements style.css подключается в
-// head ПОСЛЕ нашего style.css, и его правила вроде .UIsp{display:grid} имеют ту
-// же специфичность (0,1,0), но грузятся позже — без !important они перебили бы
-// утилиту на корне компонента. Утилита по определению должна выигрывать.
+// !important here is justified (not cruft): ui-elements style.css is loaded in the
+// head AFTER our style.css, and its rules like .UIsp{display:grid} have the same
+// specificity (0,1,0) but load later — without !important they'd override the
+// utility on the component root. A utility should win by definition.
 
-// --- Прятать по ориентации (любой вьюпорт, включая десктоп) ---
+// --- Hide by orientation (any viewport, including desktop) ---
 .h-portrait {
   @media (orientation: portrait) {
     display: none !important;
@@ -21,7 +21,7 @@
   }
 }
 
-// --- Прятать только на мобильном (порог отсекает десктоп) ---
+// --- Hide on mobile only (the threshold excludes desktop) ---
 .h-portrait-m {
   @media (orientation: portrait) and (max-width: 768px) {
     display: none !important;

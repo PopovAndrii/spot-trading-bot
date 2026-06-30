@@ -4,13 +4,13 @@ export class Theme {
     const icon = document.getElementById('themeIcon');
     const html = document.documentElement;
 
-    // SVG-иконка темы (sun/moon) из спрайта вместо эмодзи: меняем ссылку <use>.
+    // Theme SVG icon (sun/moon) from the sprite instead of an emoji: swap the <use> href.
     const setIcon = (dark) => {
       const use = icon && icon.querySelector('use');
       if (use) use.setAttribute('href', dark ? '/sprite.svg#moon' : '/sprite.svg#sun');
     };
 
-    // Загружаем тему из localStorage
+    // Load the theme from localStorage
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
       html.setAttribute('data-theme', 'dark');
@@ -24,8 +24,8 @@ export class Theme {
         localStorage.setItem('theme', 'dark');
         setIcon(true);
       } else {
-        // Явный 'light', а не removeAttribute: иначе ui-elements 0.4.0
-        // включит авто-тёмную тему по ОС (prefers-color-scheme).
+        // Explicit 'light', not removeAttribute: otherwise ui-elements 0.4.0
+        // turns on the OS auto-dark theme (prefers-color-scheme).
         html.setAttribute('data-theme', 'light');
         localStorage.setItem('theme', 'light');
         setIcon(false);

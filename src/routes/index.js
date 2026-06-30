@@ -6,7 +6,7 @@ const { getPublicIp } = require('../lib/serverIp');
 const { getKeysInfo, checkKeys } = require('../lib/checkKeys');
 const { DONATIONS } = require('../lib/donations');
 
-const apiMethod = new InvokeApi();
+const apiMethod = InvokeApi.getInstance();
 
 router.get('/', async function (req, res, next) {
   const [result, serverIp] = await Promise.all([
@@ -22,7 +22,7 @@ router.get('/', async function (req, res, next) {
   });
 });
 
-// Проверка пары ключей (real | test) подписанным запросом к Binance
+// Check a key pair (real | test) with a signed request to Binance
 router.post('/check-keys', async function (req, res, next) {
   const env = req.body?.env;
   if (env !== 'real' && env !== 'test') {

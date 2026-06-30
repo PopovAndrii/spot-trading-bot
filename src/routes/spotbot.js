@@ -11,7 +11,7 @@ const { archiveIfActive } = require('../lib/cycleArchive');
 const { decimalCount, roundToStep } = require('../lib/format');
 const logBus = require('../lib/logBus');
 
-const API = new InvokeApi();
+const API = InvokeApi.getInstance();
 
 router.get('/:currency', async function (req, res, next) {
   const currency = req.params.currency; // BNBUSDT
@@ -23,9 +23,7 @@ router.get('/:currency', async function (req, res, next) {
   let formatInfo = {};
 
   const exchangeInfo = await API.exchangeInfo({ symbol: currency });
-  // При ошибке API .message — строка, а не объект; без этой проверки
-  // .message.symbols[0] бросал TypeError (async-роут → unhandled rejection,
-  // запрос подвисал вместо внятной error-страницы). ANALYSIS §2 Баги.
+
   if (!exchangeInfo.success) {
     const err = new Error(`Binance API error: ${exchangeInfo.message}`);
     err.status = 502;
@@ -109,9 +107,6 @@ router.post('/:symbol', async function (req, res, next) {
     API.exchangeInfo({ symbol }),
   ]);
 
-  // При ошибке любого из вызовов .message — строка; без проверки
-  // .message.symbols[0] / .message.balances.find бросали TypeError → 500.
-  // Возвращаем внятный JSON с сообщением биржи. ANALYSIS §2 Баги.
   const failed = [account, tickerPrice, exchangeInfo].find((r) => !r.success);
   if (failed) {
     return res.status(502).json({ success: false, message: failed.message });
@@ -143,7 +138,7 @@ router.post('/:symbol', async function (req, res, next) {
       stepSize: decimalCount(stepSize), // accuracy of quantity
       // Balance precision for SpinBox: long → balance in quote (tickSize), short → in base (stepSize)
       balanceFormat: decimalCount(strategy === 'long' ? tickSize : stepSize),
-      balance: roundToStep(balance, tickSize), // free balance (округляем вниз)
+      balance: roundToStep(balance, strategy === 'long' ? tickSize : stepSize), // free balance (round down)
       minQuoteAsset: roundToStep(minNotional, tickSize, 'ceil'), // min. rate quote currency
       minNotional: ticker > 0 ? roundToStep(minNotional / ticker, stepSize, 'ceil') : 0, // min. base currency rate
       price: ticker,
@@ -170,11 +165,6 @@ router.post('/calculator/save', async (req, res, next) => {
       return res.status(409).json({ message: 'Cycle is running — press "Stop" before saving' });
     }
 
-    // Recovery-лок (ANALYSIS п.1.5): рестарт сервера прервал цикл посередине —
-    // в файле живые ордера (NEW/PARTIALLY_FILLED), они висят на бирже, но цикл
-    // по ним не возобновлён. Save затёр бы их orderId — потеря контроля над
-    // реальными ордерами. Завершённые циклы (DONE, без живых ордеров) скан
-    // не помечает — их Save перезаписывает как обычно.
     if (pair.needsAttention(symbol)) {
       return res.status(409).json({
         message: 'Server was restarted with live orders — press "Start" to resume or cancel orders before saving',
@@ -202,8 +192,18 @@ router.post('/calculator/save', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-${exchangeName}.json`);
 
-    // история циклов: прожитый цикл (есть ордера с orderId) снапшотится в
-    // {timestamp}-SYMBOL-binance.json перед перезаписью новым расчётом
+    const open = await API.openOrders({ symbol });
+    if (!open.success) {
+      return res.status(502).json({
+        message: 'Cannot verify the exchange has no live orders — try again, or stop the cycle first',
+      });
+    }
+    if (open.message > 0) {
+      return res.status(409).json({
+        message: `${open.message} live order(s) still resting on the exchange — press "Start" to resume, or cancel them before saving`,
+      });
+    }
+
     const archived = await archiveIfActive(filePath);
     if (archived) {
       console.log(`🗄️ Previous cycle archived: ${path.basename(archived)}`);
@@ -250,8 +250,6 @@ router.post('/calculator/restart', async (req, res, next) => {
 
     await writeFileAtomic(filePath, data, 'utf8');
 
-    // newData.restart выше приведён к boolean — сравнение со строкой "true"
-    // всегда давало false и ответ «off» (ANALYSIS.md п.2, баги)
     const str = newData.restart === true ? "on" : "off";
 
     res.json({ message: `Restart for: ${symbol} is <b>${str}</b>` });
@@ -261,11 +259,6 @@ router.post('/calculator/restart', async (req, res, next) => {
   }
 });
 
-// Live-обновление параметров, не влияющих на расчётную таблицу: Active orders и
-// Request frequency. Эти спинбоксы НЕ блокируются на время работы (вынесены из
-// #group-spinbox), и их изменения должны попадать в файл прямо во время цикла —
-// робот перечитывает конфиг на каждом проходе readLoop. В отличие от /save, здесь
-// НЕТ guard isRunning: правка точечная (только param[key]), ордера не трогаются.
 router.post('/calculator/param', async (req, res, next) => {
   try {
     const msg = req.body.message || {};
@@ -274,9 +267,6 @@ router.post('/calculator/param', async (req, res, next) => {
       return res.status(400).json({ message: 'Pair is required' });
     }
 
-    // Server-side clamp (ANALYSIS п.2): UI-минимумы спинбоксов легко обходятся
-    // прямым POST, а requestFrequency=1 × getOrder на каждый ордер — риск бана
-    // Binance (-1003/418). Границы зеркалят SpinBox'ы в spotbot.ejs.
     const LIMITS = {
       'field-activeOrders': { min: 2, max: 50 },
       'field-requestFrequency': { min: 500, max: 5000 },
@@ -314,7 +304,7 @@ router.post('/calculator/param', async (req, res, next) => {
 
     await writeFileAtomic(filePath, jsonString, 'utf8');
 
-    // value, а не msg.value: показать фактически сохранённое (после clamp)
+    // value, not msg.value: show what was actually saved (after clamp)
     res.json({ message: `${msg.key} = <b>${value}</b> saved for ${symbol}` });
   } catch (err) {
     console.error('Error saving param:', err);
@@ -339,22 +329,13 @@ router.post('/cancel/allorders', async (req, res, next) => {
     return res.status(500).json(result);
   }
 
-  // Живых ордеров на бирже больше нет — снять recovery-лок (ANALYSIS п.1.5),
-  // иначе Save останется заблокированным до перезапуска цикла.
   if (pair.needsAttention(symbol)) {
     pair.updateSymbol({ symbol, status: statusPair.STOP });
   }
 
-  // Пару из меню здесь НЕ убираем: меню = файлы серий на диске, а файл остаётся.
-  // Удаление серии — отдельное осознанное действие (кнопка Delete current series →
-  // POST /series/delete), которое снова проверяет биржу и стирает файл.
   res.json(result);
 });
 
-// Удалить файл текущей серии (SYMBOL-binance.json) → пара уходит из меню.
-// Кнопка активна только после Cancel all orders. Перед удалением ПЕРЕПРОВЕРЯЕМ
-// биржу: если на паре остались живые ордера, файл не трогаем — иначе потеряли бы
-// orderId, по которым потом нечем снять ордера (осиротевшие ордера на бирже).
 router.post('/series/delete', async (req, res) => {
   const rawSymbol = req.body.message;
   if (!rawSymbol) {
@@ -366,7 +347,6 @@ router.post('/series/delete', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid symbol' });
   }
 
-  // Цикл не должен работать (иначе он перезапишет файл следующим тиком).
   if (pair.isRunning(symbol)) {
     return res.status(409).json({ success: false, message: 'Cycle is running — press Stop first' });
   }
@@ -389,12 +369,10 @@ router.post('/series/delete', async (req, res) => {
     if (err.code !== 'ENOENT') {
       return res.status(500).json({ success: false, message: `Failed to delete series file: ${err.message}` });
     }
-    // ENOENT — файла и так нет, считаем удаление успешным (идемпотентно).
   }
 
   pair.deleteSymbol(symbol);
-  // чистим историю логов пары, иначе после перезагрузки страницы её вкладка-
-  // фильтр в консоли вернётся из replay logBus.history().
+
   logBus.clearSymbol(symbol);
 
   res.json({ success: true, message: 'No active orders.<br>Series deleted' });
@@ -412,7 +390,7 @@ router.post('/calculator/result', async (req, res, next) => {
 
     let calc;
     try {
-      calc = new Calculator(settings, message);
+      calc = Calculator.build(settings, message);
     } catch (err) {
       console.error('Calculator constructor error:', err);
       return res.status(400).json({

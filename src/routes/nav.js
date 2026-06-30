@@ -8,20 +8,20 @@ const logBus = require('../lib/logBus');
 const buildInfo = require('../lib/buildInfo');
 const { isTestnet, requestedTestnet } = require('../lib/runMode');
 
-// Источник правды для меню навигации — файлы текущих серий на диске
-// (SYMBOL-binance.json). Пара видна в меню, пока её файл существует; кнопка
-// Cancel All Orders удаляет файл — пара уходит из меню. Ручные ордера на бирже
-// файла не создают, поэтому в меню робота не попадают (в отличие от опроса
-// openOrders, который захватил бы и ручную спот-покупку).
+// Source of truth for the navigation menu — the current series files on disk
+// (SYMBOL-binance.json). A pair is visible in the menu while its file exists; the
+// Cancel All Orders button deletes the file — the pair leaves the menu. Manual
+// orders on the exchange don't create a file, so they don't appear in the robot's
+// menu (unlike an openOrders poll, which would also capture a manual spot buy).
 const DATA_DIR = path.join(__dirname, '../data');
-const ARCHIVE_RE = /^\d+-/; // {timestamp}-SYMBOL-binance.json — архив серии, не текущая
+const ARCHIVE_RE = /^\d+-/; // {timestamp}-SYMBOL-binance.json — a series archive, not the current one
 const SERIES_SUFFIX = '-binance.json';
 
 router.get('/symbols', async (req, res) => {
   try {
     const files = await fs.readdir(DATA_DIR).catch(() => []);
-    // статус (running/pause/attention) живёт в памяти; для пар, которых в карте
-    // нет (не подписаны в этой сессии, но файл на диске есть), показываем pause.
+    // the status (running/pause/attention) lives in memory; for pairs not in the
+    // map (not subscribed this session, but a file exists on disk) we show pause.
     const inMem = new Map(pair.getActiveSymbols().map((s) => [s.symbol, s]));
 
     const symbols = [];
@@ -61,7 +61,7 @@ router.get('/ping', (req, res) => {
   res.json({ time: Date.now(), network: testnet ? 'testnet' : 'real', fallback });
 });
 
-// Идентификатор сборки для футера (version + commit + dirty + время старта).
+// Build identifier for the footer (version + commit + dirty + start time).
 router.get('/version', (req, res) => {
   res.json(buildInfo);
 });
@@ -77,15 +77,15 @@ router.get('/logs', (req, res) => {
   // long-lived stream — drop the idle timeout on this response's socket
   req.socket.setTimeout(0);
 
-  // id: позволяет клиенту дедуплицировать после reconnect (replay истории).
+  // id: lets the client dedup after a reconnect (history replay).
   const send = (e) => {
     if (res.writableEnded) return;
     try { res.write(`id: ${e.id}\ndata: ${JSON.stringify(e)}\n\n`); } catch { }
   };
 
-  // Replay только того, что клиент ещё не видел. Last-Event-ID браузер шлёт сам
-  // при внутреннем reconnect; при ручном пересоздании EventSource клиент кладёт
-  // его в ?lastEventId. NaN (первое подключение) → реплеим всю историю.
+  // Replay only what the client hasn't seen yet. The browser sends Last-Event-ID
+  // itself on an internal reconnect; on a manual EventSource recreation the client
+  // puts it in ?lastEventId. NaN (first connection) → replay the whole history.
   const lastSeen = Number(req.headers['last-event-id'] ?? req.query.lastEventId);
   logBus
     .history()
@@ -94,12 +94,12 @@ router.get('/logs', (req, res) => {
 
   const unsub = logBus.subscribe(send);
 
-  // heartbeat: named 'ping' event every 15s. Двойная роль:
-  //  1) держит соединение живым против idle-timeout (NAT/proxy/browser);
-  //  2) клиент его ВИДИТ (именованное событие, в отличие от комментария : ping)
-  //     и сбрасывает watchdog — иначе полуоткрытый сокет (sleep, рециклинг
-  //     upstream в nginx-proxy-manager) клиент не замечал и консоль молча вставала.
-  // Без id: ping не сдвигает Last-Event-ID, replay остаётся корректным.
+  // heartbeat: named 'ping' event every 15s. Dual role:
+  //  1) keeps the connection alive against the idle-timeout (NAT/proxy/browser);
+  //  2) the client SEES it (a named event, unlike a comment : ping) and resets the
+  //     watchdog — otherwise a half-open socket (sleep, upstream recycling in
+  //     nginx-proxy-manager) went unnoticed and the console silently stalled.
+  // Without an id: the ping doesn't move Last-Event-ID, so the replay stays correct.
   const heartbeat = setInterval(() => {
     if (res.writableEnded) return;
     try { res.write(`event: ping\ndata: {}\n\n`); } catch { }

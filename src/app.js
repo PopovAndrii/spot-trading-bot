@@ -8,8 +8,8 @@ const helmet = require('helmet');
 const Dotenv = require('dotenv');
 Dotenv.config();
 
-// Fail-fast (ANALYSIS п.11): без секрета express-session бросит на первом же
-// запросе невнятный stack — лучше упасть сразу с понятным сообщением.
+// Fail-fast (ANALYSIS item 11): without the secret, express-session throws an
+// opaque stack on the very first request — better to crash now with a clear message.
 if (!process.env.SESSION_SECRET) {
   console.error('❌ SESSION_SECRET is not set (src/.env) — refusing to start');
   process.exit(1);
@@ -26,12 +26,12 @@ const FileStore = require('session-file-store')(session);
 
 const app = express();
 
-// Безопасные заголовки (CSP, nosniff, X-Frame-Options и т.д.). Поправки под
-// этот проект: inline-скрипты в ejs (navbar/spotbot) → 'unsafe-inline';
-// WebSocket → connect-src ws:/wss:; приложение ходит по HTTP в локальной
-// сети → upgrade-insecure-requests выключен, иначе браузер форсирует https.
-// В dev CSP выключен: browser-sync (live-reload) грузит socket.io с отдельного
-// порта по http-polling, strict CSP это блокирует. CSP — фича прода.
+// Security headers (CSP, nosniff, X-Frame-Options, etc.). Tweaks for this
+// project: inline scripts in ejs (navbar/spotbot) → 'unsafe-inline'; WebSocket →
+// connect-src ws:/wss:; the app runs over HTTP on the local network →
+// upgrade-insecure-requests is disabled, otherwise the browser forces https.
+// In dev CSP is off: browser-sync (live-reload) loads socket.io from a separate
+// port via http-polling, which strict CSP blocks. CSP is a prod feature.
 const isDev = process.env.NODE_ENV === 'development';
 app.use(
   helmet({
@@ -64,20 +64,20 @@ const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  rolling: true, // продлевать сессию по активности (инактивити-таймаут)
-  // Файловый стор вместо MemoryStore (ANALYSIS п.11): сессии переживают
-  // рестарт контейнера (не разлогинивает) и не текут по памяти.
-  // data/ уже в .gitignore и персистится bind-mount'ом.
+  rolling: true, // extend the session on activity (inactivity timeout)
+  // File store instead of MemoryStore (ANALYSIS item 11): sessions survive a
+  // container restart (no forced logout) and don't leak memory.
+  // data/ is already in .gitignore and persisted via a bind-mount.
   store: new FileStore({
     path: path.join(__dirname, 'data/sessions'),
-    ttl: 2 * 60 * 60, // секунды; согласован с cookie.maxAge
+    ttl: 2 * 60 * 60, // seconds; aligned with cookie.maxAge
     retries: 1,
-    logFn: () => {}, // file-store шумит ENOENT'ами на пустом сторе
+    logFn: () => {}, // file-store spams ENOENT on an empty store
   }),
   cookie: {
     secure: 'auto', // auto for HTTP/HTTPS
     httpOnly: true,
-    sameSite: 'strict', // CSRF-минимум: POST-ы (cancel allorders) только со своего сайта
+    sameSite: 'strict', // CSRF minimum: POSTs (cancel allorders) only from our own site
     maxAge: 2 * 60 * 60 * 1000,
   },
 });

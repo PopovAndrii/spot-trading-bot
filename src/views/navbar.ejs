@@ -37,7 +37,7 @@
     const symbols = await res.json();
 
     const ddown = document.querySelector('#main-menu .ddown-menu');
-    ddown.replaceChildren(); // чистим перед заполнением: при повторном вызове (после отмены) иначе задвоит
+    ddown.replaceChildren(); // clear before filling: otherwise a repeated call (after a cancel) doubles it
 
     for (const [key, value] of symbols.entries()) {
       const a = document.createElement('a');
@@ -48,9 +48,9 @@
         status = value.status == 1 ? 'running' : 'pause';
       }
 
-      // base/quote в query не нужны: GET /spotbot/:currency сам выводит их из
-      // exchangeInfo. А у символов, помеченных recovery-сканом при старте,
-      // base/quote в pair нет — ссылка получалась ?base=undefined&quote=undefined.
+      // base/quote in the query aren't needed: GET /spotbot/:currency derives them
+      // from exchangeInfo. And symbols flagged by the recovery scan at startup have
+      // no base/quote in pair — the link came out ?base=undefined&quote=undefined.
       a.href = `/spotbot/${value.symbol}`;
       a.textContent = `${value.symbol} ${status}`;
 

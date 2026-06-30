@@ -5,37 +5,28 @@ class StreamAPI extends EventEmitter {
   static instances = new Map();
 
   /**
-   * const btcStream = new StreamAPI('BTCUSDT');
-   * btcStream.on('message', (data) => {
-   *  console.log('BTC price:', data.c);
-   * });
+   * One stream per symbol is obtained via the static getInstance() — the
+   * constructor no longer deduplicates (previously `new StreamAPI(sym)` returned
+   * a cached instance — an antipattern).
+   *
+   * const btcStream = StreamAPI.getInstance('BTCUSDT');
+   * btcStream.on('message', (data) => console.log('BTC price:', data.c));
    * btcStream.start();
    *
-   * const btcStream2 = new StreamAPI('BTCUSDT');  // same instance!
-   * console.log(btcStream === btcStream2);  // true
+   * const sameBtc = StreamAPI.getInstance('BTCUSDT'); // same object
+   * console.log(btcStream === sameBtc); // true
    * @param {*} symbol
-   * @returns
    */
   constructor(symbol) {
     super();
 
-    const normalizedSymbol = symbol.toLowerCase();
-
-    // If an instance of this symbol already exists, return it.
-    if (StreamAPI.instances.has(normalizedSymbol)) {
-      console.log(`⚠️ StreamAPI for ${normalizedSymbol} already exist`);
-      return StreamAPI.instances.get(normalizedSymbol);
-    }
-
-    this.symbol = normalizedSymbol;
+    this.symbol = symbol.toLowerCase();
     this.ws = null;
     this.reconnectTimer = null;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.lastMessageTime = null;
     this.heartbeatTimer = null;
-
-    StreamAPI.instances.set(normalizedSymbol, this);
   }
 
   start() {
@@ -58,8 +49,8 @@ class StreamAPI extends EventEmitter {
     this.ws.on('open', () => {
       console.log(`🟢 Start Stream: ${this.symbol}`);
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        // восстановились после длительного сбоя, о котором уже сигналили
-        // через maxReconnectReached — сообщить слушателям
+        // recovered after a long outage we already signaled via
+        // maxReconnectReached — notify the listeners
         this.emit('reconnected');
       }
       this.reconnectAttempts = 0; // Reset the counter
@@ -89,10 +80,10 @@ class StreamAPI extends EventEmitter {
 
     this.ws.on('error', (err) => {
       console.error(`❌ Stream error ${this.symbol}: ${err.message}`);
-      // EventEmitter бросает, если emit('error') без слушателей → краш процесса.
-      // Сетевые ошибки (ETIMEDOUT и т.п.) сопровождаются событием 'close',
-      // которое уже запускает переподключение, поэтому здесь достаточно
-      // ре-эмитить только когда кто-то реально слушает 'error'.
+      // EventEmitter throws if emit('error') has no listeners → process crash.
+      // Network errors (ETIMEDOUT etc.) come with a 'close' event, which already
+      // triggers reconnection, so here it's enough to re-emit only when someone
+      // is actually listening for 'error'.
       if (this.listenerCount('error') > 0) {
         this.emit('error', err);
       }
@@ -111,7 +102,7 @@ class StreamAPI extends EventEmitter {
 
     if (this.ws) {
       this.ws.removeAllListeners();
-      this.ws.on('error', () => {}); // noop — подавить unhandled error при закрытии
+      this.ws.on('error', () => {}); // noop — suppress unhandled error on close
       if (this.ws.readyState === 0 /* CONNECTING */) {
         this.ws.terminate();
       } else {
@@ -121,23 +112,23 @@ class StreamAPI extends EventEmitter {
     }
   }
 
-  // ========== HEARTBEAT (проверка живости соединения) ==========
+  // ========== HEARTBEAT (connection liveness check) ==========
   startHeartbeat() {
-    this.stopHeartbeat(); // Остановить предыдущий
+    this.stopHeartbeat(); // Stop the previous one
 
     this.heartbeatTimer = setInterval(() => {
       if (!this.lastMessageTime) return;
 
       const timeSinceLastMsg = Date.now() - this.lastMessageTime;
 
-      // Если 30 секунд нет данных → переподключаемся
+      // If there's no data for 30 seconds → reconnect
       if (timeSinceLastMsg > 30 * 1000) {
         console.warn(
           `⚠️ ${this.symbol}: no data ${Math.round(timeSinceLastMsg / 1000)}s, reconnecting...`
         );
         this.reconnect();
       }
-    }, 10 * 1000); // Проверяем каждые 10 секунд
+    }, 10 * 1000); // Check every 10 seconds
   }
 
   stopHeartbeat() {
@@ -147,15 +138,15 @@ class StreamAPI extends EventEmitter {
     }
   }
 
-  // ========== ПЕРЕПОДКЛЮЧЕНИЕ ==========
+  // ========== RECONNECTION ==========
   scheduleReconnect() {
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Exponential backoff, потолок 30с
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Exponential backoff, capped at 30s
     this.reconnectAttempts++;
 
-    // Не сдаёмся навсегда: для торгового робота молча потерять прайс-стрим
-    // хуже, чем пытаться вечно (ANALYSIS.md п.1.4). После maxReconnectAttempts
-    // продолжаем с потолком задержки, но один раз сигналим о длительном сбое —
-    // слушатели уведомят UI/лог. При успешном 'open' эмитится 'reconnected'.
+    // Never give up: for a trading bot, silently losing the price stream is worse
+    // than retrying forever (ANALYSIS.md item 1.4). After maxReconnectAttempts we
+    // keep going at the delay cap, but signal a long outage once — listeners notify
+    // the UI/log. On a successful 'open', 'reconnected' is emitted.
     if (this.reconnectAttempts === this.maxReconnectAttempts) {
       console.error(`❌ ${this.symbol}: stream down for a long time, keep reconnecting...`);
       this.emit('maxReconnectReached');
@@ -175,7 +166,7 @@ class StreamAPI extends EventEmitter {
     this.start();
   }
 
-  // ========== ПРОВЕРКИ СТАТУСА ==========
+  // ========== STATUS CHECKS ==========
   isConnected() {
     return this.ws && this.ws.readyState === WebSocket.OPEN;
   }
@@ -235,7 +226,7 @@ class StreamAPI extends EventEmitter {
     const normalizedSymbol = symbol.toLowerCase();
 
     if (!StreamAPI.instances.has(normalizedSymbol)) {
-      new StreamAPI(normalizedSymbol);
+      StreamAPI.instances.set(normalizedSymbol, new StreamAPI(normalizedSymbol));
     }
 
     return StreamAPI.instances.get(normalizedSymbol);

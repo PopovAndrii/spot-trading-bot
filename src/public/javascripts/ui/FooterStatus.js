@@ -22,8 +22,8 @@ export class FooterStatus {
     this.#ping();
   }
 
-  // Сборка не меняется в рамте процесса — тянем один раз. Формат: v1.1.0 · 2d6115a* · 14:32
-  // (звёздочка = незакоммиченные изменения; время — когда сервер поднят).
+  // The build doesn't change within the process lifetime — fetch once. Format: v1.1.0 · 2d6115a* · 14:32
+  // (the asterisk = uncommitted changes; the time = when the server started).
   async #loadVersion() {
     if (!this.versionEl) return;
     try {
@@ -37,7 +37,7 @@ export class FooterStatus {
       this.versionEl.textContent = `v${version} · ${rev} · ${hhmm}`;
       this.versionEl.title = `version ${version} · ${branch ? 'branch ' + branch + ' · ' : ''}commit ${commit}${dirty ? ' (dirty)' : ''} · started ${t.toLocaleString()}`;
     } catch {
-      /* футер без версии не критичен */
+      /* a footer without the version isn't critical */
     }
   }
 

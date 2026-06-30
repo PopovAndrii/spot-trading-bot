@@ -1,0 +1,278 @@
+{
+  "long-progressive": {
+    "settings": {
+      "field-currency": 100,
+      "field-deposit": 1000,
+      "field-orderSize": 1,
+      "field-profit": 0.1,
+      "field-commission": 0.2,
+      "field-fibonachiStep": 0.2,
+      "field-martingail": 49,
+      "field-indent": 0,
+      "field-stepSize": 3,
+      "field-tickSize": 2
+    },
+    "strategy": "long",
+    "expected": [
+      {
+        "overlapRange": "0.00",
+        "buyCurrency": "100.00",
+        "buy": "1.000",
+        "totalSell": "1.000",
+        "sellCurrency": "100.30",
+        "didBuy": "100.00",
+        "calcBalance": "900.00"
+      },
+      {
+        "overlapRange": "0.40",
+        "buyCurrency": "99.60",
+        "buy": "1.495",
+        "totalSell": "2.495",
+        "sellCurrency": "100.06",
+        "didBuy": "148.90",
+        "calcBalance": "751.10"
+      },
+      {
+        "overlapRange": "1.00",
+        "buyCurrency": "99.00",
+        "buy": "2.242",
+        "totalSell": "4.737",
+        "sellCurrency": "99.70",
+        "didBuy": "221.96",
+        "calcBalance": "529.13"
+      },
+      {
+        "overlapRange": "1.79",
+        "buyCurrency": "98.21",
+        "buy": "3.368",
+        "totalSell": "8.105",
+        "sellCurrency": "99.20",
+        "didBuy": "330.77",
+        "calcBalance": "198.36"
+      }
+    ]
+  },
+  "short-progressive-small": {
+    "settings": {
+      "field-currency": 100,
+      "field-deposit": 200,
+      "field-orderSize": 1,
+      "field-profit": 0.1,
+      "field-commission": 0.2,
+      "field-fibonachiStep": 0.2,
+      "field-martingail": 49,
+      "field-indent": 0,
+      "field-stepSize": 3,
+      "field-tickSize": 2
+    },
+    "strategy": "short",
+    "expected": [
+      {
+        "overlapRange": "0.00",
+        "buyCurrency": "99.70",
+        "buy": "1.000",
+        "totalSell": "1.000",
+        "sellCurrency": "100.00",
+        "didBuy": "100.00",
+        "calcBalance": "199.000"
+      },
+      {
+        "overlapRange": "0.40",
+        "buyCurrency": "99.94",
+        "buy": "2.490",
+        "totalSell": "1.490",
+        "sellCurrency": "100.40",
+        "didBuy": "149.60",
+        "calcBalance": "197.510"
+      },
+      {
+        "overlapRange": "1.00",
+        "buyCurrency": "100.30",
+        "buy": "4.710",
+        "totalSell": "2.220",
+        "sellCurrency": "101.00",
+        "didBuy": "224.23",
+        "calcBalance": "195.290"
+      },
+      {
+        "overlapRange": "1.81",
+        "buyCurrency": "100.79",
+        "buy": "8.017",
+        "totalSell": "3.307",
+        "sellCurrency": "101.81",
+        "didBuy": "336.69",
+        "calcBalance": "191.983"
+      },
+      {
+        "overlapRange": "2.83",
+        "buyCurrency": "101.44",
+        "buy": "12.944",
+        "totalSell": "4.927",
+        "sellCurrency": "102.83",
+        "didBuy": "506.64",
+        "calcBalance": "187.056"
+      },
+      {
+        "overlapRange": "4.06",
+        "buyCurrency": "102.27",
+        "buy": "20.285",
+        "totalSell": "7.341",
+        "sellCurrency": "104.06",
+        "didBuy": "763.92",
+        "calcBalance": "179.715"
+      },
+      {
+        "overlapRange": "5.52",
+        "buyCurrency": "103.28",
+        "buy": "31.223",
+        "totalSell": "10.938",
+        "sellCurrency": "105.52",
+        "didBuy": "1154.17",
+        "calcBalance": "168.777"
+      },
+      {
+        "overlapRange": "7.21",
+        "buyCurrency": "104.49",
+        "buy": "47.520",
+        "totalSell": "16.297",
+        "sellCurrency": "107.21",
+        "didBuy": "1747.16",
+        "calcBalance": "152.480"
+      },
+      {
+        "overlapRange": "9.14",
+        "buyCurrency": "105.91",
+        "buy": "71.802",
+        "totalSell": "24.282",
+        "sellCurrency": "109.14",
+        "didBuy": "2650.07",
+        "calcBalance": "128.198"
+      },
+      {
+        "overlapRange": "11.32",
+        "buyCurrency": "107.56",
+        "buy": "107.982",
+        "totalSell": "36.180",
+        "sellCurrency": "111.32",
+        "didBuy": "4027.56",
+        "calcBalance": "92.018"
+      },
+      {
+        "overlapRange": "13.77",
+        "buyCurrency": "109.44",
+        "buy": "161.890",
+        "totalSell": "53.908",
+        "sellCurrency": "113.77",
+        "didBuy": "6133.07",
+        "calcBalance": "38.110"
+      }
+    ]
+  },
+  "long-indent": {
+    "settings": {
+      "field-currency": 100,
+      "field-deposit": 1000,
+      "field-orderSize": 1,
+      "field-profit": 0.1,
+      "field-commission": 0.2,
+      "field-fibonachiStep": 0.2,
+      "field-martingail": 49,
+      "field-indent": 0.15,
+      "field-stepSize": 3,
+      "field-tickSize": 2
+    },
+    "strategy": "long",
+    "expected": [
+      {
+        "overlapRange": "0.15",
+        "buyCurrency": "99.85",
+        "buy": "1.001",
+        "totalSell": "1.001",
+        "sellCurrency": "100.15",
+        "didBuy": "99.95",
+        "calcBalance": "900.05"
+      },
+      {
+        "overlapRange": "0.55",
+        "buyCurrency": "99.45",
+        "buy": "1.498",
+        "totalSell": "2.499",
+        "sellCurrency": "99.91",
+        "didBuy": "148.98",
+        "calcBalance": "751.07"
+      },
+      {
+        "overlapRange": "1.15",
+        "buyCurrency": "98.85",
+        "buy": "2.245",
+        "totalSell": "4.744",
+        "sellCurrency": "99.55",
+        "didBuy": "221.93",
+        "calcBalance": "529.15"
+      },
+      {
+        "overlapRange": "1.94",
+        "buyCurrency": "98.06",
+        "buy": "3.373",
+        "totalSell": "8.117",
+        "sellCurrency": "99.05",
+        "didBuy": "330.77",
+        "calcBalance": "198.38"
+      }
+    ]
+  },
+  "long-fibonacci": {
+    "settings": {
+      "field-currency": 100,
+      "field-deposit": 1000,
+      "field-orderSize": 1,
+      "field-profit": 0.1,
+      "field-commission": 0.2,
+      "field-fibonachiStep": 0.2,
+      "field-martingail": 49,
+      "field-indent": 0,
+      "field-stepSize": 3,
+      "field-tickSize": 2,
+      "strategyList": "fibonacci"
+    },
+    "strategy": "long",
+    "expected": [
+      {
+        "overlapRange": "0.00",
+        "buyCurrency": "100.00",
+        "buy": "1.000",
+        "totalSell": "1.000",
+        "sellCurrency": "100.30",
+        "didBuy": "100.00",
+        "calcBalance": "900.00"
+      },
+      {
+        "overlapRange": "0.20",
+        "buyCurrency": "99.80",
+        "buy": "1.492",
+        "totalSell": "2.492",
+        "sellCurrency": "100.18",
+        "didBuy": "148.90",
+        "calcBalance": "751.10"
+      },
+      {
+        "overlapRange": "0.60",
+        "buyCurrency": "99.40",
+        "buy": "2.233",
+        "totalSell": "4.725",
+        "sellCurrency": "99.95",
+        "didBuy": "221.96",
+        "calcBalance": "529.14"
+      },
+      {
+        "overlapRange": "1.20",
+        "buyCurrency": "98.80",
+        "buy": "3.347",
+        "totalSell": "8.072",
+        "sellCurrency": "99.60",
+        "didBuy": "330.70",
+        "calcBalance": "198.44"
+      }
+    ]
+  }
+}

@@ -5,8 +5,8 @@ const path = require('path');
 const os = require('os');
 const { scanLiveCycles } = require('../lib/recovery');
 
-// ANALYSIS.md п.1.5 — после рестарта сервера конфиги с живыми ордерами
-// (NEW/PARTIALLY_FILLED + orderId) должны находиться recovery-сканом.
+// ANALYSIS.md item 1.5 — after a server restart, configs with live orders
+// (NEW/PARTIALLY_FILLED + orderId) must be found by the recovery scan.
 
 async function withTmpDir(files, fn) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'recovery-test-'));
@@ -52,8 +52,8 @@ test('PARTIALLY_FILLED on SELL side counts as live', async () => {
 });
 
 test('DONE cycle with stale NEW insurance orders → not found (false positive)', async () => {
-  // финальный cancelOpenOrders снимает ордера на бирже, но в старых файлах
-  // их статусы остались NEW — статус DONE файла авторитетнее
+  // the final cancelOpenOrders pulls the orders on the exchange, but in old files
+  // their statuses stayed NEW — the file's DONE status is authoritative
   const config = JSON.stringify({
     pair: 'BNBUSDT',
     status: 3, // Status.DONE
@@ -95,7 +95,7 @@ test('timestamped archives and non-JSON files are skipped', async () => {
 
   await withTmpDir(
     {
-      '1779992341074-BTCUSDT-binance.json': live, // архив autoRestart
+      '1779992341074-BTCUSDT-binance.json': live, // autoRestart archive
       'readme.txt': 'not json',
       'BNBUSDT-binance.json': live,
     },

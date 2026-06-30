@@ -1,16 +1,17 @@
-// Донат-адреса автора проекта. Статика: одни на всех, кто развернёт копию бота.
-// Никакого бекенда/кастоди/внешних сервисов — просто показываем адрес + QR.
+// The project author's donation addresses. Static: shared by everyone who deploys
+// a copy of the bot. No backend/custody/external services — we just show the
+// address + QR.
 //
-// QR в public/images/qr/<id>.svg генерируется офлайн из `address` (вариант A):
-//   npm run gen-qr   (см. tools/gen-qr.js — qrcode только в devDependencies)
+// The QR at public/images/qr/<id>.svg is generated offline from `address` (option A):
+//   npm run gen-qr   (see tools/gen-qr.js — qrcode is in devDependencies only)
 const DONATIONS = [
   {
     id: 'usdt-polygon',
     coin: 'USDT',
     network: 'EVM · Polygon/BNB/ETH',
-    // EVM-адрес: один и тот же для любой EVM-сети (Polygon/BNB/ETH/Arbitrum…).
+    // EVM address: the same for any EVM network (Polygon/BNB/ETH/Arbitrum…).
     address: '0xBA5DFcab30DE75125A3a6950263cF088f313C59F',
-    uri: '', // голый адрес — сеть/токен выбираются в кошельке при отправке
+    uri: '', // bare address — network/token are chosen in the wallet when sending
     qr: '/images/qr/usdt-polygon.svg',
   },
   {

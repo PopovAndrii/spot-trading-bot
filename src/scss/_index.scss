@@ -15,7 +15,7 @@
     padding: 1rem;
   }
 
-  // прочитанные блоки (item.hidden = true) — перебиваем display:grid выше
+  // read blocks (item.hidden = true) — override display:grid above
   &>div[hidden] {
     display: none;
   }

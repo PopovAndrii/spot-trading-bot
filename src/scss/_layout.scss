@@ -1,17 +1,17 @@
 @use './var' as *;
 
 :root {
-  // Высота открытой консоли. На мобильном в альбомной ориентации вьюпорт
-  // низкий — фиксированные 450px вылезали за экран и перекрывали шапку.
-  // Ограничиваем долей вьюпорта (dvh учитывает панели мобильного браузера),
-  // на десктопе и в портрете остаётся 450px.
+  // Height of the open console. On mobile in landscape the viewport is low —
+  // a fixed 450px spilled off-screen and covered the header. We cap it to a
+  // fraction of the viewport (dvh accounts for mobile browser bars); on desktop
+  // and in portrait it stays 450px.
   --console-open-h: 450px;
   --console-open-h: min(450px, 60dvh);
 }
 
-// На мобильном в альбомной ориентации (низкий вьюпорт) открываем консоль на всю
-// высоту окна — тело занимает вьюпорт за вычетом шапки (2rem). max-height
-// отсекает десктоп, где ориентация тоже landscape, но окно высокое.
+// On mobile in landscape (low viewport) we open the console to the full window
+// height — the body takes the viewport minus the header (2rem). max-height excludes
+// desktop, where orientation is also landscape but the window is tall.
 @media (orientation: landscape) and (max-height: 600px) {
   :root {
     --console-open-h: calc(100dvh - 2rem);

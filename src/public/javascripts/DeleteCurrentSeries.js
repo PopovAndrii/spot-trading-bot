@@ -10,8 +10,8 @@ export class DeleteCurrentSeries {
     });
   }
 
-  // Активна только после Cancel all orders — иначе на паре могут висеть ордера,
-  // и удалять файл серии нельзя (бэк всё равно перепроверит биржу и откажет).
+  // Enabled only after Cancel all orders — otherwise the pair may have live orders,
+  // and the series file can't be deleted (the backend re-checks the exchange and refuses anyway).
   enable() {
     const btn = document.getElementById('delete-current-series');
     if (btn) btn.disabled = false;
@@ -35,8 +35,8 @@ export class DeleteCurrentSeries {
       if (data.success) {
         this.notifications.showNotification(data.message, 'success');
         this.disable();
-        // Файл серии удалён на бэке — перечитываем меню навигации (пара уходит)
-        // и убираем её вкладку-фильтр из консоли, без перезагрузки страницы.
+        // The series file was deleted on the backend — re-read the navigation menu
+        // (the pair leaves) and remove its filter tab from the console, without a page reload.
         window.fetchActiveSymbols?.();
         window.dispatchEvent(new CustomEvent('pair-removed', { detail: { symbol: currency } }));
       } else {

@@ -49,6 +49,7 @@
 
             <div class="line">
               <div class="">Progression strategy
+                <span class="UIql UIql--click" tabindex="0"><span class="UIql__text">Increase in order size across the grid: with the progressive method, each step is scaled by a fixed multiplier; with the Fibonacci method, the Fibonacci sequence is used. This determines how quickly the deposit is used up as the grid progresses. The Fibonacci method is the most effective.</span></span>
                 <div class="UIselect lg" id="strategyList" tabindex="0" role="listbox" aria-haspopup="listbox">
                   <span class="UIselect-selected">Select</span>
                   <span class="UIselect-arrow">
@@ -79,10 +80,10 @@
             </div>
           </div>
 
-          <!-- Эти параметры остаются доступными во время работы робота: Active orders /
-               Request frequency / Restart. Поэтому они вынесены ИЗ #group-spinbox, который
-               блокируется (.params-locked) на время цикла. Их изменения пишутся в файл
-               на лету (см. LoadDataCalculator.runtimeParams / Restart). -->
+          <!-- These params stay available while the robot is running: Active orders /
+               Request frequency / Restart. That's why they're kept OUT of #group-spinbox,
+               which is locked (.params-locked) during a cycle. Their changes are written
+               to the file on the fly (see LoadDataCalculator.runtimeParams / Restart). -->
           <div id="group-runtime" class="line">
             <div class="">
               <%- include('../views/ui/SpinBox', { id:'field-activeOrders' , label:'Active orders' , min:2, max:50, step:0, hint:'Number of active orders. Can be changed while the bot is running' }); %>
@@ -104,19 +105,19 @@
           </div>
 
           <div class="line line-press -line-between">
-            <button data-value="stumb" id="settings-calculate" class="UIb lg g-1 " type="button">Calculate
+            <button data-value="stumb" id="settings-calculate" class="UIb -lg g-1 " type="button">Calculate
               <svg class="icon">
                 <use href="/sprite.svg#calc"></use>
               </svg>
             </button>
-            <button data-value="stumb" id="settings-calculate-save" class="UIb lg g-1 " type="button">Save
+            <button data-value="stumb" id="settings-calculate-save" class="UIb -lg g-1 " type="button">Save
               <svg class="icon">
                 <use href="/sprite.svg#save"></use>
               </svg>
             </button>
 
             <div class="-line-line">
-              <button data-value='{"base":"<%= base %>", "quote":"<%= quote %>"}' id="startBtn" type="button" class="UIb lg g-1 success">
+              <button data-value='{"base":"<%= base %>", "quote":"<%= quote %>"}' id="startBtn" type="button" class="UIb -lg g-1 success">
                 Start
                 <svg class="icon">
                   <use href="/sprite.svg#play"></use>
@@ -149,17 +150,28 @@
         </table>
 
         <div class="row">
-          <div class="col">
-            <div class="line line-press">
-              <button data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb lg g-1 danger" type="button">
-                Check and Cancel all <%= base + quote %> pairs
-                  <svg class="icon">
-                    <use href="/sprite.svg#close"></use>
-                  </svg>
-              </button>
-              <button data-value="<%= base + quote %>" id="delete-current-series" class="UIb lg" type="button" disabled>
-                Delete current series
-              </button>
+          <div class="spotbot-danger-zone">
+            <button data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb" type="button">
+              Check and Cancel all <%= base + quote %> pairs
+                <svg class="icon">
+                  <use href="/sprite.svg#close"></use>
+                </svg>
+            </button>
+
+            <button data-value="<%= base + quote %>" id="delete-current-series" class="UIb" type="button" disabled>
+              Delete current series
+            </button>
+
+            <div class="UIsw r-1" role="switch" tabindex="0" id="settings-expert-mode">
+              <label class="UIsw-label" for="expert">Expert Mode
+                <span class="UIql UIql--click" tabindex="0">
+                  <span class="UIql__text">Unblocks per-order controls in the table below: manual cancel (✕) of a single resting order and re-place (＋) of a pulled order at a new price.</span>
+                </span>
+              </label>
+              <input type="checkbox" id="expert" name="expert-mode" hidden>
+              <span class="UIsw-slider"></span>
+              <span class="UIsw-slider__on">on</span>
+              <span class="UIsw-slider__off">off</span>
             </div>
           </div>
         </div>
