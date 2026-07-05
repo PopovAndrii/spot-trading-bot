@@ -33,7 +33,7 @@ async function setup() {
 
   const sender = new JsonTimerSender({}, 'long');
   sender.symbol = SYMBOL;
-  sender.running[SYMBOL] = true;
+  sender.running = true;
   // A successful re-place kicks an out-of-band tick (#kickTick) to persist soon.
   // Stub readLoop so that tick is a no-op here — we assert the schedule, not the
   // full loop (which would reschedule itself and keep the test process alive).
@@ -147,13 +147,13 @@ test('replaceManualOrder: not running / invalid price → fail, no API call', as
   const { sender, calls } = await setup();
   sender.manualPulls.BUY.add(0);
 
-  sender.running[SYMBOL] = false;
+  sender.running = false;
   assert.equal(
     (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101' })).success,
     false
   );
 
-  sender.running[SYMBOL] = true;
+  sender.running = true;
   assert.equal(
     (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '0' })).success,
     false

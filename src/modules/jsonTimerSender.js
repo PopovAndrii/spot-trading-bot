@@ -101,7 +101,7 @@ class JsonTimerSender extends EventEmitter {
     this.symbol = null;
     this.strategy = strategy;
     this.autoRestart = false;
-    this.running = {};
+    this.running = false;
     this.exchangeName = 'binance';
 
     this.busy = false;
@@ -126,7 +126,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   getSpotStatus(symbol) {
-    return this.running[symbol];
+    return this.symbol === symbol ? this.running : false;
   }
 
   /**
@@ -136,7 +136,7 @@ class JsonTimerSender extends EventEmitter {
    * statuses via getOrder, and the next tick schedules readLoop as usual.
    */
   #kickTick() {
-    if (!this.running[this.symbol]) return;
+    if (!this.running) return;
     if (this.busy) return;
 
     clearTimeout(this.timer);
@@ -246,7 +246,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async cancelManualOrder({ side, index, orderId } = {}) {
-    if (!this.running[this.symbol]) {
+    if (!this.running) {
       return { success: false, message: 'cycle is not running' };
     }
     if ((side !== 'BUY' && side !== 'SELL') || !Number.isInteger(index) || orderId == null) {
@@ -284,7 +284,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async replaceManualOrder({ side, index, price } = {}) {
-    if (!this.running[this.symbol]) {
+    if (!this.running) {
       return { success: false, message: 'cycle is not running' };
     }
     const priceNum = Number(price);
@@ -444,7 +444,7 @@ class JsonTimerSender extends EventEmitter {
 
       // never started 0
       for (const [key, val] of obj[strategy.side].entries()) {
-        if (!this.running[this.symbol]) return;
+        if (!this.running) return;
 
         const cellStatus = obj[strategy.side][key]['status'];
         if (
@@ -534,7 +534,7 @@ class JsonTimerSender extends EventEmitter {
           const delta = partialFillDelta(stored, result.message);
 
           if (delta) {
-            if (!this.running[this.symbol]) return;
+            if (!this.running) return;
             Object.assign(stored, delta);
             await this.#mergeLiveEdits(obj);
             await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
@@ -554,7 +554,7 @@ class JsonTimerSender extends EventEmitter {
           toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
         }
 
-        if (!this.running[this.symbol]) return;
+        if (!this.running) return;
 
         // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
@@ -569,7 +569,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async readLoop() {
-    if (!this.running[this.symbol]) return;
+    if (!this.running) return;
 
     try {
       const content = await fs.readFile(this.#filePath(), 'utf8');
@@ -608,7 +608,7 @@ class JsonTimerSender extends EventEmitter {
       console.error(this.#filePath(), 'Error reading file:', err);
     }
 
-    if (!this.running[this.symbol]) return;
+    if (!this.running) return;
 
     this.timer = setTimeout(() => this.readLoop(), this.interval || 5000);
   }
@@ -631,7 +631,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async start(symbol, strategy, options = {}) {
-    if (!this.running[symbol]) {
+    if (!this.running) {
       // this.strategy = (this.strategy == null) ? strategy : this.strategy;
       this.strategy = strategy == 'short' ? 'short' : 'long';
 
@@ -696,7 +696,7 @@ class JsonTimerSender extends EventEmitter {
         this.emit('streamState', { symbol, up: true, message: msg });
       });
 
-      this.running[symbol] = true;
+      this.running = true;
 
       this.symbol = symbol;
 
@@ -740,7 +740,7 @@ class JsonTimerSender extends EventEmitter {
     StreamAPI.removeInstance(this.symbol);
 
     this.timer = null;
-    this.running[this.symbol] = false;
+    this.running = false;
 
     const stopMsg = `🛑 Stop: ${this.symbol}`;
     console.log(stopMsg);

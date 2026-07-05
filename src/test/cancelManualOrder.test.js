@@ -12,7 +12,7 @@ const JsonTimerSender = require('../modules/jsonTimerSender');
 function setup() {
   const sender = new JsonTimerSender({}, 'long');
   sender.symbol = 'TESTUSDT';
-  sender.running[sender.symbol] = true;
+  sender.running = true;
 
   const calls = [];
   sender.API = {
@@ -37,7 +37,7 @@ test('cancelManualOrder: cancels on exchange, then records the pull', async () =
 
 test('cancelManualOrder: cycle not running → fail, no API call, no mark', async () => {
   const { sender, calls } = setup();
-  sender.running[sender.symbol] = false;
+  sender.running = false;
 
   const r = await sender.cancelManualOrder({ side: 'BUY', index: 0, orderId: 1 });
 

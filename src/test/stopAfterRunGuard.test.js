@@ -55,7 +55,7 @@ async function setup(flipStopDuringCall) {
 
   const sender = new JsonTimerSender({}, 'long');
   sender.symbol = symbol;
-  sender.running[symbol] = true;
+  sender.running = true;
 
   const flags = { apiCalled: false };
   sender.job = {
@@ -64,7 +64,7 @@ async function setup(flipStopDuringCall) {
   sender.API = {
     getOrder: async () => {
       flags.apiCalled = true;
-      if (flipStopDuringCall) sender.running[symbol] = false; // Stop during the await
+      if (flipStopDuringCall) sender.running = false; // Stop during the await
       return filledReply();
     },
   };
@@ -73,7 +73,7 @@ async function setup(flipStopDuringCall) {
 }
 
 async function teardown({ sender, symbol, dir }) {
-  sender.running[symbol] = false;
+  sender.running = false;
   clearTimeout(sender.timer);
   await fs.rm(dir, { recursive: true, force: true });
 }
