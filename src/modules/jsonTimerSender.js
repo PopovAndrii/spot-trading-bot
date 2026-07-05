@@ -438,14 +438,12 @@ class JsonTimerSender extends EventEmitter {
     const strategy = this.#strategy();
 
     if (obj.status == Status.READY && strategy != null) {
-
       if (await this.#maybePrepareRecoveryClose(obj, strategy)) return;
 
       let i = 0;
 
       // never started 0
       for (const [key, val] of obj[strategy.side].entries()) {
-
         if (!this.running[this.symbol]) return;
 
         const cellStatus = obj[strategy.side][key]['status'];
@@ -473,8 +471,8 @@ class JsonTimerSender extends EventEmitter {
             const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
             logBus.log(
               `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
-              `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
-              `Funds are on the exchange; decide manually (swap or keep).`
+                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+                `Funds are on the exchange; decide manually (swap or keep).`
             );
           }
 
@@ -517,7 +515,6 @@ class JsonTimerSender extends EventEmitter {
             this.stop();
             return;
           }
-
         }
 
         if (currentOrder.status === 'pass') {
@@ -533,7 +530,6 @@ class JsonTimerSender extends EventEmitter {
         }
 
         if (result.message.status === currentOrder.status) {
-
           const stored = obj[result.message.side]?.[currentOrder['id']];
           const delta = partialFillDelta(stored, result.message);
 
@@ -595,7 +591,9 @@ class JsonTimerSender extends EventEmitter {
 
         this.#jobIterator(data)
           .catch((err) => console.error('jobIterator:', err))
-          .finally(() => { this.busy = false; });
+          .finally(() => {
+            this.busy = false;
+          });
       }
 
       this.#remindManualStuck(data);
@@ -633,7 +631,6 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async start(symbol, strategy, options = {}) {
-
     if (!this.running[symbol]) {
       // this.strategy = (this.strategy == null) ? strategy : this.strategy;
       this.strategy = strategy == 'short' ? 'short' : 'long';
@@ -777,14 +774,14 @@ class JsonTimerSender extends EventEmitter {
       // Get current price (and param ??)
       const data = await this.API.bookTicker({ symbol: this.symbol });
 
-      const price = (this.strategy === "long") ? data.message.askPrice : data.message.bidPrice;
+      const price = this.strategy === 'long' ? data.message.askPrice : data.message.bidPrice;
 
       // recalculete
       const settings = {
         ...obj['param'],
         'field-currency': `${price}`,
-        'field-indent': "0",
-      }
+        'field-indent': '0',
+      };
 
       const calc = Calculator.build(settings, this.strategy);
 
@@ -804,7 +801,6 @@ class JsonTimerSender extends EventEmitter {
       );
 
       this.emit('restarted', { symbol: this.symbol, price });
-
     } catch (err) {
       console.error('❌ Failed to restart cycle:', err);
       this.emit('stopped', this.symbol);
@@ -845,7 +841,7 @@ class JsonTimerSender extends EventEmitter {
         timeInForce: 'GTC',
         orderId: null,
       };
-    })
+    });
 
     return config;
   }

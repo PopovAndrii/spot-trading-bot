@@ -33,7 +33,9 @@ class InvokeApi {
     // work without keys, and signed ones will return an error via the methods' try/catch blocks.
     this.configured = Boolean(api_key && api_secret);
     if (!this.configured) {
-      console.warn(`🟡 Binance ${testnet ? 'testnet' : 'real'} keys are not set — signed requests will fail, public ones work`);
+      console.warn(
+        `🟡 Binance ${testnet ? 'testnet' : 'real'} keys are not set — signed requests will fail, public ones work`
+      );
     }
 
     this.client = new Spot(api_key || '', api_secret || '', { baseURL: baseURL });
@@ -56,9 +58,7 @@ class InvokeApi {
 
         const retryAfter = Number(err.response?.headers?.['retry-after']);
         const delay =
-          Number.isFinite(retryAfter) && retryAfter > 0
-            ? retryAfter * 1000
-            : 2000 * (attempt + 1);
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000 * (attempt + 1);
 
         this.getConsoleMsg(
           `429 rate limit — retry in ${delay / 1000}s (${attempt + 1}/${MAX_RETRIES})`,
@@ -96,7 +96,6 @@ class InvokeApi {
 
   async newOrder(data) {
     try {
-
       const res = await this.#withRateLimitRetry(() =>
         this.client.newOrder(data.symbol, data.side, data.type, {
           price: data.price,
@@ -182,7 +181,9 @@ class InvokeApi {
       // and the request went without symbol → it returned open orders for the
       // WHOLE account (not just this pair). Because of that count lied, and the
       // pre-delete check for a series falsely saw "foreign" orders.
-      const res = await this.#withRateLimitRetry(() => this.client.openOrders({ symbol: data.symbol }));
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.openOrders({ symbol: data.symbol })
+      );
 
       const msg = { count: res.data.length };
 
@@ -204,9 +205,7 @@ class InvokeApi {
     }
 
     try {
-      const res = await this.#withRateLimitRetry(() =>
-        this.client.cancelOpenOrders(data.symbol)
-      );
+      const res = await this.#withRateLimitRetry(() => this.client.cancelOpenOrders(data.symbol));
 
       if (res.data?.code < 0) {
         this.getConsoleMsg(res.data.msg, false);
@@ -304,13 +303,13 @@ class InvokeApi {
       this.getConsoleMsg('bookTicker()');
 
       // return { success: true, message :
-      //  { 
+      //  {
       //    "symbol": "BTCUSDT",
       //    "bidPrice": "63450.00000000",
       //    "bidQty": "0.54210000",
       //    "askPrice": "63450.01000000",
       //    "askQty": "1.12540000"
-      //  } 
+      //  }
       // }
       return { success: true, message: res.data };
     } catch (err) {
@@ -336,8 +335,8 @@ class InvokeApi {
       }
 
       const symbols = res.data.symbols
-        .filter(s => s.status === 'TRADING' && /^[A-Z0-9]+$/.test(s.symbol))
-        .map(s => ({ symbol: s.symbol, baseAsset: s.baseAsset, quoteAsset: s.quoteAsset }));
+        .filter((s) => s.status === 'TRADING' && /^[A-Z0-9]+$/.test(s.symbol))
+        .map((s) => ({ symbol: s.symbol, baseAsset: s.baseAsset, quoteAsset: s.quoteAsset }));
 
       this.getConsoleMsg(`getSpotSymbols() ${symbols.length} symbols`);
       return { success: true, message: { symbols } };
@@ -351,11 +350,7 @@ class InvokeApi {
   #getCatchMsg(err) {
     const data = err.response?.data;
 
-    return [
-      err.message,
-      data?.code,
-      data?.msg || data?.message
-    ].filter(Boolean).join(' | ');
+    return [err.message, data?.code, data?.msg || data?.message].filter(Boolean).join(' | ');
   }
 }
 

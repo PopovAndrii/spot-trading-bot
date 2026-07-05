@@ -9,10 +9,7 @@ const { DONATIONS } = require('../lib/donations');
 const apiMethod = InvokeApi.getInstance();
 
 router.get('/', async function (req, res, next) {
-  const [result, serverIp] = await Promise.all([
-    apiMethod.getSpotSymbols(),
-    getPublicIp(),
-  ]);
+  const [result, serverIp] = await Promise.all([apiMethod.getSpotSymbols(), getPublicIp()]);
   res.render('index', {
     title: 'Main Page',
     info: result.success ? result.message : { symbols: [] },

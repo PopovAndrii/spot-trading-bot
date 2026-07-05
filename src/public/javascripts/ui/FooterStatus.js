@@ -83,7 +83,9 @@ export class FooterStatus {
     // fallback: REAL, but we’re running on TESTNET without keys — explicitly showing
     this.netEl.textContent = fallback
       ? 'REAL → TESTNET (no keys)'
-      : network === 'real' ? 'REAL' : 'TESTNET';
+      : network === 'real'
+        ? 'REAL'
+        : 'TESTNET';
     this.netEl.title = fallback
       ? 'REAL is selected, but REAL keys are not specified — running on TESTNET'
       : '';

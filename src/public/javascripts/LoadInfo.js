@@ -24,11 +24,7 @@ export class LoadInfo {
       }
     } catch (err) {
       console.error('❌ loadPersonalInfo():', err);
-      this.notifications.showNotification(
-        err.message,
-        'danger',
-        10000
-      );
+      this.notifications.showNotification(err.message, 'danger', 10000);
       return null;
     }
   }

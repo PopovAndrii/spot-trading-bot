@@ -31,9 +31,7 @@ test('live NEW order with orderId → found', async () => {
 
   await withTmpDir({ 'BNBUSDT-binance.json': config }, async (dir) => {
     const found = await scanLiveCycles(dir);
-    assert.deepEqual(found, [
-      { symbol: 'BNBUSDT', file: 'BNBUSDT-binance.json', liveOrders: 1 },
-    ]);
+    assert.deepEqual(found, [{ symbol: 'BNBUSDT', file: 'BNBUSDT-binance.json', liveOrders: 1 }]);
   });
 });
 

@@ -41,7 +41,7 @@ const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
 );
 
 const setStrategy = new SetStrategy(notifications, () => {
-  // Recreate the SpinBox so that it re-reads the data-step 
+  // Recreate the SpinBox so that it re-reads the data-step
   // (the balance accuracy depends on the strategy, and the package locks the step during initialization).
   spinBox.destroy();
   spinBox = new UiElements.SpinBox();

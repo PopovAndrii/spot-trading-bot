@@ -23,7 +23,11 @@ async function writeFileAtomic(filePath, data, encoding = 'utf8') {
     await fs.rename(tmp, filePath);
   } catch (err) {
     // clean up the leftover if rename didn't happen (otherwise .tmp files pile up)
-    try { await fs.unlink(tmp); } catch (_) { /* already gone — ok */ }
+    try {
+      await fs.unlink(tmp);
+    } catch (_) {
+      /* already gone — ok */
+    }
     throw err;
   }
 }

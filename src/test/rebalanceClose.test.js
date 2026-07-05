@@ -37,8 +37,14 @@ test('multiple closes accumulate', () => {
 
 test('position fully closed / overshot → null', () => {
   const entries = [{ executedQty: 1, cummulativeQuoteQty: 100 }];
-  assert.equal(rebalanceClose(entries, { executedQty: 1, cummulativeQuoteQty: 100 }, 'long', 0.45), null);
-  assert.equal(rebalanceClose(entries, { executedQty: 1.2, cummulativeQuoteQty: 120 }, 'long', 0.45), null);
+  assert.equal(
+    rebalanceClose(entries, { executedQty: 1, cummulativeQuoteQty: 100 }, 'long', 0.45),
+    null
+  );
+  assert.equal(
+    rebalanceClose(entries, { executedQty: 1.2, cummulativeQuoteQty: 120 }, 'long', 0.45),
+    null
+  );
 });
 
 test('short: close price below average (factor 1 − fees%)', () => {

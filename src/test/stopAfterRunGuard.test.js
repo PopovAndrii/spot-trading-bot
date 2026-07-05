@@ -34,8 +34,11 @@ const gridObj = () => ({
 const filledReply = () => ({
   success: true,
   message: {
-    status: 'FILLED', orderId: 777, side: 'BUY',
-    executedQty: '1', cummulativeQuoteQty: '10',
+    status: 'FILLED',
+    orderId: 777,
+    side: 'BUY',
+    executedQty: '1',
+    cummulativeQuoteQty: '10',
   },
 });
 

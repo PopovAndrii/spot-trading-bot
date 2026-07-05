@@ -80,7 +80,9 @@ router.get('/logs', (req, res) => {
   // id: lets the client dedup after a reconnect (history replay).
   const send = (e) => {
     if (res.writableEnded) return;
-    try { res.write(`id: ${e.id}\ndata: ${JSON.stringify(e)}\n\n`); } catch { }
+    try {
+      res.write(`id: ${e.id}\ndata: ${JSON.stringify(e)}\n\n`);
+    } catch {}
   };
 
   // Replay only what the client hasn't seen yet. The browser sends Last-Event-ID
@@ -102,7 +104,9 @@ router.get('/logs', (req, res) => {
   // Without an id: the ping doesn't move Last-Event-ID, so the replay stays correct.
   const heartbeat = setInterval(() => {
     if (res.writableEnded) return;
-    try { res.write(`event: ping\ndata: {}\n\n`); } catch { }
+    try {
+      res.write(`event: ping\ndata: {}\n\n`);
+    } catch {}
   }, 15000);
 
   req.on('close', () => {

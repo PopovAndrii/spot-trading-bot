@@ -18,7 +18,7 @@ class Calculator {
       'field-deposit': 560, // 1.074 430$
       'field-orderSize': 125, // 0.028
       'field-profit': 0.1,
-      'field-commission': 0.20,
+      'field-commission': 0.2,
       'field-strategyList': '',
       'field-fibonachiStep': 0.2, // fibonachi
       'field-martingail': 49,
@@ -96,7 +96,10 @@ class Calculator {
       totalSell += buy;
       balanceTotal -= actualSpent;
 
-      let sellCurrency = ((spentTotal / totalSell) * (100 + this.data['field-profit'] + this.data['field-commission'])) / 100;
+      let sellCurrency =
+        ((spentTotal / totalSell) *
+          (100 + this.data['field-profit'] + this.data['field-commission'])) /
+        100;
 
       // Spent in quote currency (money = price × qty); quote precision = price tickSize
       const spentQuote = actualSpent.toFixed(this.data['field-tickSize']);
@@ -172,7 +175,10 @@ class Calculator {
 
       sellTotalCoins += currentOrderSell / sellPrice;
 
-      let buyPrice = ((spentTotalMoney / sellTotalCoins) * (100 - (this.data['field-profit'] + this.data['field-commission']))) / 100;
+      let buyPrice =
+        ((spentTotalMoney / sellTotalCoins) *
+          (100 - (this.data['field-profit'] + this.data['field-commission']))) /
+        100;
 
       // Spent in quote currency (money = qty × price); quote precision = price tickSize
       const spentQuote = (currentOrderSell * sellPrice).toFixed(this.data['field-tickSize']);

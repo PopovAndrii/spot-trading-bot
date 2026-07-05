@@ -37,7 +37,7 @@ export class LoadDataCalculator {
           3000
         );
       }
-    })
+    });
 
     // Change claculate button
     document.querySelector('#settings-calculate').addEventListener('ui-button-change', () => {
@@ -139,9 +139,11 @@ export class LoadDataCalculator {
 
   // Change button restart
   restart() {
-    document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {
-      this.addRestartStatus(e.detail.value);
-    });
+    document
+      .getElementById('settings-calculate-restart')
+      .addEventListener('ui-switch-change', (e) => {
+        this.addRestartStatus(e.detail.value);
+      });
   }
 
   runtimeParams() {
@@ -155,9 +157,9 @@ export class LoadDataCalculator {
 
   async saveRuntimeParam(key, value) {
     const obj = {
-      'pair': base + quote,
-      'key': key,
-      'value': value,
+      pair: base + quote,
+      key: key,
+      value: value,
     };
 
     try {
@@ -180,7 +182,7 @@ export class LoadDataCalculator {
 
     const all = [
       ...document.querySelectorAll('[id^="field-"]'),
-      strategyList?.querySelector('[name="strategyList"]')
+      strategyList?.querySelector('[name="strategyList"]'),
     ].filter(Boolean); // Remove null if element is not found
 
     all.forEach((el) => {
@@ -264,14 +266,20 @@ export class LoadDataCalculator {
       const tick = parseInt(obj.param?.['field-tickSize'], 10);
       const dec = Number.isFinite(tick) ? tick : 2;
       const replace = JSON.stringify({
-        action: 'replace', side: type, index,
+        action: 'replace',
+        side: type,
+        index,
         orderId: o.orderId ?? null,
-        price: o.price ?? '', grid: gridPrice ?? '', dec,
+        price: o.price ?? '',
+        grid: gridPrice ?? '',
+        dec,
       });
-      return `<span class="row-actions row-actions--edit">`
-        + `<button type="button" class="UIb xsm r-round success" data-value='${replace}' title="Re-place at a new price">`
-        + `+</button>`
-        + `</span>`;
+      return (
+        `<span class="row-actions row-actions--edit">` +
+        `<button type="button" class="UIb xsm r-round success" data-value='${replace}' title="Re-place at a new price">` +
+        `+</button>` +
+        `</span>`
+      );
     }
 
     // manual cancel in flight → hold a DISABLED ✕ until ＋ appears. Held through
@@ -280,17 +288,26 @@ export class LoadDataCalculator {
     // ✕ mid-cancel. Cleared only by the ＋ branch above, or by clearPendingCancel
     // on a failed cancel (SpotWS).
     if (this._pendingCancel.has(key)) {
-      return `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"`
-        + ` disabled title="Cancelling…">`
-        + `x</button></span>`;
+      return (
+        `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"` +
+        ` disabled title="Cancelling…">` +
+        `x</button></span>`
+      );
     }
 
     // active order → hover cancel pill
     if (o.status === 'NEW' || o.status === 'PARTIALLY_FILLED') {
-      const cancel = JSON.stringify({ action: 'cancel', side: type, index, orderId: o.orderId ?? null });
-      return `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"`
-        + ` data-value='${cancel}' title="Cancel order">`
-        + `x</button></span>`;
+      const cancel = JSON.stringify({
+        action: 'cancel',
+        side: type,
+        index,
+        orderId: o.orderId ?? null,
+      });
+      return (
+        `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"` +
+        ` data-value='${cancel}' title="Cancel order">` +
+        `x</button></span>`
+      );
     }
 
     return '';
@@ -316,7 +333,11 @@ export class LoadDataCalculator {
       if (!btn) return;
 
       let payload;
-      try { payload = JSON.parse(btn.dataset.value); } catch { return; }
+      try {
+        payload = JSON.parse(btn.dataset.value);
+      } catch {
+        return;
+      }
 
       // Expert Mode gate is server-enforced, not only CSS: emit a manual order op
       // only while the switch is on (source of truth = .expert-on on the table).
@@ -325,7 +346,9 @@ export class LoadDataCalculator {
       const expertOn = table.classList.contains('expert-on');
       if ((payload.action === 'cancel' || payload.action === 'replace') && !expertOn) {
         this.notifications.showNotification(
-          'Enable Expert Mode to manage individual orders', 'warning', 5000
+          'Enable Expert Mode to manage individual orders',
+          'warning',
+          5000
         );
         return;
       }
@@ -345,14 +368,20 @@ export class LoadDataCalculator {
         if (!ORDER_CANCEL_ENABLED) {
           this.notifications.showNotification(
             `🧪 Stub: ${payload.side} #${payload.index + 1} not cancelled (manual cancel disabled)`,
-            'warning', 6000
+            'warning',
+            6000
           );
           return;
         }
         // Real cancel: send to this symbol's bot via WS (SpotWS sets the
         // callback). The bot cancels on the exchange and marks the order
         // manual:true so the engine won't re-place it.
-        this.onCancelOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, expert: true });
+        this.onCancelOrder?.({
+          side: payload.side,
+          index: payload.index,
+          orderId: payload.orderId,
+          expert: true,
+        });
         // Hold the ✕ disabled until the order turns CANCELED+manual (✕ → ＋):
         // the key survives the per-tick re-render (node.disabled would not), and
         // the current node is disabled too for instant feedback before re-render.
@@ -381,11 +410,18 @@ export class LoadDataCalculator {
         if (!ORDER_CANCEL_ENABLED) {
           this.notifications.showNotification(
             `🧪 Stub: ${payload.side} #${payload.index + 1} not re-placed at ${price} (manual cancel disabled)`,
-            'warning', 6000
+            'warning',
+            6000
           );
           return;
         }
-        this.onReplaceOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, price, expert: true });
+        this.onReplaceOrder?.({
+          side: payload.side,
+          index: payload.index,
+          orderId: payload.orderId,
+          price,
+          expert: true,
+        });
         return;
       }
     });
@@ -505,9 +541,9 @@ export class LoadDataCalculator {
 
   async addRestartStatus(value) {
     const obj = {
-      "pair": base + quote,
-      "restart": value
-    }
+      pair: base + quote,
+      restart: value,
+    };
 
     try {
       const res = await fetch(`/spotbot/calculator/restart`, {

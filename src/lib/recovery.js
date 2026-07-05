@@ -39,9 +39,7 @@ async function scanLiveCycles(dataDir) {
       if (data.status === 3 /* Status.DONE */) continue;
 
       const orders = [...(data.BUY || []), ...(data.SELL || [])];
-      const live = orders.filter(
-        (o) => o && o.orderId != null && LIVE_STATES.has(o.status)
-      );
+      const live = orders.filter((o) => o && o.orderId != null && LIVE_STATES.has(o.status));
 
       if (live.length > 0) {
         // symbol from the pair field or from the file name SYMBOL-exchange.json

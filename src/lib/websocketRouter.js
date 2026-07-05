@@ -3,7 +3,14 @@ const JsonTimerSender = require('../modules/jsonTimerSender.js');
 const { pair, statusPair } = require('./pair.js');
 const { UserStreamAPI } = require('./UserStreamApi.js');
 
-const MESSAGE_TYPES = new Set(['subscribe', 'start', 'restartSync', 'stop', 'cancelOrder', 'replaceOrder']);
+const MESSAGE_TYPES = new Set([
+  'subscribe',
+  'start',
+  'restartSync',
+  'stop',
+  'cancelOrder',
+  'replaceOrder',
+]);
 const SYMBOL_RE = /^[A-Z0-9]{3,20}$/;
 const STRATEGIES = new Set(['short', 'long']);
 
@@ -44,7 +51,9 @@ class WebSocketRouter {
       console.log('🟢 WebSocket connected');
 
       ws.isAlive = true;
-      ws.on('pong', () => { ws.isAlive = true; });
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
 
       ws.on('message', (msg) => {
         let data;
@@ -60,8 +69,7 @@ class WebSocketRouter {
           }
 
           if (data.type === 'subscribe') {
-            const symbol =
-              typeof data.symbol === 'string' ? data.symbol.toUpperCase() : '';
+            const symbol = typeof data.symbol === 'string' ? data.symbol.toUpperCase() : '';
 
             if (!SYMBOL_RE.test(symbol)) {
               return this.safeSend(ws, { error: 'invalid symbol' });
@@ -166,8 +174,8 @@ class WebSocketRouter {
                     data: {
                       symbol: data.symbol,
                       price: data.price,
-                      message: 'New + cycle started'
-                    }
+                      message: 'New + cycle started',
+                    },
                   });
                 }
               });
@@ -198,7 +206,7 @@ class WebSocketRouter {
             const ts = this.timerSenders.get(currentSymbol);
 
             ts.start(currentSymbol, data.strategy, {
-              autoRestart: data.autoRestart === true
+              autoRestart: data.autoRestart === true,
             });
 
             pair.updateSymbol({ symbol: currentSymbol, status: statusPair.START });
@@ -263,9 +271,7 @@ class WebSocketRouter {
               index: Number(data.index),
               price: data.price,
             })
-              .then((result) =>
-                this.safeSend(ws, { event: 'replaceOrderResult', data: result })
-              )
+              .then((result) => this.safeSend(ws, { event: 'replaceOrderResult', data: result }))
               .catch((err) => {
                 console.error('❌ replaceOrder WS:', err);
                 this.safeSend(ws, { error: 'replace failed' });

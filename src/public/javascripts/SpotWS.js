@@ -28,14 +28,25 @@ export class SpotWS {
     // `expert` carries the Expert Mode gate to the server (rejected without it).
     this.loadDataCalculator.onCancelOrder = ({ side, index, orderId, expert }) => {
       if (this.#isWebSocketOpen(this.ws)) {
-        this.ws.send(JSON.stringify({ type: 'cancelOrder', symbol: base + quote, side, index, orderId, expert }));
+        this.ws.send(
+          JSON.stringify({
+            type: 'cancelOrder',
+            symbol: base + quote,
+            side,
+            index,
+            orderId,
+            expert,
+          })
+        );
       }
     };
 
     // Item 10: manual re-place of a pulled order at a new price → tell the bot.
     this.loadDataCalculator.onReplaceOrder = ({ side, index, price, expert }) => {
       if (this.#isWebSocketOpen(this.ws)) {
-        this.ws.send(JSON.stringify({ type: 'replaceOrder', symbol: base + quote, side, index, price, expert }));
+        this.ws.send(
+          JSON.stringify({ type: 'replaceOrder', symbol: base + quote, side, index, price, expert })
+        );
       }
     };
 

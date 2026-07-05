@@ -78,11 +78,15 @@ test('replaceManualOrder: places slot qty at user price, records the replace', a
 test('replaceManualOrder: snaps price to tickSize decimals (PRICE_FILTER)', async () => {
   const { sender, calls } = await setup();
   // grid carrying price precision (tickSize = 2 decimals) in param
-  await fs.writeFile(filePath, JSON.stringify({
-    param: { 'field-tickSize': 2 },
-    BUY: [{ status: 'CANCELED', orderId: 1, quantity: '0.5', price: '100', manual: true }],
-    SELL: [],
-  }), 'utf8');
+  await fs.writeFile(
+    filePath,
+    JSON.stringify({
+      param: { 'field-tickSize': 2 },
+      BUY: [{ status: 'CANCELED', orderId: 1, quantity: '0.5', price: '100', manual: true }],
+      SELL: [],
+    }),
+    'utf8'
+  );
   sender.manualPulls.BUY.add(0);
 
   const r = await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101.567' });
@@ -144,11 +148,20 @@ test('replaceManualOrder: not running / invalid price → fail, no API call', as
   sender.manualPulls.BUY.add(0);
 
   sender.running[SYMBOL] = false;
-  assert.equal((await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101' })).success, false);
+  assert.equal(
+    (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101' })).success,
+    false
+  );
 
   sender.running[SYMBOL] = true;
-  assert.equal((await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '0' })).success, false);
-  assert.equal((await sender.replaceManualOrder({ side: 'BUY', index: 0, price: 'abc' })).success, false);
+  assert.equal(
+    (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '0' })).success,
+    false
+  );
+  assert.equal(
+    (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: 'abc' })).success,
+    false
+  );
 
   assert.equal(calls.length, 0);
 });
