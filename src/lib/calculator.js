@@ -25,6 +25,12 @@ class Calculator {
       'field-fibonachiStep': 0.2, // fibonachi
       'field-martingail': 49,
       'field-indent': 0.0,
+      // Hybrid DCA/GRID: when 'on', each rung also gets its OWN micro take-profit
+      // (own entry price marked up by microProfit + commission) so a grid leg can
+      // bank an oscillation independently of the DCA averaged close. Off = the
+      // classic single-averaged-close behavior, output byte-for-byte unchanged.
+      'field-hybrid': 'off',
+      'field-microProfit': 0.1, // % net profit for a grid micro-order (on top of commission)
       'field-trackPrice': 0.15, // does not participate in the construction
       'field-activeOrders': 3, // does not participate in the construction
       'field-requestFrequency': 500, // does not participate in the construction
@@ -46,11 +52,22 @@ class Calculator {
     );
   };
 
+  // Hybrid enabled? Turns on the per-rung micro take-profit field. Accepts 'on',
+  // boolean true, or 1 — parseNumbers() coerces a boolean true to 1, so we match
+  // that too. Kept intentionally lax so a stray value never crashes the grid.
+  #hybridOn() {
+    const h = this.data['field-hybrid'];
+    return h === 'on' || h === true || h === 1;
+  }
+
   long = () => {
     const mainObj = [];
     const step = this.data['field-stepSize'];
     const tick = this.data['field-tickSize'];
     const currency = new Decimal(this.data['field-currency']);
+    const hybrid = this.#hybridOn();
+    const microProfit = new Decimal(this.data['field-microProfit'] ?? 0);
+    const commission = new Decimal(this.data['field-commission']);
 
     let balanceTotal = new Decimal(this.data['field-deposit']);
 
@@ -112,15 +129,32 @@ class Calculator {
       // Spent in quote currency (money = price × qty); quote precision = price tickSize
       const spentQuote = actualSpent.toFixed(tick);
 
-      mainObj.push({
+      // The actual placed entry price (rounded to tick) — the exchange fills the
+      // BUY here, so the micro take-profit must be measured from this, not the
+      // full-precision internal value, or the banked profit drifts by a rounding tick.
+      const entryPrice = buyPrice.toFixed(tick);
+
+      const row = {
         overlapRange: overlapRange.toFixed(2),
-        buyCurrency: buyPrice.toFixed(tick),
+        buyCurrency: entryPrice,
         buy: buy.toFixed(step),
         totalSell: totalSell.toFixed(step),
         sellCurrency: sellCurrency.toFixed(tick),
         didBuy: spentQuote,
         calcBalance: balanceTotal.toFixed(tick),
-      });
+      };
+
+      if (hybrid) {
+        // Grid micro take-profit for THIS rung: its own entry price marked up by
+        // microProfit + commission. The DCA path ignores it; job's hybrid path uses
+        // it for rungs at/below the activation level, so each leg banks its own bounce.
+        row.microSellCurrency = new Decimal(entryPrice)
+          .times(new Decimal(100).plus(microProfit).plus(commission))
+          .div(100)
+          .toFixed(tick);
+      }
+
+      mainObj.push(row);
     }
     return mainObj;
   };
@@ -141,6 +175,9 @@ class Calculator {
     const step = this.data['field-stepSize'];
     const tick = this.data['field-tickSize'];
     const currency = new Decimal(this.data['field-currency']);
+    const hybrid = this.#hybridOn();
+    const microProfit = new Decimal(this.data['field-microProfit'] ?? 0);
+    const commission = new Decimal(this.data['field-commission']);
 
     let currentBalance = new Decimal(this.data['field-deposit']);
     const initialDeposit = new Decimal(this.data['field-deposit']);
@@ -199,15 +236,30 @@ class Calculator {
       // Spent in quote currency (money = qty × price); quote precision = price tickSize
       const spentQuote = currentOrderSell.times(sellPrice).toFixed(tick);
 
-      mainObj.push({
+      // The actual placed entry price (rounded to tick) — the exchange fills the
+      // SELL here, so measure the micro buy-back from this rounded value.
+      const entryPrice = sellPrice.toFixed(tick);
+
+      const row = {
         overlapRange: overlapRange.toFixed(2),
         buyCurrency: buyPrice.toFixed(tick),
         buy: initialDeposit.minus(currentBalance).toFixed(step),
         totalSell: currentOrderSell.toFixed(step),
-        sellCurrency: sellPrice.toFixed(tick),
+        sellCurrency: entryPrice,
         didBuy: spentQuote,
         calcBalance: currentBalance.toFixed(step),
-      });
+      };
+
+      if (hybrid) {
+        // Mirror of long: grid micro take-profit is a BUY-back at THIS rung's own
+        // sell entry price marked down by microProfit + commission.
+        row.microBuyCurrency = new Decimal(entryPrice)
+          .times(new Decimal(100).minus(microProfit.plus(commission)))
+          .div(100)
+          .toFixed(tick);
+      }
+
+      mainObj.push(row);
     }
 
     return mainObj;
