@@ -2,6 +2,18 @@
 // the only ESM module and worked only thanks to require(esm) in Node ≥22.
 const Decimal = require('decimal.js');
 
+// Hybrid grid micro take-profit price: an entry price marked up (long close =
+// SELL) or down (short close = BUY) by microProfit + commission. Single source of
+// truth — used by the Calculator rows (for display) and by the Job at placement
+// time (from the real fill). entryPrice is a number/string; returns a tick-rounded
+// string.
+function microClosePrice(entryPrice, microProfit, commission, tick, strategy) {
+  const total = new Decimal(microProfit).plus(commission);
+  const factor =
+    strategy === 'short' ? new Decimal(100).minus(total) : new Decimal(100).plus(total);
+  return new Decimal(entryPrice).times(factor).div(100).toFixed(tick);
+}
+
 class Calculator {
   // The grid is built by a factory, not the constructor: `new Calculator()` now
   // returns a normal instance (instanceof works); the entry point is the static
@@ -148,10 +160,7 @@ class Calculator {
         // Grid micro take-profit for THIS rung: its own entry price marked up by
         // microProfit + commission. The DCA path ignores it; job's hybrid path uses
         // it for rungs at/below the activation level, so each leg banks its own bounce.
-        row.microSellCurrency = new Decimal(entryPrice)
-          .times(new Decimal(100).plus(microProfit).plus(commission))
-          .div(100)
-          .toFixed(tick);
+        row.microSellCurrency = microClosePrice(entryPrice, microProfit, commission, tick, 'long');
       }
 
       mainObj.push(row);
@@ -253,10 +262,7 @@ class Calculator {
       if (hybrid) {
         // Mirror of long: grid micro take-profit is a BUY-back at THIS rung's own
         // sell entry price marked down by microProfit + commission.
-        row.microBuyCurrency = new Decimal(entryPrice)
-          .times(new Decimal(100).minus(microProfit.plus(commission)))
-          .div(100)
-          .toFixed(tick);
+        row.microBuyCurrency = microClosePrice(entryPrice, microProfit, commission, tick, 'short');
       }
 
       mainObj.push(row);
@@ -266,4 +272,4 @@ class Calculator {
   };
 }
 
-module.exports = { Calculator };
+module.exports = { Calculator, microClosePrice };

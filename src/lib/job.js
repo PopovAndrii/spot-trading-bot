@@ -1,5 +1,6 @@
 const Decimal = require('decimal.js');
 const { rebalanceClose } = require('./rebalanceClose');
+const { microClosePrice } = require('./calculator');
 
 const Status = Object.freeze({
   READY: 0, // 0 - can deletad. never started
@@ -549,7 +550,7 @@ class Job {
     const g = this.#gridStartIndex(obj);
     if (i >= g) {
       // grid leg: entry = BUY[i], close = SELL[i]
-      return this.#gridLeg(el.symbol, i, el, obj['SELL'][i], 'BUY', 'SELL');
+      return this.#gridLeg(obj, i, el, obj['SELL'][i], 'BUY', 'SELL');
     }
 
     // DCA base over a base-only view (indices < g)
@@ -563,12 +564,30 @@ class Job {
     const g = this.#gridStartIndex(obj);
     if (i >= g) {
       // grid leg (mirror): entry = SELL[i], close = BUY[i]
-      return this.#gridLeg(el.symbol, i, el, obj['BUY'][i], 'SELL', 'BUY');
+      return this.#gridLeg(obj, i, el, obj['BUY'][i], 'SELL', 'BUY');
     }
 
     const view = { ...obj, BUY: obj['BUY'].slice(0, g), SELL: obj['SELL'].slice(0, g) };
     return this.short(view, i, el);
   };
+
+  // Grid close order (price + quantity) computed at placement time, like DCA's
+  // rebalancedClose. Price = the rung's own entry LEVEL marked by microProfit +
+  // commission (matches the displayed micro column). Quantity = what the entry
+  // actually filled, floored to stepSize (safe against a partial entry fill).
+  #gridClose(obj, entry, closeSide) {
+    const p = obj.param || {};
+    const microProfit = p['field-microProfit'] ?? 0.1;
+    const commission = p['field-commission'] ?? 0;
+    const tick = parseInt(p['field-tickSize'], 10) || 0;
+    const step = parseInt(p['field-stepSize'], 10) || 0;
+    const strategy = closeSide === 'SELL' ? 'long' : 'short';
+
+    const price = microClosePrice(entry.price, microProfit, commission, tick, strategy);
+    const execQty = new Decimal(entry.executedQty || entry.quantity || 0);
+    const quantity = execQty.toDecimalPlaces(step, Decimal.ROUND_DOWN).toFixed(step);
+    return { quantity, price };
+  }
 
   // One self-contained grid leg. entry/close are the two paired slots; entrySide/
   // closeSide are their order sides ('BUY'/'SELL'). Returns the next action:
@@ -578,7 +597,8 @@ class Job {
   //   close NEW/PARTIAL       → getOrder(close)     [poll]
   //   both FILLED             → REARM               [one oscillation banked]
   // A manually pulled slot is left alone (pass), like the DCA path.
-  #gridLeg(symbol, i, entry, close, entrySide, closeSide) {
+  #gridLeg(obj, i, entry, close, entrySide, closeSide) {
+    const symbol = entry.symbol;
     if (entry.status === state.FILLED) {
       if (close.status === state.FILLED) {
         return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
@@ -595,6 +615,8 @@ class Job {
       if (close.manual) {
         return { status: 'pass', method: false, side: null, id: i, data: {} };
       }
+      // micro take-profit price/qty from the real entry fill (not the stale slot)
+      const { quantity, price } = this.#gridClose(obj, entry, closeSide);
       return {
         status: null,
         method: 'newOrder',
@@ -606,8 +628,8 @@ class Job {
           side: closeSide,
           type: 'LIMIT',
           timeInForce: 'GTC',
-          quantity: close.quantity,
-          price: close.price,
+          quantity,
+          price,
         },
       };
     }

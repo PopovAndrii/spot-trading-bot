@@ -107,14 +107,17 @@ test('grid long: entry NEW → poll the BUY', () => {
 });
 
 test('grid long: entry FILLED, close not placed → place the micro take-profit SELL', () => {
+  // micro price = entry level × (1 + (microProfit + commission)/100), computed by
+  // the engine from the fill — not the stale close slot. Here 90.00 × 1.002 = 90.18
+  // (microProfit default 0.1 + commission 0.1). Qty = the entry's filled amount.
   const obj = gridObj({
-    buys: [mkOrder('BUY', 'FILLED', { orderId: 5 })],
-    sells: [mkOrder('SELL', null, { quantity: '1.000', price: '90.27' })],
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 5, quantity: '1.000', price: '90.00' })],
+    sells: [mkOrder('SELL', null, { quantity: '9.999', price: '999.99' })], // ignored
   });
   const r = job.hybridLong(obj, 0, obj.BUY[0]);
   assert.equal(r.method, 'newOrder');
   assert.equal(r.side, 'SELL');
-  assert.equal(r.data.price, '90.27'); // its OWN micro price, not an averaged close
+  assert.equal(r.data.price, '90.18');
   assert.equal(r.data.quantity, '1.000');
 });
 
@@ -187,15 +190,17 @@ test('hybrid: grid micro-close does NOT leak into the base rebalance', () => {
 // ===== short mirror =====
 
 test('grid short: entry (SELL) FILLED, close not placed → place the micro BUY-back', () => {
+  // mirror: micro buy-back = entry level × (1 − 0.2/100). 100.00 × 0.998 = 99.80.
   const obj = mkObj({
-    sells: [mkOrder('SELL', 'FILLED', { orderId: 5 })],
-    buys: [mkOrder('BUY', null, { quantity: '1.000', price: '110.00' })],
+    sells: [mkOrder('SELL', 'FILLED', { orderId: 5, quantity: '1.000', price: '100.00' })],
+    buys: [mkOrder('BUY', null, { quantity: '9.999', price: '999.99' })], // ignored
     param: { 'field-gridLevel': '1' },
   });
   const r = job.hybridShort(obj, 0, obj.SELL[0]);
   assert.equal(r.method, 'newOrder');
   assert.equal(r.side, 'BUY');
-  assert.equal(r.data.price, '110.00');
+  assert.equal(r.data.price, '99.80');
+  assert.equal(r.data.quantity, '1.000');
 });
 
 test('grid short: entry FILLED + close FILLED → REARM', () => {

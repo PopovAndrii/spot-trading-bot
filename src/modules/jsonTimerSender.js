@@ -1,7 +1,14 @@
 const EventEmitter = require('events');
 const fs = require('fs/promises');
 const path = require('path');
-const { Job, Status, rebalancedClose, deepestFilledIndex } = require('../lib/job');
+const {
+  Job,
+  Status,
+  rebalancedClose,
+  deepestFilledIndex,
+  gridLegProfit,
+  rearmGridLeg,
+} = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
@@ -78,7 +85,11 @@ function cycleProfit(obj) {
           : (parseFloat(o.price) || 0) * (parseFloat(o.executedQty ?? o.quantity) || 0);
       return acc + (Number.isFinite(quote) ? quote : 0);
     }, 0);
-  return sumFilledQuote(obj?.SELL) - sumFilledQuote(obj?.BUY);
+  // Hybrid: grid legs bank each oscillation and then reset their fills (rearmGridLeg
+  // clears executedQty/cummulativeQuoteQty), so that realized profit is no longer in
+  // the BUY/SELL sums — it is accumulated in obj.gridRealized. Fold it back in.
+  const gridRealized = Number(obj?.gridRealized) || 0;
+  return sumFilledQuote(obj?.SELL) - sumFilledQuote(obj?.BUY) + gridRealized;
 }
 
 function partialFillDelta(stored, message) {
@@ -438,7 +449,18 @@ class JsonTimerSender extends EventEmitter {
     const strategy = this.#strategy();
 
     if (obj.status == Status.READY && strategy != null) {
-      if (await this.#maybePrepareRecoveryClose(obj, strategy)) return;
+      // Hybrid DCA/GRID: route to hybridLong/hybridShort so rungs ≥ gridLevel run
+      // as recycling grid legs. The averaged-recovery consolidation is a DCA-only
+      // safety (it assumes the whole grid folds into one close) — skip it in hybrid,
+      // where grid legs are meant to keep several live closes at once.
+      const hybrid = obj?.param?.['field-hybrid'] === 'on' || obj?.param?.['field-hybrid'] === true;
+      const method = hybrid
+        ? strategy.method === 'short'
+          ? 'hybridShort'
+          : 'hybridLong'
+        : strategy.method;
+
+      if (!hybrid && (await this.#maybePrepareRecoveryClose(obj, strategy))) return;
 
       let i = 0;
 
@@ -459,7 +481,30 @@ class JsonTimerSender extends EventEmitter {
           i++;
         }
 
-        let currentOrder = this.job[strategy.method](obj, key, val); // strategy.
+        let currentOrder = this.job[method](obj, key, val); // strategy.
+
+        // Hybrid grid leg banked one oscillation (entry + micro-close both FILLED):
+        // record the realized quote profit, then re-arm the leg (reset both slots so
+        // it buys/sells again at the same level). No API call — pure bookkeeping.
+        if (currentOrder.status === 'REARM') {
+          if (!this.running) return;
+          const id = currentOrder.id;
+          const banked = gridLegProfit(obj['BUY'][id], obj['SELL'][id]);
+          obj.gridRealized = (Number(obj.gridRealized) || 0) + banked;
+          obj.gridCycles = (Number(obj.gridCycles) || 0) + 1;
+          rearmGridLeg(obj, id);
+          obj.date_modified = new Date().toISOString();
+
+          logBus.log(
+            `♻️ ${this.symbol}: grid leg #${id + 1} banked ` +
+              `${banked >= 0 ? '+' : ''}${banked.toFixed(this.tickDecimals)} ${this.quoteAsset || ''} ` +
+              `(total grid: ${(Number(obj.gridRealized) || 0).toFixed(this.tickDecimals)})`
+          );
+
+          await this.#mergeLiveEdits(obj);
+          await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
+          continue;
+        }
 
         if (currentOrder.status === Status.DONE) {
           const result = await this.#runToApi(currentOrder); // cancelOpenOrders
