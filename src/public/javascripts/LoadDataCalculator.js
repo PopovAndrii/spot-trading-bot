@@ -486,17 +486,39 @@ export class LoadDataCalculator {
       // first order sits at the bottom and safety sells climb upward. Data binding stays
       // keyed by `index` (order number, badges, status backlight, cancel/replace
       // side:index), so only the DOM order changes — numbering keeps index+1 (№1 bottom).
+      // Hybrid grid: rungs from gridLevel (a 1-based order number) downward are grid
+      // legs whose CLOSE is the backend-computed micro take-profit — long closes with
+      // SELL (microSellCurrency), short with BUY (microBuyCurrency). Show that price in
+      // the close column (and feed it to the re-place/current-price badges) instead of
+      // the DCA averaged close, so the table matches what the engine actually places.
+      // Purely a display choice over values the backend already computed.
+      const hybridOn = this.defaultData['field-hybrid'] === 'on';
+      const gridLevel = parseInt(this.defaultData['field-gridLevel'], 10);
+      const gridFrom =
+        hybridOn && Number.isInteger(gridLevel) && gridLevel >= 1 ? gridLevel - 1 : Infinity;
+
       const rows = [];
       data['calculator'].forEach((el, index) => {
-        const buyAct = this.#rowAction(obj, 'BUY', index, el.buyCurrency);
-        const sellAct = this.#rowAction(obj, 'SELL', index, el.sellCurrency);
-        rows[index] = `<tr>
+        const isGrid = index >= gridFrom;
+        const buyPrice =
+          isGrid && el.microBuyCurrency != null ? el.microBuyCurrency : el.buyCurrency;
+        const sellPrice =
+          isGrid && el.microSellCurrency != null ? el.microSellCurrency : el.sellCurrency;
+        // A long grid leg sells only what THIS rung bought (el.buy), not the DCA
+        // cumulative (el.totalSell = the averaged close's size). Short's SELL column
+        // is already the per-rung entry size, so it stays as-is.
+        const sellQty = isGrid && this.strategy === 'long' ? el.buy : el.totalSell;
+        const gridTitle = isGrid ? ' title="grid leg — micro take-profit"' : '';
+
+        const buyAct = this.#rowAction(obj, 'BUY', index, buyPrice);
+        const sellAct = this.#rowAction(obj, 'SELL', index, sellPrice);
+        rows[index] = `<tr${gridTitle}>
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
-              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${this.#currentPriceBadge(obj, 'BUY', index, el.buyCurrency)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
+              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${buyPrice}${this.#currentPriceBadge(obj, 'BUY', index, buyPrice)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
               <td class="${this.#backlight(obj, 'BUY', index)}"><span class="fill-cell">${el.buy}${this.#fillBadge(obj, 'BUY', index, 'qty')}</span></td>
-              <td class="${this.#backlight(obj, 'SELL', index)}"><span class="fill-cell">${el.totalSell}${this.#fillBadge(obj, 'SELL', index, 'qty')}</span></td>
-              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${el.sellCurrency}${this.#currentPriceBadge(obj, 'SELL', index, el.sellCurrency)}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
+              <td class="${this.#backlight(obj, 'SELL', index)}"><span class="fill-cell">${sellQty}${this.#fillBadge(obj, 'SELL', index, 'qty')}</span></td>
+              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${sellPrice}${this.#currentPriceBadge(obj, 'SELL', index, sellPrice)}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
               <td>${el.didBuy}</td>
               <td>${el.calcBalance}</td>
           </tr>`;
