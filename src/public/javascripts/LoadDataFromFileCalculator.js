@@ -65,6 +65,18 @@ export class LoadDataFromFileCalculator {
       }
     }
 
+    // Hybrid-grid switch: restore from the saved param (same pattern as Restart).
+    // Old configs without field-hybrid leave it off.
+    const hybridSw = document.getElementById('settings-hybrid');
+    if (hybridSw) {
+      const input = hybridSw.querySelector('input');
+      const on = String(data.param['field-hybrid']) === 'on';
+      input.checked = on;
+      if (on) input.setAttribute('checked', '');
+      else input.removeAttribute('checked');
+      hybridSw.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+
     this.#fillInData(data);
     this.loadDataCalculator.calculate(data);
   }

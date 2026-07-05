@@ -81,6 +81,8 @@ export class SetStrategy {
       'field-fibonachiStep': 0.6,
       'field-martingail': 68, // %
       'field-indent': 0.1, // %
+      'field-gridLevel': 3, // hybrid: first order (down the ladder) that becomes a grid leg
+      'field-microProfit': 0.1, // hybrid: net take-profit % of each grid micro-order
       'field-activeOrders': 3,
       'field-requestFrequency': 1500, // ms
       'field-stepSize': data['stepSize'],

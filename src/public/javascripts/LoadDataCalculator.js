@@ -191,6 +191,30 @@ export class LoadDataCalculator {
         this.defaultData[key] = el.value;
       }
     });
+
+    // Hybrid grid: the switch is the source of truth (no hidden field-* input).
+    // Serialize it into param as 'on'/'off' so the engine can read field-hybrid.
+    this.defaultData['field-hybrid'] = document.getElementById('hybrid')?.checked ? 'on' : 'off';
+  }
+
+  // Wire the Hybrid-grid switch: toggling it recomputes the grid (the micro
+  // take-profit column depends on it), like a settings SpinBox change. Locked
+  // while a cycle runs, same guard as the other build params.
+  hybrid() {
+    const sw = document.getElementById('settings-hybrid');
+    sw?.addEventListener('ui-switch-change', () => {
+      if (this.getListenerStatus()) {
+        this.getSettings();
+        this.strategy = document.getElementById('field-strategy').value;
+        this.calculator();
+      } else {
+        this.notifications.showNotification(
+          'Calculator is locked. <br>Press the "Stop" button.',
+          'warning',
+          3000
+        );
+      }
+    });
   }
 
   #backlight(obj, type, index) {

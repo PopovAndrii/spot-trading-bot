@@ -78,6 +78,26 @@
                 <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
               </div>
             </div>
+
+            <div class="line">
+              <div class="UIsw info lg r-1 label-top" role="switch" tabindex="0" id="settings-hybrid">
+                <label class="UIsw-label" for="hybrid">Hybrid grid
+                  <span class="UIql" tabindex="0">
+                    <span class="UIql__text">DCA/GRID hybrid. Rungs from "Grid from order" downward become recycling grid legs: each buys at its level and sells back at its own micro-profit, banking every bounce, then re-arms. Rungs above stay classic DCA (one averaged close). Off = pure DCA.</span>
+                  </span>
+                </label>
+                <input type="checkbox" id="hybrid" name="hybrid-switch" hidden>
+                <span class="UIsw-slider"></span>
+                <span class="UIsw-slider__on">on</span>
+                <span class="UIsw-slider__off">off</span>
+              </div>
+              <div class="">
+                <%- include('../views/ui/SpinBox', { id:'field-gridLevel' , label:'Grid from order' , min:1, max:50 , step: 0, hint:'From which order number (down the ladder) rungs become grid legs. Rungs above this stay DCA. Only used when Hybrid grid is on.' }); %>
+              </div>
+              <div class="">
+                <%- include('../views/ui/SpinBox', { id:'field-microProfit' , label:'Micro profit %' , min:0.01, max:2 , step: 2, hint:'Net take-profit of each grid micro-order, on top of commission. Smaller = banks bounces more often. Default 0.1.' }); %>
+              </div>
+            </div>
           </div>
 
           <!-- These params stay available while the robot is running: Active orders /
