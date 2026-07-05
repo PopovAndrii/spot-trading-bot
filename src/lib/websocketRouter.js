@@ -153,7 +153,7 @@ class WebSocketRouter {
                 }
               });
 
-              // Reminder about a stuck manual slot (risk #4): a self-dismissing
+              // Reminder about a stuck manual slot: a self-dismissing
               // warning toast (no persist), like a normal notification. The text is
               // computed in jsonTimerSender (#remindManualStuck, read-only).
               ts.on('manualStuck', (data) => {

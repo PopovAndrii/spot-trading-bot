@@ -386,7 +386,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
-   * Step 3: the entry grid is exhausted (all entries FILLED) and the closes
+   * The entry grid is exhausted (all entries FILLED) and the closes
    * overlapped (≥2 live NEW — a burst fill on a wick). There's nothing left to
    * average into, while several closes hang on pieces of one position. Action:
    * pull the overlapping closes on the exchange, write ONE close at the deepest

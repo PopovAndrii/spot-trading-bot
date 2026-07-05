@@ -301,7 +301,7 @@ test('long: active close lagging below i-1 (gap-fill) → cancel it before placi
   assert.equal(r.data.orderId, 102);
 });
 
-// ===== orphan inventory after a "blind" window (Step 2) =====
+// ===== orphan inventory after a "blind" window =====
 // the sell slipped through between the drop and the bounce within one poll
 // interval: the lower buys filled, but the close executed at the upper index
 // before it crawled down. The cycle must not close, leaving an unsold position.

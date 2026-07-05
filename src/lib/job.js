@@ -30,7 +30,7 @@ function deepestFilledIndex(arr) {
   return -1;
 }
 
-// Stage 3c: quantity/price of the closing order, accounting for what was actually
+// Quantity/price of the closing order, accounting for what was actually
 // sold/bought back across partially filled and canceled closes during the cycle.
 // Returns { quantity, price } (strings, rounded by step/tick) or null — in which
 // case the caller uses the precomputed values from config.

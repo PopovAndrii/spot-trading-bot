@@ -1,6 +1,6 @@
 const Decimal = require('decimal.js');
 
-// Stage 2: recompute the averaged CLOSING order after a partial fill.
+// Recompute the averaged CLOSING order after a partial fill.
 //
 // Context (long): the position is built with BUY orders (spend quote, receive
 // base) and closed with one SELL at the averaged price plus profit. If the active
