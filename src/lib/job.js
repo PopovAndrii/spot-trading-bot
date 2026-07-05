@@ -1,3 +1,4 @@
+const Decimal = require('decimal.js');
 const { rebalanceClose } = require('./rebalanceClose');
 
 const Status = Object.freeze({
@@ -60,12 +61,13 @@ function rebalancedClose(obj, i, strategy) {
 
   const stepSize = parseInt(obj['param']['field-stepSize'], 10) || 0;
   const tickSize = parseInt(obj['param']['field-tickSize'], 10) || 0;
-  const stepPow = 10 ** stepSize;
 
   return {
     // floor the quantity — so we don't try to close more than we actually hold
-    quantity: (Math.floor(res.quantity * stepPow) / stepPow).toFixed(stepSize),
-    price: res.price.toFixed(tickSize),
+    quantity: new Decimal(res.quantity)
+      .toDecimalPlaces(stepSize, Decimal.ROUND_DOWN)
+      .toFixed(stepSize),
+    price: new Decimal(res.price).toFixed(tickSize),
   };
 }
 

@@ -1,3 +1,5 @@
+const Decimal = require('decimal.js');
+
 // Stage 2: recompute the averaged CLOSING order after a partial fill.
 //
 // Context (long): the position is built with BUY orders (spend quote, receive
@@ -20,23 +22,30 @@
 //
 // Returns { quantity, avgEntryPrice, price } — raw numbers without rounding
 // (rounding by stepSize/tickSize is done at apply time), or null if the position
-// is already fully closed (base leftover <= 0).
+// is already fully closed (base leftover <= 0). Sums and the averaging division
+// run in Decimal so the money math doesn't drift; the boundary values are handed
+// back as plain numbers for the callers.
 function rebalanceClose(entries, closes, strategy, feesPct) {
   const closeArr = Array.isArray(closes) ? closes : closes ? [closes] : [];
-  const sum = (arr, key) => (arr || []).reduce((s, e) => s + (Number(e[key]) || 0), 0);
+  const sum = (arr, key) =>
+    (arr || []).reduce((s, e) => s.plus(Number(e[key]) || 0), new Decimal(0));
 
-  const remainingBase = sum(entries, 'executedQty') - sum(closeArr, 'executedQty');
-  const remainingQuote = sum(entries, 'cummulativeQuoteQty') - sum(closeArr, 'cummulativeQuoteQty');
+  const remainingBase = sum(entries, 'executedQty').minus(sum(closeArr, 'executedQty'));
+  const remainingQuote = sum(entries, 'cummulativeQuoteQty').minus(
+    sum(closeArr, 'cummulativeQuoteQty')
+  );
 
-  if (remainingBase <= 0) return null; // position already fully closed
+  if (remainingBase.lte(0)) return null; // position already fully closed
 
-  const avgEntryPrice = remainingQuote / remainingBase;
-  const factor = strategy === 'short' ? 1 - feesPct / 100 : 1 + feesPct / 100;
+  const avgEntryPrice = remainingQuote.div(remainingBase);
+  const feeFactor = new Decimal(feesPct).div(100);
+  const factor =
+    strategy === 'short' ? new Decimal(1).minus(feeFactor) : new Decimal(1).plus(feeFactor);
 
   return {
-    quantity: remainingBase,
-    avgEntryPrice,
-    price: avgEntryPrice * factor,
+    quantity: remainingBase.toNumber(),
+    avgEntryPrice: avgEntryPrice.toNumber(),
+    price: avgEntryPrice.times(factor).toNumber(),
   };
 }
 

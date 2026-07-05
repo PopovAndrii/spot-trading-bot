@@ -13,6 +13,7 @@
 // (the stranded quantity), remainingQuote = Σ entry.quote − Σ close.quote (the
 // stranded money). Commission is passed WITHOUT profit — we need the series
 // break-even, not the close's target profit.
+const Decimal = require('decimal.js');
 const { rebalanceClose } = require('./rebalanceClose');
 
 function recoveryStats(session) {
@@ -32,7 +33,7 @@ function recoveryStats(session) {
   const r = rebalanceClose(entries, closes, strategy, commission);
   if (!r) return null; // position fully closed — nothing to return
 
-  const strandedQty = Number(r.quantity.toFixed(qtyPrec));
+  const strandedQty = Number(new Decimal(r.quantity).toFixed(qtyPrec));
   if (strandedQty <= 0) return null; // leftover within dust
 
   const base = (session.pair || '').replace(/(USDT|USDC|BUSD|FDUSD)$/i, '') || 'base';
@@ -50,7 +51,7 @@ function recoveryStats(session) {
     };
   }
 
-  const breakevenPrice = Number(r.price.toFixed(pricePrec));
+  const breakevenPrice = Number(new Decimal(r.price).toFixed(pricePrec));
   const side = strategy === 'short' ? 'buy' : 'sell';
   const bound = strategy === 'short' ? 'no more than' : 'no less than';
   // one-shot: after recovery the cycle is done — no reverse trade is needed
