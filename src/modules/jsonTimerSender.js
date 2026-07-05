@@ -8,6 +8,7 @@ const { StreamAPI } = require('../lib/streamAPI');
 const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
 const { recoveryStats } = require('../lib/recoveryStats');
+const telegram = require('../lib/telegram');
 
 /**
  * Decides whether the growth of an order's partial fill should be persisted.
@@ -62,6 +63,24 @@ function manualStuckSlots(obj, pending = { BUY: new Map(), SELL: new Map() }) {
   return out;
 }
 
+// Realized quote flow of a finished cycle from the ACTUAL fills: Σ(SELL quote) −
+// Σ(BUY quote) over FILLED orders. For both long and short this equals the cycle
+// profit in the quote asset (long: buy low / sell high; short: sell high / buy
+// back low — the sign works out either way). Read-only — used only for the
+// Telegram completion notice. Pure/testable.
+function cycleProfit(obj) {
+  const sumFilledQuote = (arr) =>
+    (arr || []).reduce((acc, o) => {
+      if (!o || o.status !== 'FILLED') return acc;
+      const quote =
+        o.cummulativeQuoteQty !== undefined && o.cummulativeQuoteQty !== null
+          ? parseFloat(o.cummulativeQuoteQty)
+          : (parseFloat(o.price) || 0) * (parseFloat(o.executedQty ?? o.quantity) || 0);
+      return acc + (Number.isFinite(quote) ? quote : 0);
+    }, 0);
+  return sumFilledQuote(obj?.SELL) - sumFilledQuote(obj?.BUY);
+}
+
 function partialFillDelta(stored, message) {
   if (!message || message.status !== 'PARTIALLY_FILLED') return null;
   if (message.executedQty === undefined) return null;
@@ -92,6 +111,7 @@ class JsonTimerSender extends EventEmitter {
 
     this.baseAsset = '';
     this.quoteAsset = '';
+    this.tickDecimals = 2; // price decimals for notifications; refreshed from the grid on start
 
     this.API = InvokeApi.getInstance();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
@@ -467,6 +487,15 @@ class JsonTimerSender extends EventEmitter {
 
           this.autoRestart = obj.restart == true ? true : false;
 
+          // Telegram: cycle finished — realized profit in the quote asset from the
+          // actual fills (read-only, does not touch trading).
+          const profit = cycleProfit(obj);
+          telegram.send(
+            `🏁 <b>Done</b> ${this.symbol}\n` +
+              `Profit: <b>${profit >= 0 ? '+' : ''}${profit.toFixed(this.tickDecimals)}</b> ${this.quoteAsset || ''}\n` +
+              `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+          );
+
           await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
           const stranded = recoveryStats(obj);
@@ -628,6 +657,20 @@ class JsonTimerSender extends EventEmitter {
         this.onExecReport = (report) => {
           if (report.s !== symbol) return;
           logBus.log(`⚡ ${symbol} executionReport: ${report.S} ${report.X} (order ${report.i})`);
+
+          // Telegram: a real fill (a TRADE that completed the order). 🟢 BUY / 🔴 SELL.
+          if (report.x === 'TRADE' && report.X === 'FILLED') {
+            const qty = parseFloat(report.z) || 0; // cumulative filled qty
+            const quote = parseFloat(report.Z) || 0; // cumulative quote spent/received
+            const avg = qty > 0 ? quote / qty : parseFloat(report.p) || 0;
+            const isBuy = report.S === 'BUY';
+            telegram.send(
+              `${isBuy ? '🟢' : '🔴'} <b>${report.S}</b> ${symbol}\n` +
+                `${qty} ${this.baseAsset || ''} @ ${avg.toFixed(this.tickDecimals)}\n` +
+                `≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
+            );
+          }
+
           this.#kickTick();
         };
 
@@ -665,6 +708,23 @@ class JsonTimerSender extends EventEmitter {
       const startMsg = `🟢 Start: ${this.symbol} | ${this.strategy} | restart: ${this.autoRestart}`;
       console.log(startMsg);
       logBus.log(startMsg);
+
+      // Telegram: cycle start — price (grid base), strategy, auto-restart status.
+      let startPrice = '';
+      try {
+        const obj = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
+        startPrice = obj?.param?.['field-currency'] || '';
+        const td = parseInt(obj?.param?.['field-tickSize'], 10);
+        if (Number.isInteger(td) && td >= 0) this.tickDecimals = td;
+      } catch {
+        // grid file unreadable — send without a price rather than skip the notice
+      }
+      telegram.send(
+        `🟢 <b>Start</b> ${this.symbol}\n` +
+          `Strategy: <b>${this.strategy}</b>\n` +
+          (startPrice ? `Price: <b>${startPrice}</b> ${this.quoteAsset || ''}\n` : '') +
+          `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+      );
     }
   }
 
@@ -736,6 +796,13 @@ class JsonTimerSender extends EventEmitter {
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
       await writeFileAtomic(filePath, JSON.stringify(tmp, null, 2), 'utf8');
 
+      // Telegram: the cycle looped — new grid built around the fresh price.
+      telegram.send(
+        `🔄 <b>Restart</b> ${this.symbol}\n` +
+          `Strategy: <b>${this.strategy}</b>\n` +
+          `Price: <b>${price}</b> ${this.quoteAsset || ''}`
+      );
+
       this.emit('restarted', { symbol: this.symbol, price });
 
     } catch (err) {
@@ -793,3 +860,4 @@ module.exports.partialFillDelta = partialFillDelta;
 module.exports.markOpenAsCanceled = markOpenAsCanceled;
 module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
 module.exports.manualStuckSlots = manualStuckSlots;
+module.exports.cycleProfit = cycleProfit;
