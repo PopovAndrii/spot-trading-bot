@@ -760,6 +760,9 @@ class JsonTimerSender extends EventEmitter {
       console.log(line);
       logBus.log(line);
       this.emit('recovery', { symbol: this.symbol, text: rec.text });
+      // Same leftover notice over Telegram: the cycle stopped with unsold
+      // inventory on hand and the person decides what to do with it.
+      telegram.send(`💰 <b>Leftover</b> ${this.symbol}\n${rec.text}`);
     } catch (err) {
       console.warn('🟡 recoveryStats failed:', err.message);
     }
