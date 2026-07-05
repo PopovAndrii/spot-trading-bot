@@ -6,7 +6,7 @@
 // the previous SELL plan becomes wrong: less base is held and some profit is
 // already realized. This function computes the new close quantity and price from
 // the ACTUAL fills (executedQty / cummulativeQuoteQty from the getOrder response,
-// which are persisted to config — see jsonTimerSender.js, REQUIREMENTS.md item 20).
+// which are persisted to config — see jsonTimerSender.js).
 //
 // For short it's mirrored: the position is built with SELL, closed with a BUY lower.
 //

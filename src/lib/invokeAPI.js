@@ -42,7 +42,7 @@ class InvokeApi {
   }
 
   /**
-   * Retry a request on rate-limit (ANALYSIS item 2): 429 → wait Retry-After (or a
+   * Retry a request on rate-limit: 429 → wait Retry-After (or a
    * growing default) and try again, up to 3 retries. 418 (IP ban) is NOT retried —
    * hammering with a banned IP would only extend the ban; the error propagates to
    * the calling method's try/catch as usual.

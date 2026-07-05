@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { Calculator } = require('../lib/calculator');
 
-// DEEP_ANALYSIS_PLAN.md §6 — money in float + toFixed. The logic is NOT changed;
+// Money in float + toFixed. The logic is NOT changed;
 // this is a safety-net golden: it pins the current Calculator.build() output
 // bit-for-bit across a set of inputs (long/short, progressive/fibonacci, indent).
 // Any future money-arithmetic refactor (decimal.js / integer ticks) must produce

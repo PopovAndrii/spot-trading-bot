@@ -6,7 +6,6 @@ const path = require('path');
  * (atomic within one filesystem). A crash/restart exactly at write time won't
  * leave broken JSON in the main file — it stays either fully old or fully new.
  * Protects the single source of truth about open orders.
- * See REQUIREMENTS.md item 22.
  *
  * @param {string} filePath - target path.
  * @param {string|Buffer} data - contents.

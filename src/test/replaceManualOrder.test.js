@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 
-// DEEP_ANALYSIS_PLAN.md Item 10 — manual single-order re-place (replaceManualOrder).
+// Manual single-order re-place (replaceManualOrder).
 // Contract: re-place only a manually-pulled, already-CANCELED slot — its order is
 // surely off the book, so a new placement can't double a live one. "Pulled" means
 // an in-session pull (manualPulls) OR a persisted `manual` flag in the grid file

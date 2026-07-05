@@ -1,4 +1,4 @@
-// Reusable "Are you sure?" confirmation dialog (Item 10). Returns a Promise that
+// Reusable "Are you sure?" confirmation dialog. Returns a Promise that
 // resolves to true (confirmed) or false (dismissed). Self-contained: builds an
 // overlay, wires keyboard (Enter = confirm, Escape/backdrop = dismiss) and
 // removes itself on choice. Buttons reuse ui-elements `UIb` classes for styling

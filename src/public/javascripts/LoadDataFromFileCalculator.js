@@ -94,6 +94,6 @@ export class LoadDataFromFileCalculator {
     // loadDataCalculator.calculate() (called right after in getStateCalculator) with
     // a single `tbody.innerHTML = html` — with status colors and real-fill badges.
     // A duplicate render here appended rows `innerHTML += row` without clearing
-    // tbody → a "double" table flickered on every robot auto-poll (REQUIREMENTS.md item 26).
+    // tbody → a "double" table flickered on every robot auto-poll.
   }
 }

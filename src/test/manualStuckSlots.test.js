@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { manualStuckSlots } = require('../modules/jsonTimerSender');
 
-// DEEP_ANALYSIS_PLAN.md Item 10 (risk #4) — manualStuckSlots.
+// manualStuckSlots.
 // A slot the user pulled (CANCELED + manual) and never re-placed is left untouched
 // by the engine, so the position stays open. This pure helper lists such slots so
 // readLoop can periodically remind. A slot being re-placed (in manualReplaces) is

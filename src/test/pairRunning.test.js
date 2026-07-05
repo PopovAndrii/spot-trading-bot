@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { pair, statusPair } = require('../lib/pair');
 
-// REQUIREMENTS.md item 15 — server-side write lock. pair.isRunning() is the shared
+// Server-side write lock. pair.isRunning() is the shared
 // source of truth used by /calculator/save to refuse overwriting a live
 // order-state file while the bot is running for a symbol.
 

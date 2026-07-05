@@ -153,7 +153,7 @@ class Job {
           }
 
           if (obj['SELL'][i].status === null || obj['SELL'][i].status === state.CANCELED) {
-            // Manual pull (Item 10): user cancelled this close — do NOT re-place
+            // Manual pull: user cancelled this close — do NOT re-place
             // it; the position stays open until they re-place (their choice).
             if (obj['SELL'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
@@ -238,7 +238,7 @@ class Job {
           };
 
         default:
-          // Manual pull (Item 10): user cancelled this entry — leave it alone,
+          // Manual pull: user cancelled this entry — leave it alone,
           // do not re-place. Without the flag a null/CANCELED entry is re-placed.
           if (el.manual) {
             return { status: 'pass', method: false, side: null, id: i, data: {} };
@@ -356,7 +356,7 @@ class Job {
           }
 
           if (obj['BUY'][i].status === null || obj['BUY'][i].status === state.CANCELED) {
-            // Manual pull (Item 10): user cancelled this close — do NOT re-place
+            // Manual pull: user cancelled this close — do NOT re-place
             // it; the position stays open until they re-place (their choice).
             if (obj['BUY'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
@@ -440,7 +440,7 @@ class Job {
           };
 
         default:
-          // Manual pull (Item 10): user cancelled this entry — leave it alone,
+          // Manual pull: user cancelled this entry — leave it alone,
           // do not re-place. Without the flag a null/CANCELED entry is re-placed.
           if (el.manual) {
             return { status: 'pass', method: false, side: null, id: i, data: {} };

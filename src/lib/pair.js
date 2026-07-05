@@ -4,7 +4,7 @@ const statusPair = Object.freeze({
   STOP: 2,
   // The server restarted while the config still has live orders (NEW/PARTIALLY_FILLED
   // with an orderId): no cycle walks them, Save is locked until an explicit Start
-  // (resume) or the orders are canceled (ANALYSIS.md item 1.5).
+  // (resume) or the orders are canceled.
   ATTENTION: 3,
 });
 
@@ -43,7 +43,7 @@ class Pair {
 
   // Authoritative "is the bot running for this symbol" check, shared between the
   // WS router (which sets START/STOP) and HTTP routes that must not overwrite a
-  // live order-state file (req 15). Unknown symbol → not running.
+  // live order-state file. Unknown symbol → not running.
   isRunning(symbol) {
     return this.symbols.get(symbol)?.status === statusPair.START;
   }

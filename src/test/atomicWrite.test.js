@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 const { writeFileAtomic } = require('../lib/atomicWrite');
 
-// REQUIREMENTS.md item 22 — atomic config write (temp + rename) so a crash mid-write
+// Atomic config write (temp + rename) so a crash mid-write
 // never leaves corrupt JSON in the source of truth.
 
 test('writes content to the target file', async () => {

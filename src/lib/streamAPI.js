@@ -144,7 +144,7 @@ class StreamAPI extends EventEmitter {
     this.reconnectAttempts++;
 
     // Never give up: for a trading bot, silently losing the price stream is worse
-    // than retrying forever (ANALYSIS.md item 1.4). After maxReconnectAttempts we
+    // than retrying forever. After maxReconnectAttempts we
     // keep going at the delay cap, but signal a long outage once — listeners notify
     // the UI/log. On a successful 'open', 'reconnected' is emitted.
     if (this.reconnectAttempts === this.maxReconnectAttempts) {

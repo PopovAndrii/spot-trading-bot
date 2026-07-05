@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Job, Status } = require('../lib/job');
 
-// ANALYSIS.md item 8 — the order state machine (the most money-critical logic) had
+// The order state machine (the most money-critical logic) had
 // no tests. Table-driven transition tests: for each pair state (entry[i], close[i])
 // we check which API call Job decides to make and with what data.
 
@@ -436,7 +436,7 @@ test('test mode: both strategies always return pass (no API calls)', () => {
   assert.equal(testJob.short(obj, 0, obj.SELL[0]).status, 'pass');
 });
 
-// ===== manual pull (Item 10): engine must NOT re-place a user-cancelled order =====
+// ===== manual pull: engine must NOT re-place a user-cancelled order =====
 // A CANCELED order is normally treated as "re-place me". The `manual: true` flag
 // (set by a manual single-order cancel) makes the engine leave it alone (pass).
 

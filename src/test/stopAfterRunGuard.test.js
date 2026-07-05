@@ -6,7 +6,7 @@ const path = require('path');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 const { Status } = require('../lib/job');
 
-// DEEP_ANALYSIS_PLAN.md §B.3 — a "spurious" file write after stop().
+// A "spurious" file write after stop().
 // Invariant: if Stop is pressed while #jobIterator is awaiting the exchange in
 // #runToApi, after the resolve the iterator must NOT touch the grid file (guard
 // before the write).

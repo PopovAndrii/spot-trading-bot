@@ -12,7 +12,7 @@ const telegram = require('../lib/telegram');
 
 /**
  * Decides whether the growth of an order's partial fill should be persisted.
- * Pure function — testable without the exchange (REQUIREMENTS.md item 20).
+ * Pure function — testable without the exchange.
  *
  * @param {Object} stored - the order stored in config (obj[side][id]).
  * @param {Object} message - the API response (getOrder) for this order.
@@ -130,7 +130,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
-   * Out-of-band readLoop tick — a reaction to executionReport (ANALYSIS item 10).
+   * Out-of-band readLoop tick — a reaction to executionReport.
    * 50 ms is a debounce in case of a burst of reports (a series of partial fills).
    * If a pass is already running (busy) — do nothing: it'll pick up the fresh
    * statuses via getOrder, and the next tick schedules readLoop as usual.
@@ -233,7 +233,7 @@ class JsonTimerSender extends EventEmitter {
    * Mixes fresh live edits from the file into obj before the iterator writes.
    * A #jobIterator pass is long (a sleep per order) and writes the WHOLE obj: without
    * the merge, a param edit (/calculator/param) or restart (/calculator/restart) made
-   * during the pass would be silently lost — a lost update (ANALYSIS.md item 1.3).
+   * during the pass would be silently lost — a lost update.
    * We don't touch orders (BUY/SELL): their only writer during a cycle is the
    * iterator itself (Save is held by a write-lock while the pair is running).
    */
@@ -357,7 +357,7 @@ class JsonTimerSender extends EventEmitter {
       if (fresh.param) obj.param = fresh.param;
       if ('restart' in fresh) obj.restart = fresh.restart;
 
-      // Manual-pull marker (Item 10): a manual single-order cancel writes
+      // Manual-pull marker: a manual single-order cancel writes
       // { status: CANCELED, manual: true } straight to the grid file. The robot
       // owns the file and rewrites it every tick, so without this merge its
       // write would clobber that flag. Carry a manual pull (with its canceled

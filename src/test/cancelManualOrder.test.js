@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 
-// DEEP_ANALYSIS_PLAN.md Item 10 — manual single-order cancel (cancelManualOrder).
+// Manual single-order cancel (cancelManualOrder).
 // Contract: mark the pull in this.manualPulls OPTIMISTICALLY (before the exchange
 // responds) so the very next readLoop tick already sees `manual` and the engine
 // never re-places ("resurrects") an order whose cancel ACK lagged. A failed/invalid

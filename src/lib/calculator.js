@@ -1,4 +1,4 @@
-// CommonJS, like the rest of the backend (ANALYSIS item 14): this file used to be
+// CommonJS, like the rest of the backend: this file used to be
 // the only ESM module and worked only thanks to require(esm) in Node ≥22.
 class Calculator {
   // The grid is built by a factory, not the constructor: `new Calculator()` now

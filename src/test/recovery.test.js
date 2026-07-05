@@ -5,7 +5,7 @@ const path = require('path');
 const os = require('os');
 const { scanLiveCycles } = require('../lib/recovery');
 
-// ANALYSIS.md item 1.5 — after a server restart, configs with live orders
+// After a server restart, configs with live orders
 // (NEW/PARTIALLY_FILLED + orderId) must be found by the recovery scan.
 
 async function withTmpDir(files, fn) {

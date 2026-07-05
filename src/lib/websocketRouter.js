@@ -17,7 +17,7 @@ const STRATEGIES = new Set(['short', 'long']);
 class WebSocketRouter {
   constructor() {
     // noServer: the HTTP server's 'upgrade' event is handled in bin/www, which
-    // authorizes the session BEFORE handing the socket to handleUpgrade() (req 24).
+    // authorizes the session BEFORE handing the socket to handleUpgrade().
     this.wss = new WebSocket.Server({ noServer: true });
     this.clients = new Map();
     this.timerSenders = new Map();
@@ -228,7 +228,7 @@ class WebSocketRouter {
           }
 
           if (data.type === 'cancelOrder' && currentSymbol) {
-            // Expert Mode gate, server-enforced (Item 10, risk #5): manual order
+            // Expert Mode gate, server-enforced: manual order
             // ops require the client to assert expert:true. Defense-in-depth for a
             // single-user app — guards against a stray/replayed/buggy emission, not
             // a hostile client (already authenticated).
@@ -258,7 +258,7 @@ class WebSocketRouter {
           }
 
           if (data.type === 'replaceOrder' && currentSymbol) {
-            // Expert Mode gate, server-enforced (Item 10, risk #5) — see cancelOrder.
+            // Expert Mode gate, server-enforced — see cancelOrder.
             if (data.expert !== true) {
               return this.safeSend(ws, { error: 'expert mode required' });
             }

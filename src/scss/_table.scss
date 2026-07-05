@@ -74,7 +74,7 @@
   text-align: center;
 }
 
-// Current resting price of a manually re-placed order (Item 10): the column
+// Current resting price of a manually re-placed order: the column
 // keeps the planned grid price; this accent badge is the live price the order
 // actually rests at. Warning accent = "you changed this from the plan".
 .price-badge {
@@ -82,7 +82,7 @@
   color: $c-w-900;
 }
 
-// Per-order manual actions (Item 10): hover-revealed cancel/replace buttons
+// Per-order manual actions: hover-revealed cancel/replace buttons
 // (ui-elements UIb) inside the Buy/Sell currency cells. The cell reserves right
 // padding so the floating button overlays the empty space without shifting the
 // number; the button's own look/colors come from the ui-elements package.
@@ -91,7 +91,7 @@
   padding-right: 3rem;
 }
 
-// Expert Mode gate (Item 10): the cancel/replace controls are rendered every
+// Expert Mode gate: the cancel/replace controls are rendered every
 // tick but stay hidden until the table gets .expert-on from the Expert switch.
 // Without it, drop the reserved right padding so the numbers don't get pushed.
 .t:not(.expert-on) .row-actions {
@@ -119,7 +119,7 @@
   pointer-events: auto;
 }
 
-// Re-place state (Item 10): a user-pulled order (CANCELED+manual) shows the ＋
+// Re-place state: a user-pulled order (CANCELED+manual) shows the ＋
 // re-place button ALWAYS (not hover) next to its price — the row is waiting for a
 // manual re-place. Clicking ＋ opens the price-editor popup (priceDialog); the
 // new price is NOT edited inline, since the table re-renders every tick.
