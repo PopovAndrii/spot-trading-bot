@@ -71,6 +71,31 @@ function rebalancedClose(obj, i, strategy) {
   };
 }
 
+// Realized quote profit of one completed grid oscillation: quote received on the
+// SELL minus quote spent on the BUY. Works for both long and short (entry/close
+// sides differ, but sellQuote − buyQuote is the leg profit either way). Pure.
+function gridLegProfit(buySlot, sellSlot) {
+  const q = (o) => Number(o?.cummulativeQuoteQty) || 0;
+  return q(sellSlot) - q(buySlot);
+}
+
+// Re-arm a grid leg in place: reset both paired slots (BUY[i]/SELL[i]) to
+// "not placed", keeping quantity/price/side so the next pass re-buys/re-sells at
+// the SAME level. The realized profit must be banked (gridLegProfit) BEFORE this,
+// since it drops the fill fields. Mutates and returns obj. Pure/testable.
+function rearmGridLeg(obj, i) {
+  for (const side of ['BUY', 'SELL']) {
+    const s = obj?.[side]?.[i];
+    if (!s) continue;
+    s.status = null;
+    s.orderId = null;
+    delete s.executedQty;
+    delete s.cummulativeQuoteQty;
+    delete s.manual;
+  }
+  return obj;
+}
+
 class Job {
   constructor(test = false) {
     this.test = test;
@@ -497,6 +522,132 @@ class Job {
       }
     }
   };
+
+  // ── Hybrid DCA/GRID ───────────────────────────────────────────────────────
+  //
+  // Rungs 0..N-1 stay pure DCA (one averaged close, as today). Rungs N..deep are
+  // independent GRID legs: each buys at its own level and closes at its own micro
+  // take-profit, then re-arms — banking every oscillation while the DCA base sits
+  // deep. N (0-based) comes from field-gridLevel (a 1-based order number in the UI).
+  //
+  // The DCA base is evaluated by the UNCHANGED long()/short() against a VIEW that
+  // slices the arrays to 0..N. A shallow slice shares element references, so the
+  // proven state machine reads only base rungs (its deepestFilled / rebalance scans
+  // never see a grid leg), while the iterator still writes results by absolute id.
+
+  // 0-based index of the first GRID rung. Invalid/missing level → Infinity, i.e.
+  // every rung stays DCA and hybrid degrades to the classic behavior.
+  #gridStartIndex(obj) {
+    const n = parseInt(obj?.param?.['field-gridLevel'], 10);
+    if (!Number.isInteger(n) || n < 1) return Infinity;
+    return n - 1;
+  }
+
+  hybridLong = (obj, i, el) => {
+    if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
+
+    const g = this.#gridStartIndex(obj);
+    if (i >= g) {
+      // grid leg: entry = BUY[i], close = SELL[i]
+      return this.#gridLeg(el.symbol, i, el, obj['SELL'][i], 'BUY', 'SELL');
+    }
+
+    // DCA base over a base-only view (indices < g)
+    const view = { ...obj, BUY: obj['BUY'].slice(0, g), SELL: obj['SELL'].slice(0, g) };
+    return this.long(view, i, el);
+  };
+
+  hybridShort = (obj, i, el) => {
+    if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
+
+    const g = this.#gridStartIndex(obj);
+    if (i >= g) {
+      // grid leg (mirror): entry = SELL[i], close = BUY[i]
+      return this.#gridLeg(el.symbol, i, el, obj['BUY'][i], 'SELL', 'BUY');
+    }
+
+    const view = { ...obj, BUY: obj['BUY'].slice(0, g), SELL: obj['SELL'].slice(0, g) };
+    return this.short(view, i, el);
+  };
+
+  // One self-contained grid leg. entry/close are the two paired slots; entrySide/
+  // closeSide are their order sides ('BUY'/'SELL'). Returns the next action:
+  //   entry not placed        → newOrder(entry)     [arm the leg]
+  //   entry NEW/PARTIAL       → getOrder(entry)     [poll]
+  //   entry FILLED, no close  → newOrder(close)     [place the micro take-profit]
+  //   close NEW/PARTIAL       → getOrder(close)     [poll]
+  //   both FILLED             → REARM               [one oscillation banked]
+  // A manually pulled slot is left alone (pass), like the DCA path.
+  #gridLeg(symbol, i, entry, close, entrySide, closeSide) {
+    if (entry.status === state.FILLED) {
+      if (close.status === state.FILLED) {
+        return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
+      }
+      if (close.status === state.NEW || close.status === state.PARTIALLY_FILLED) {
+        return {
+          status: close.status,
+          method: 'getOrder',
+          side: closeSide,
+          id: i,
+          data: { id: i, symbol, orderId: close.orderId },
+        };
+      }
+      if (close.manual) {
+        return { status: 'pass', method: false, side: null, id: i, data: {} };
+      }
+      return {
+        status: null,
+        method: 'newOrder',
+        side: closeSide,
+        id: i,
+        data: {
+          id: i,
+          symbol,
+          side: closeSide,
+          type: 'LIMIT',
+          timeInForce: 'GTC',
+          quantity: close.quantity,
+          price: close.price,
+        },
+      };
+    }
+
+    if (entry.status === state.NEW || entry.status === state.PARTIALLY_FILLED) {
+      return {
+        status: entry.status,
+        method: 'getOrder',
+        side: entrySide,
+        id: i,
+        data: { id: i, symbol, orderId: entry.orderId },
+      };
+    }
+
+    if (entry.manual) {
+      return { status: 'pass', method: false, side: null, id: i, data: {} };
+    }
+    return {
+      status: null,
+      method: 'newOrder',
+      side: entrySide,
+      id: i,
+      data: {
+        id: i,
+        symbol,
+        side: entrySide,
+        type: 'LIMIT',
+        timeInForce: 'GTC',
+        quantity: entry.quantity,
+        price: entry.price,
+      },
+    };
+  }
 }
 
-module.exports = { Job, Status, rebalancedClose, deepestFilledIndex };
+module.exports = {
+  Job,
+  Status,
+  rebalancedClose,
+  deepestFilledIndex,
+  gridLegProfit,
+  rearmGridLeg,
+};
