@@ -1,5 +1,7 @@
 // CommonJS, like the rest of the backend: this file used to be
 // the only ESM module and worked only thanks to require(esm) in Node ≥22.
+const Decimal = require('decimal.js');
+
 class Calculator {
   // The grid is built by a factory, not the constructor: `new Calculator()` now
   // returns a normal instance (instanceof works); the entry point is the static
@@ -45,20 +47,25 @@ class Calculator {
   };
 
   long = () => {
-    let mainObj = [];
-    let balanceTotal = this.data['field-deposit'];
+    const mainObj = [];
+    const step = this.data['field-stepSize'];
+    const tick = this.data['field-tickSize'];
+    const currency = new Decimal(this.data['field-currency']);
+
+    let balanceTotal = new Decimal(this.data['field-deposit']);
 
     let prevStep = 0;
     let currentStep = this.data['field-fibonachiStep'];
 
-    let totalSell = 0.0;
-    let spentTotal = 0.0;
+    let totalSell = new Decimal(0);
+    let spentTotal = new Decimal(0);
 
-    let targetOrderAmount = this.data['field-orderSize'] * this.data['field-currency'];
-    const precision = Math.pow(10, this.data['field-stepSize']);
+    let targetOrderAmount = new Decimal(this.data['field-orderSize']).times(currency);
 
     // first knee price at indent% below current price
-    let buyPrice = this.data['field-currency'] * ((100 - this.data['field-indent']) / 100);
+    let buyPrice = currency.times(new Decimal(100).minus(this.data['field-indent'])).div(100);
+
+    const minPrice = new Decimal('0.1').pow(tick);
 
     for (let i = 0; i < 100; ++i) {
       if (i > 0) {
@@ -74,44 +81,45 @@ class Calculator {
         currentStep = nextStep;
 
         // geometric decay: each knee is nextStep% below the previous knee price
-        buyPrice = buyPrice * ((100 - nextStep) / 100);
-        targetOrderAmount = targetOrderAmount * ((100 + this.data['field-martingail']) / 100);
+        buyPrice = buyPrice.times(new Decimal(100).minus(nextStep)).div(100);
+        targetOrderAmount = targetOrderAmount
+          .times(new Decimal(100).plus(this.data['field-martingail']))
+          .div(100);
       }
 
-      const minPrice = Math.pow(0.1, this.data['field-tickSize']);
-      if (buyPrice <= minPrice) break;
+      if (buyPrice.lte(minPrice)) break;
 
-      const overlapRange = (1 - buyPrice / this.data['field-currency']) * 100;
+      const overlapRange = new Decimal(1).minus(buyPrice.div(currency)).times(100);
 
-      let buy = targetOrderAmount / buyPrice;
-      buy = Math.floor(buy * precision) / precision;
+      // floor the base quantity to stepSize decimals (never buy more than a step allows)
+      const buy = targetOrderAmount.div(buyPrice).toDecimalPlaces(step, Decimal.ROUND_DOWN);
 
-      if (buy === 0) break;
+      if (buy.isZero()) break;
 
-      let actualSpent = buy * buyPrice;
+      const actualSpent = buy.times(buyPrice);
 
-      if (balanceTotal < actualSpent) break;
+      if (balanceTotal.lt(actualSpent)) break;
 
-      spentTotal += actualSpent;
-      totalSell += buy;
-      balanceTotal -= actualSpent;
+      spentTotal = spentTotal.plus(actualSpent);
+      totalSell = totalSell.plus(buy);
+      balanceTotal = balanceTotal.minus(actualSpent);
 
-      let sellCurrency =
-        ((spentTotal / totalSell) *
-          (100 + this.data['field-profit'] + this.data['field-commission'])) /
-        100;
+      const sellCurrency = spentTotal
+        .div(totalSell)
+        .times(new Decimal(100).plus(this.data['field-profit']).plus(this.data['field-commission']))
+        .div(100);
 
       // Spent in quote currency (money = price × qty); quote precision = price tickSize
-      const spentQuote = actualSpent.toFixed(this.data['field-tickSize']);
+      const spentQuote = actualSpent.toFixed(tick);
 
       mainObj.push({
         overlapRange: overlapRange.toFixed(2),
-        buyCurrency: buyPrice.toFixed(this.data['field-tickSize']),
-        buy: buy.toFixed(this.data['field-stepSize']),
-        totalSell: totalSell.toFixed(this.data['field-stepSize']),
-        sellCurrency: sellCurrency.toFixed(this.data['field-tickSize']),
+        buyCurrency: buyPrice.toFixed(tick),
+        buy: buy.toFixed(step),
+        totalSell: totalSell.toFixed(step),
+        sellCurrency: sellCurrency.toFixed(tick),
         didBuy: spentQuote,
-        calcBalance: balanceTotal.toFixed(this.data['field-tickSize']),
+        calcBalance: balanceTotal.toFixed(tick),
       });
     }
     return mainObj;
@@ -130,21 +138,23 @@ class Calculator {
 
   short = () => {
     const mainObj = [];
+    const step = this.data['field-stepSize'];
+    const tick = this.data['field-tickSize'];
+    const currency = new Decimal(this.data['field-currency']);
 
-    let currentBalance = this.data['field-deposit'];
-    const initialDeposit = this.data['field-deposit'];
+    let currentBalance = new Decimal(this.data['field-deposit']);
+    const initialDeposit = new Decimal(this.data['field-deposit']);
 
     let prevStep = 0;
     let currentStep = this.data['field-fibonachiStep'];
 
-    let sellTotalCoins = 0.0;
-    let spentTotalMoney = 0.0;
+    let sellTotalCoins = new Decimal(0);
+    let spentTotalMoney = new Decimal(0);
 
-    let currentOrderSell = this.data['field-orderSize'];
-    const precision = Math.pow(10, this.data['field-stepSize']);
+    let currentOrderSell = new Decimal(this.data['field-orderSize']);
 
     // first knee sell price at indent% above current price
-    let sellPrice = this.data['field-currency'] * ((100 + this.data['field-indent']) / 100);
+    let sellPrice = currency.times(new Decimal(100).plus(this.data['field-indent'])).div(100);
 
     for (let i = 0; i < 100; ++i) {
       if (i > 0) {
@@ -160,37 +170,43 @@ class Calculator {
         currentStep = nextStep;
 
         // geometric growth: each knee is nextStep% above the previous knee price
-        sellPrice = sellPrice * ((100 + nextStep) / 100);
-        currentOrderSell = currentOrderSell * ((100 + this.data['field-martingail']) / 100);
-        currentOrderSell = Math.floor(currentOrderSell * precision) / precision;
+        sellPrice = sellPrice.times(new Decimal(100).plus(nextStep)).div(100);
+        currentOrderSell = currentOrderSell
+          .times(new Decimal(100).plus(this.data['field-martingail']))
+          .div(100)
+          .toDecimalPlaces(step, Decimal.ROUND_DOWN);
       }
 
-      if (currentOrderSell === 0) break;
-      if (currentBalance < currentOrderSell) break;
+      if (currentOrderSell.isZero()) break;
+      if (currentBalance.lt(currentOrderSell)) break;
 
-      currentBalance -= currentOrderSell;
-      spentTotalMoney += currentOrderSell;
+      currentBalance = currentBalance.minus(currentOrderSell);
+      spentTotalMoney = spentTotalMoney.plus(currentOrderSell);
 
-      const overlapRange = (sellPrice / this.data['field-currency'] - 1) * 100;
+      const overlapRange = sellPrice.div(currency).minus(1).times(100);
 
-      sellTotalCoins += currentOrderSell / sellPrice;
+      sellTotalCoins = sellTotalCoins.plus(currentOrderSell.div(sellPrice));
 
-      let buyPrice =
-        ((spentTotalMoney / sellTotalCoins) *
-          (100 - (this.data['field-profit'] + this.data['field-commission']))) /
-        100;
+      const buyPrice = spentTotalMoney
+        .div(sellTotalCoins)
+        .times(
+          new Decimal(100).minus(
+            new Decimal(this.data['field-profit']).plus(this.data['field-commission'])
+          )
+        )
+        .div(100);
 
       // Spent in quote currency (money = qty × price); quote precision = price tickSize
-      const spentQuote = (currentOrderSell * sellPrice).toFixed(this.data['field-tickSize']);
+      const spentQuote = currentOrderSell.times(sellPrice).toFixed(tick);
 
       mainObj.push({
         overlapRange: overlapRange.toFixed(2),
-        buyCurrency: buyPrice.toFixed(this.data['field-tickSize']),
-        buy: (initialDeposit - currentBalance).toFixed(this.data['field-stepSize']),
-        totalSell: currentOrderSell.toFixed(this.data['field-stepSize']),
-        sellCurrency: sellPrice.toFixed(this.data['field-tickSize']),
+        buyCurrency: buyPrice.toFixed(tick),
+        buy: initialDeposit.minus(currentBalance).toFixed(step),
+        totalSell: currentOrderSell.toFixed(step),
+        sellCurrency: sellPrice.toFixed(tick),
         didBuy: spentQuote,
-        calcBalance: currentBalance.toFixed(this.data['field-stepSize']),
+        calcBalance: currentBalance.toFixed(step),
       });
     }
 
