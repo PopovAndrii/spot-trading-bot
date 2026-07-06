@@ -112,6 +112,7 @@ test('gridExitThreshold: invalid/missing pct falls back to 50', () => {
   assert.equal(gridExitThreshold(101, 99, undefined), 100);
   assert.equal(gridExitThreshold(101, 99, 'abc'), 100);
   assert.equal(gridExitThreshold(101, 99, null), 100); // Number(null) = 0 would be wrong
+  assert.equal(gridExitThreshold(101, 99, ''), 100); // old config → empty SpinBox restore
 });
 
 test('gridExitThreshold: string prices (as stored in config) are handled', () => {

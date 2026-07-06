@@ -97,6 +97,9 @@
               <div class="">
                 <%- include('../views/ui/SpinBox', { id:'field-microProfit' , label:'Micro profit %' , min:0.01, max:2 , step: 2, hint:'Net take-profit of each grid micro-order, on top of commission. Smaller = banks bounces more often. Default 0.1.' }); %>
               </div>
+              <div class="">
+                <%- include('../views/ui/SpinBox', { id:'field-gridExit' , label:'Grid exit %' , min:0, max:100 , step: 0, hint:'Where grid mode yields to the whole-position close: the exit threshold sits between the averaged close without the deepest grid rung (0%) and with it (100%). Default 50 = midway. Lower = exits sooner on a bounce, higher = keeps micro-recycling longer.' }); %>
+              </div>
             </div>
           </div>
 

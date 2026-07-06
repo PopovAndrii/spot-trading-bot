@@ -83,6 +83,7 @@ export class SetStrategy {
       'field-indent': 0.1, // %
       'field-gridLevel': 3, // hybrid: first order (down the ladder) that becomes a grid leg
       'field-microProfit': 0.1, // hybrid: net take-profit % of each grid micro-order
+      'field-gridExit': 50, // hybrid: exit threshold between S_{F-1} (0) and S_F (100)
       'field-activeOrders': 3,
       'field-requestFrequency': 1500, // ms
       'field-stepSize': data['stepSize'],

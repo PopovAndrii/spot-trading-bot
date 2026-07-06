@@ -248,6 +248,15 @@ export class LoadDataCalculator {
     return `<span class="fill-badge" title="real ${kind}">${out}</span>`;
   }
 
+  // Per-rung recycle counter for hybrid grid rungs: how many oscillations this
+  // rung has banked (obj.gridCounts, bumped by the engine on every re-arm).
+  // Display only; absent/zero → no badge.
+  #recycleBadge(obj, index) {
+    const n = Number(obj?.gridCounts?.[index]) || 0;
+    if (n <= 0) return '';
+    return `<span class="fill-badge" title="grid recycles — banked oscillations">×${n}</span>`;
+  }
+
   // A live order may rest at a price different from the planned grid
   // price — a manual re-place. The column shows the plan (el.buyCurrency), so
   // surface the order's ACTUAL resting price as a badge; otherwise the table
@@ -513,7 +522,7 @@ export class LoadDataCalculator {
         const buyAct = this.#rowAction(obj, 'BUY', index, buyPrice);
         const sellAct = this.#rowAction(obj, 'SELL', index, sellPrice);
         rows[index] = `<tr${gridTitle}>
-              <th class="center">${index + 1}</th>
+              <th class="center">${index + 1}${this.#recycleBadge(obj, index)}</th>
               <td>${el.overlapRange}</td>
               <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${buyPrice}${this.#currentPriceBadge(obj, 'BUY', index, buyPrice)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
               <td class="${this.#backlight(obj, 'BUY', index)}"><span class="fill-cell">${el.buy}${this.#fillBadge(obj, 'BUY', index, 'qty')}</span></td>

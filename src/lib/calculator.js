@@ -23,9 +23,10 @@ function microClosePrice(entryPrice, microProfit, commission, tick, strategy) {
 // long (S_F below S_{F-1}) and short (mirrored) use the same formula. Invalid pct
 // falls back to 50. Returns a number (comparison only — no tick rounding here).
 function gridExitThreshold(sPrev, sF, pct) {
-  // pct == null guards null/undefined explicitly: Number(null) is 0 (finite), which
-  // would silently turn a missing field into "exit at S_{F-1}" instead of the default.
-  const p = pct == null ? NaN : Number(pct);
+  // pct == null / '' guarded explicitly: Number(null) and Number('') are 0
+  // (finite), which would silently turn a missing field — or an old config
+  // restored into an empty SpinBox — into "exit at S_{F-1}" instead of the default.
+  const p = pct == null || pct === '' ? NaN : Number(pct);
   const share = new Decimal(Number.isFinite(p) ? p : 50).div(100);
   const prev = new Decimal(sPrev);
   return prev.plus(new Decimal(sF).minus(prev).times(share)).toNumber();
