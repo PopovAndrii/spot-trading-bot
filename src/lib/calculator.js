@@ -14,6 +14,23 @@ function microClosePrice(entryPrice, microProfit, commission, tick, strategy) {
   return new Decimal(entryPrice).times(factor).div(100).toFixed(tick);
 }
 
+// Hybrid v2 exit threshold T_F: where the frontier rung stops micro-recycling and
+// the whole position is closed with ONE averaged order. Interpolates between the
+// two neighboring averaged-close prices — S_{F-1} (position without the frontier
+// rung) and S_F (position including it): T = S_{F-1} + pct/100 × (S_F − S_{F-1}).
+// pct comes from field-gridExit; 50 (the default) is the midpoint from the spec,
+// 0 sticks to S_{F-1}, 100 to S_F. Pure interpolation — direction-agnostic, so
+// long (S_F below S_{F-1}) and short (mirrored) use the same formula. Invalid pct
+// falls back to 50. Returns a number (comparison only — no tick rounding here).
+function gridExitThreshold(sPrev, sF, pct) {
+  // pct == null guards null/undefined explicitly: Number(null) is 0 (finite), which
+  // would silently turn a missing field into "exit at S_{F-1}" instead of the default.
+  const p = pct == null ? NaN : Number(pct);
+  const share = new Decimal(Number.isFinite(p) ? p : 50).div(100);
+  const prev = new Decimal(sPrev);
+  return prev.plus(new Decimal(sF).minus(prev).times(share)).toNumber();
+}
+
 class Calculator {
   // The grid is built by a factory, not the constructor: `new Calculator()` now
   // returns a normal instance (instanceof works); the entry point is the static
@@ -43,6 +60,7 @@ class Calculator {
       // classic single-averaged-close behavior, output byte-for-byte unchanged.
       'field-hybrid': 'off',
       'field-microProfit': 0.1, // % net profit for a grid micro-order (on top of commission)
+      'field-gridExit': 50, // % between S_{F-1} and S_F where grid mode yields to the exit close
       'field-trackPrice': 0.15, // does not participate in the construction
       'field-activeOrders': 3, // does not participate in the construction
       'field-requestFrequency': 500, // does not participate in the construction
@@ -272,4 +290,4 @@ class Calculator {
   };
 }
 
-module.exports = { Calculator, microClosePrice };
+module.exports = { Calculator, microClosePrice, gridExitThreshold };

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { Calculator } = require('../lib/calculator');
+const { Calculator, gridExitThreshold } = require('../lib/calculator');
 
 // Hybrid DCA/GRID: when field-hybrid is 'on', every grid row gains a per-rung
 // micro take-profit (long: microSellCurrency, short: microBuyCurrency) equal to
@@ -89,4 +89,31 @@ test("hybrid accepts boolean true as well as 'on'", () => {
   const asString = Calculator.build({ ...base, 'field-hybrid': 'on' }, 'long');
   const asBool = Calculator.build({ ...base, 'field-hybrid': true }, 'long');
   assert.deepEqual(asBool, asString);
+});
+
+// ===== gridExitThreshold: interpolation between S_{F-1} and S_F =====
+
+test('gridExitThreshold: 50% → midpoint (spec default T = (S_F + S_{F-1}) / 2)', () => {
+  // long: S_F (with the deeper rung averaged in) sits BELOW S_{F-1}
+  assert.equal(gridExitThreshold(101, 99, 50), 100);
+});
+
+test('gridExitThreshold: 0% sticks to S_{F-1}, 100% to S_F', () => {
+  assert.equal(gridExitThreshold(101, 99, 0), 101);
+  assert.equal(gridExitThreshold(101, 99, 100), 99);
+});
+
+test('gridExitThreshold: short mirror (S_F above S_{F-1}) interpolates the same way', () => {
+  assert.equal(gridExitThreshold(99, 101, 50), 100);
+  assert.equal(gridExitThreshold(99, 101, 25), 99.5);
+});
+
+test('gridExitThreshold: invalid/missing pct falls back to 50', () => {
+  assert.equal(gridExitThreshold(101, 99, undefined), 100);
+  assert.equal(gridExitThreshold(101, 99, 'abc'), 100);
+  assert.equal(gridExitThreshold(101, 99, null), 100); // Number(null) = 0 would be wrong
+});
+
+test('gridExitThreshold: string prices (as stored in config) are handled', () => {
+  assert.equal(gridExitThreshold('594.52', '592.10', 50), 593.31);
 });
