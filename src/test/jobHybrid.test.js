@@ -1,6 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { Job, Status, gridLegProfit, rearmGridLeg } = require('../lib/job');
+const {
+  Job,
+  Status,
+  gridLegProfit,
+  rearmGridLeg,
+  frontierIndex,
+  averagedClosePrice,
+} = require('../lib/job');
 
 // Hybrid DCA/GRID state machine. Rungs 0..N-1 (N = field-gridLevel, a 1-based
 // order number) are pure DCA — evaluated by the existing long()/short() over a
@@ -269,4 +276,76 @@ test('rearmGridLeg: resets status/orderId/fills, keeps qty & price', () => {
   assert.equal(obj.BUY[0].quantity, '1.000');
   assert.equal(obj.BUY[0].price, '90.00');
   assert.equal(obj.SELL[0].price, '90.27'); // micro price preserved for the next leg
+});
+
+// ===== v2 pure helpers: frontier + averaged close =====
+
+test('frontierIndex: deepest FILLED entry at/below gridStart is the frontier', () => {
+  const entries = [
+    mkOrder('BUY', 'FILLED'),
+    mkOrder('BUY', 'FILLED'),
+    mkOrder('BUY', 'FILLED'),
+    mkOrder('BUY', 'NEW'),
+  ];
+  assert.equal(frontierIndex(entries, 2), 2); // rung #3 held → F = 2
+  assert.equal(frontierIndex(entries, 1), 2); // deepest fill wins, not gridStart itself
+});
+
+test('frontierIndex: no grid rung held → -1 (degrade to classic DCA)', () => {
+  const baseOnly = [mkOrder('BUY', 'FILLED'), mkOrder('BUY', 'NEW'), mkOrder('BUY', null)];
+  assert.equal(frontierIndex(baseOnly, 2), -1); // deepest fill (0) is in the DCA base
+  assert.equal(frontierIndex([], 0), -1);
+  assert.equal(frontierIndex(null, 0), -1);
+});
+
+test('frontierIndex: walks up after a re-arm (deepest fill drops to a shallower rung)', () => {
+  const entries = [
+    mkOrder('BUY', 'FILLED'),
+    mkOrder('BUY', 'FILLED'),
+    mkOrder('BUY', null), // rung 2 just re-armed — its micro banked
+  ];
+  assert.equal(frontierIndex(entries, 1), 1);
+});
+
+test('averagedClosePrice (long): (Σquote/Σqty) × (1 + fees/100) over FILLED entries 0..upTo', () => {
+  const obj = mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', { executedQty: 1.0, cummulativeQuoteQty: 100 }),
+      mkOrder('BUY', 'FILLED', { executedQty: 1.0, cummulativeQuoteQty: 90 }),
+      mkOrder('BUY', 'FILLED', { executedQty: 1.0, cummulativeQuoteQty: 80 }),
+    ],
+  });
+  // S over 0..1: avg 95 × 1.004 (profit 0.2 + commission 0.2)
+  assert.equal(averagedClosePrice(obj, 1, 'long', 0.4), 95.38);
+  // S over 0..2: avg 90 × 1.004 — deeper rung pulls the close DOWN
+  assert.equal(averagedClosePrice(obj, 2, 'long', 0.4), 90.36);
+});
+
+test('averagedClosePrice (short): mirror, avg × (1 − fees/100), SELL side', () => {
+  const obj = mkObj({
+    sells: [
+      mkOrder('SELL', 'FILLED', { executedQty: 1.0, cummulativeQuoteQty: 100 }),
+      mkOrder('SELL', 'FILLED', { executedQty: 1.0, cummulativeQuoteQty: 90 }),
+    ],
+  });
+  assert.equal(averagedClosePrice(obj, 1, 'short', 0.4), 94.62); // 95 × 0.996
+});
+
+test('averagedClosePrice: skips non-FILLED and entries without fill data', () => {
+  const obj = mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', { executedQty: 1.0, cummulativeQuoteQty: 100 }),
+      mkOrder('BUY', 'NEW', { executedQty: 0.5, cummulativeQuoteQty: 45 }), // not filled
+      mkOrder('BUY', 'FILLED'), // old config: no fill fields
+    ],
+  });
+  assert.equal(averagedClosePrice(obj, 2, 'long', 0.4), 100.4); // only rung 0 counts
+});
+
+test('averagedClosePrice: nothing filled in range → null (S_{F-1} at the first rung)', () => {
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'FILLED', { executedQty: 1.0, cummulativeQuoteQty: 100 })],
+  });
+  assert.equal(averagedClosePrice(obj, -1, 'long', 0.4), null); // upTo before the start
+  assert.equal(averagedClosePrice(mkObj(), 3, 'long', 0.4), null); // empty ladder
 });

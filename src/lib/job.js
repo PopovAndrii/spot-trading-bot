@@ -72,6 +72,39 @@ function rebalancedClose(obj, i, strategy) {
   };
 }
 
+// Hybrid v2 frontier F: the deepest currently-HELD grid rung — the deepest FILLED
+// entry at index ≥ gridStart. -1 when no grid rung is held (the deepest fill, if
+// any, is still in the DCA base) — the caller then degrades to classic DCA. When
+// the frontier's micro-close fires the rung is re-armed (entry back to null), so
+// the next call naturally walks the frontier UP to the shallower held rung. Pure.
+function frontierIndex(entries, gridStart) {
+  const d = deepestFilledIndex(entries);
+  return d >= gridStart ? d : -1;
+}
+
+// Averaged close price of the position built by the FILLED entries 0..upTo — S_j
+// from the v2 spec (j = upTo+1 in 1-based order numbers), computed from the REAL
+// fills (executedQty/cummulativeQuoteQty), not the planned config prices: micro
+// recycling re-arms rungs, so the plan drifts from what is actually held.
+// feesPct = profit + commission (round-trip). Partial closes are intentionally NOT
+// subtracted: S feeds only the exit threshold (a switching boundary between two
+// rungs); the exit order itself is priced closes-aware by rebalancedClose. Returns
+// a number, or null when nothing (with fill data) is filled in 0..upTo — e.g.
+// S_{F-1} at the very first grid rung; the caller decides the fallback. Pure.
+function averagedClosePrice(obj, upTo, strategy, feesPct) {
+  const entrySide = strategy === 'long' ? 'BUY' : 'SELL';
+  const entries = [];
+  for (let k = 0; k <= upTo; k++) {
+    const e = obj?.[entrySide]?.[k];
+    if (!e || e.status !== state.FILLED) continue;
+    if (e.executedQty === undefined || e.cummulativeQuoteQty === undefined) continue;
+    entries.push(e);
+  }
+  if (entries.length === 0) return null;
+  const res = rebalanceClose(entries, [], strategy, feesPct);
+  return res ? res.price : null;
+}
+
 // Realized quote profit of one completed grid oscillation: quote received on the
 // SELL minus quote spent on the BUY. Works for both long and short (entry/close
 // sides differ, but sellQuote − buyQuote is the leg profit either way). Pure.
@@ -670,6 +703,8 @@ module.exports = {
   Status,
   rebalancedClose,
   deepestFilledIndex,
+  frontierIndex,
+  averagedClosePrice,
   gridLegProfit,
   rearmGridLeg,
 };
