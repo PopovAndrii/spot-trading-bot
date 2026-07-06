@@ -599,6 +599,12 @@ class JsonTimerSender extends EventEmitter {
           toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
         }
 
+        // Hybrid v2: a frontier placement carries the slot's dual role
+        // ('micro' | 'exit') so the next tick can tell which close is resting.
+        if (currentOrder.role) {
+          toObj.role = currentOrder.role;
+        }
+
         if (!this.running) return;
 
         // result.message.side == "SELL" or "BUY"
