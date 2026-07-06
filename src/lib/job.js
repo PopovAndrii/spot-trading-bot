@@ -557,17 +557,24 @@ class Job {
     }
   };
 
-  // ── Hybrid DCA/GRID ───────────────────────────────────────────────────────
+  // ── Hybrid DCA/GRID (v2 frontier machine) ──────────────────────────────────
   //
-  // Rungs 0..N-1 stay pure DCA (one averaged close, as today). Rungs N..deep are
-  // independent GRID legs: each buys at its own level and closes at its own micro
-  // take-profit, then re-arms — banking every oscillation while the DCA base sits
-  // deep. N (0-based) comes from field-gridLevel (a 1-based order number in the UI).
+  // Rungs 0..g-1 (g = field-gridLevel − 1, 1-based in the UI) are the DCA base;
+  // rungs g..deep are grid-capable. While NO grid rung is held, the base runs the
+  // UNCHANGED long()/short() over a base-only VIEW (a shallow slice shares element
+  // references, so the proven DCA machine reads only base rungs while the iterator
+  // still writes results by absolute id), and grid rungs simply keep their safety
+  // entries resting.
   //
-  // The DCA base is evaluated by the UNCHANGED long()/short() against a VIEW that
-  // slices the arrays to 0..N. A shallow slice shares element references, so the
-  // proven state machine reads only base rungs (its deepestFilled / rebalance scans
-  // never see a grid leg), while the iterator still writes results by absolute id.
+  // Once a grid rung is held, the FRONTIER F (deepest held rung) owns the ONLY
+  // resting close — its micro take-profit. A micro fill banks one oscillation
+  // (REARM → iterator bookkeeping) and re-arms the rung, so the frontier walks UP
+  // as price rises. Any other live close is stale and gets canceled — including
+  // the base averaged close raced by the first grid fill: in grid mode nothing
+  // but the micro may reserve inventory. The whole-position exit above
+  // T_F = interpolate(S_{F-1}, S_F, field-gridExit) is the next step; until it
+  // lands, the frontier micro-recycles all the way up and the cycle finishes
+  // through the classic DCA close once no grid rung is held.
 
   // 0-based index of the first GRID rung. Invalid/missing level → Infinity, i.e.
   // every rung stays DCA and hybrid degrades to the classic behavior.
@@ -581,10 +588,11 @@ class Job {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
     const g = this.#gridStartIndex(obj);
-    if (i >= g) {
-      // grid leg: entry = BUY[i], close = SELL[i]
-      return this.#gridLeg(obj, i, el, obj['SELL'][i], 'BUY', 'SELL');
-    }
+    const F = frontierIndex(obj['BUY'], g); // -1 when no grid rung is held
+
+    if (F >= 0) return this.#frontierGrid(obj, i, el, g, F, 'BUY', 'SELL');
+
+    if (i >= g) return this.#armEntry(i, el, 'BUY'); // grid rung, not held yet
 
     // DCA base over a base-only view (indices < g)
     const view = { ...obj, BUY: obj['BUY'].slice(0, g), SELL: obj['SELL'].slice(0, g) };
@@ -595,10 +603,11 @@ class Job {
     if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
 
     const g = this.#gridStartIndex(obj);
-    if (i >= g) {
-      // grid leg (mirror): entry = SELL[i], close = BUY[i]
-      return this.#gridLeg(obj, i, el, obj['BUY'][i], 'SELL', 'BUY');
-    }
+    const F = frontierIndex(obj['SELL'], g); // mirror: entries are SELLs
+
+    if (F >= 0) return this.#frontierGrid(obj, i, el, g, F, 'SELL', 'BUY');
+
+    if (i >= g) return this.#armEntry(i, el, 'SELL');
 
     const view = { ...obj, BUY: obj['BUY'].slice(0, g), SELL: obj['SELL'].slice(0, g) };
     return this.short(view, i, el);
@@ -622,20 +631,77 @@ class Job {
     return { quantity, price };
   }
 
-  // One self-contained grid leg. entry/close are the two paired slots; entrySide/
-  // closeSide are their order sides ('BUY'/'SELL'). Returns the next action:
-  //   entry not placed        → newOrder(entry)     [arm the leg]
-  //   entry NEW/PARTIAL       → getOrder(entry)     [poll]
-  //   entry FILLED, no close  → newOrder(close)     [place the micro take-profit]
-  //   close NEW/PARTIAL       → getOrder(close)     [poll]
-  //   both FILLED             → REARM               [one oscillation banked]
-  // A manually pulled slot is left alone (pass), like the DCA path.
-  #gridLeg(obj, i, entry, close, entrySide, closeSide) {
-    const symbol = entry.symbol;
-    if (entry.status === state.FILLED) {
-      if (close.status === state.FILLED) {
+  // Ladder entry management shared by the not-held and frontier paths: keep the
+  // rung's safety entry resting. Not placed → newOrder; NEW/PARTIAL → poll;
+  // manually pulled → pass (like the DCA path). FILLED never reaches here.
+  #armEntry(i, el, entrySide) {
+    const symbol = el.symbol;
+    if (el.status === state.NEW || el.status === state.PARTIALLY_FILLED) {
+      return {
+        status: el.status,
+        method: 'getOrder',
+        side: entrySide,
+        id: i,
+        data: { id: i, symbol, orderId: el.orderId },
+      };
+    }
+    if (el.manual) {
+      return { status: 'pass', method: false, side: null, id: i, data: {} };
+    }
+    return {
+      status: null,
+      method: 'newOrder',
+      side: entrySide,
+      id: i,
+      data: {
+        id: i,
+        symbol,
+        side: entrySide,
+        type: 'LIMIT',
+        timeInForce: 'GTC',
+        quantity: el.quantity,
+        price: el.price,
+      },
+    };
+  }
+
+  // Grid mode — a grid rung is held, F = frontier (deepest held rung, F ≥ g).
+  // Handles EVERY index while active. Per index:
+  //   grid rung, entry+close FILLED  → REARM            [oscillation banked]
+  //   base rung, entry+close FILLED  → pass             [base close raced the
+  //     cancel during the frontier transition; its fills stay on the slot and the
+  //     closes-aware exit (rebalancedClose) reconciles the inventory later]
+  //   live close at i ≠ F            → cancelOrder      [stale: an old frontier's
+  //     micro or the base averaged close — only the frontier's micro may rest]
+  //   i == F                         → place/poll the micro take-profit
+  //   entry FILLED elsewhere         → pass              [held rung]
+  //   entry not FILLED               → #armEntry         [keep the ladder resting]
+  #frontierGrid(obj, i, el, g, F, entrySide, closeSide) {
+    const close = obj[closeSide][i] || {};
+    const symbol = el.symbol;
+
+    if (el.status === state.FILLED && close.status === state.FILLED) {
+      if (i >= g) {
         return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
       }
+      return { status: 'pass', method: false, side: null, id: i, data: {} };
+    }
+
+    if (
+      i !== F &&
+      close.orderId != null &&
+      (close.status === state.NEW || close.status === state.PARTIALLY_FILLED)
+    ) {
+      return {
+        status: null,
+        method: 'cancelOrder',
+        side: closeSide,
+        id: i,
+        data: { id: i, symbol, orderId: close.orderId },
+      };
+    }
+
+    if (i === F) {
       if (close.status === state.NEW || close.status === state.PARTIALLY_FILLED) {
         return {
           status: close.status,
@@ -649,7 +715,7 @@ class Job {
         return { status: 'pass', method: false, side: null, id: i, data: {} };
       }
       // micro take-profit price/qty from the real entry fill (not the stale slot)
-      const { quantity, price } = this.#gridClose(obj, entry, closeSide);
+      const { quantity, price } = this.#gridClose(obj, el, closeSide);
       return {
         status: null,
         method: 'newOrder',
@@ -667,34 +733,11 @@ class Job {
       };
     }
 
-    if (entry.status === state.NEW || entry.status === state.PARTIALLY_FILLED) {
-      return {
-        status: entry.status,
-        method: 'getOrder',
-        side: entrySide,
-        id: i,
-        data: { id: i, symbol, orderId: entry.orderId },
-      };
+    if (el.status === state.FILLED) {
+      return { status: 'pass', method: false, side: null, id: i, data: {} }; // held rung
     }
 
-    if (entry.manual) {
-      return { status: 'pass', method: false, side: null, id: i, data: {} };
-    }
-    return {
-      status: null,
-      method: 'newOrder',
-      side: entrySide,
-      id: i,
-      data: {
-        id: i,
-        symbol,
-        side: entrySide,
-        type: 'LIMIT',
-        timeInForce: 'GTC',
-        quantity: entry.quantity,
-        price: entry.price,
-      },
-    };
+    return this.#armEntry(i, el, entrySide);
   }
 }
 

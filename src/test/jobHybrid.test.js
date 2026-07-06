@@ -157,26 +157,109 @@ test('grid long: manual-pulled entry → pass (leave it alone)', () => {
   assert.equal(r.method, false);
 });
 
-// ===== base/grid isolation: a filled grid rung must NOT block the base close =====
+// ===== frontier: one micro at the deepest held rung, everything else quiet =====
 
-test('hybrid: base close completes (DONE) even though a deeper grid rung is FILLED', () => {
-  // gridLevel=2 → base is only rung 0. Rung 1 is a grid leg whose BUY is FILLED.
-  // Over the whole array deepestFilledIndex(BUY)=1 > 0 would wrongly force a pass;
-  // the base view (rungs 0..1 sliced to base) sees only rung 0 → DONE is correct.
+test('frontier: only the deepest held grid rung gets the micro; shallower held rungs pass', () => {
+  // gridLevel=1 → both rungs are grid-capable; both held → F=1
+  const obj = mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1, price: '100.00' }),
+      mkOrder('BUY', 'FILLED', { orderId: 2, quantity: '2.000', price: '90.00' }),
+    ],
+    sells: [mkOrder('SELL', null), mkOrder('SELL', null)],
+    param: { 'field-gridLevel': '1' },
+  });
+  assert.equal(job.hybridLong(obj, 0, obj.BUY[0]).status, 'pass'); // held, not frontier
+  const r = job.hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r.method, 'newOrder');
+  assert.equal(r.side, 'SELL');
+  assert.equal(r.data.price, '90.18'); // 90 × (1 + 0.2/100)
+  assert.equal(r.data.quantity, '2.000');
+});
+
+test('frontier: stale micro at the old frontier is canceled when a deeper rung fills', () => {
+  // F moved 0 → 1; the micro left at SELL[0] must be pulled (only F's micro rests)
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 })],
+    sells: [mkOrder('SELL', 'NEW', { orderId: 101 }), mkOrder('SELL', null)],
+    param: { 'field-gridLevel': '1' },
+  });
+  const r = job.hybridLong(obj, 0, obj.BUY[0]);
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.side, 'SELL');
+  assert.equal(r.data.orderId, 101);
+});
+
+test('frontier: the resting base averaged close is canceled once a grid rung is held', () => {
+  // gridLevel=2: rung 0 = base with its DCA close resting; rung 1 fills → grid
+  // mode → nothing but the frontier micro may reserve inventory
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 })],
+    sells: [mkOrder('SELL', 'NEW', { orderId: 200 }), mkOrder('SELL', null)],
+    param: { 'field-gridLevel': '2' },
+  });
+  const r = job.hybridLong(obj, 0, obj.BUY[0]);
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.data.orderId, 200);
+});
+
+test('frontier walks up: after the deepest rung re-arms, the shallower held rung gets the micro', () => {
+  // rung 2 just banked + re-armed (entry back to null) → F recomputes to 1
+  const obj = mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1 }),
+      mkOrder('BUY', 'FILLED', { orderId: 2, price: '95.00' }),
+      mkOrder('BUY', null, { quantity: '4.000', price: '90.00' }),
+    ],
+    sells: [mkOrder('SELL', null), mkOrder('SELL', null), mkOrder('SELL', null)],
+    param: { 'field-gridLevel': '1' },
+  });
+  const r1 = job.hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r1.method, 'newOrder');
+  assert.equal(r1.side, 'SELL');
+  assert.equal(r1.data.price, '95.19'); // 95 × 1.002 — micro moved up with the frontier
+  // the re-armed rung 2 keeps its safety buy resting for the next dip
+  const r2 = job.hybridLong(obj, 2, obj.BUY[2]);
+  assert.equal(r2.method, 'newOrder');
+  assert.equal(r2.side, 'BUY');
+  assert.equal(r2.data.price, '90.00');
+});
+
+test('frontier short: micro buy-back only at the deepest held sell rung', () => {
+  const obj = mkObj({
+    sells: [
+      mkOrder('SELL', 'FILLED', { orderId: 1, price: '100.00' }),
+      mkOrder('SELL', 'FILLED', { orderId: 2, quantity: '2.000', price: '110.00' }),
+    ],
+    buys: [mkOrder('BUY', null), mkOrder('BUY', null)],
+    param: { 'field-gridLevel': '1' },
+  });
+  assert.equal(job.hybridShort(obj, 0, obj.SELL[0]).status, 'pass');
+  const r = job.hybridShort(obj, 1, obj.SELL[1]);
+  assert.equal(r.method, 'newOrder');
+  assert.equal(r.side, 'BUY');
+  assert.equal(r.data.price, '109.78'); // 110 × (1 − 0.2/100)
+  assert.equal(r.data.quantity, '2.000');
+});
+
+// ===== grid-mode base handling (v2 replaces the v1 isolation semantics) =====
+
+test('v2: base close FILLED during the frontier race → pass (no DONE while grid is held)', () => {
+  // v1 declared DONE here and stranded the deep rung. v2 keeps the cycle open:
+  // the base close's fills stay on the slot; the closes-aware exit reconciles.
   const obj = mkObj({
     buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 })],
     sells: [mkOrder('SELL', 'FILLED', { orderId: 101 }), mkOrder('SELL', 'NEW', { orderId: 102 })],
     param: { 'field-gridLevel': '2' },
   });
   const r = job.hybridLong(obj, 0, obj.BUY[0]);
-  assert.equal(r.status, Status.DONE);
-  assert.equal(r.method, 'cancelOpenOrders');
+  assert.equal(r.status, 'pass');
+  assert.equal(r.method, false);
 });
 
-test('hybrid: grid micro-close does NOT leak into the base rebalance', () => {
-  // gridLevel=2. Base rung 0 bought 1.0 @100; its averaged close SELL[0] was
-  // canceled after selling nothing. Grid rung 1 sold 1.0 (a banked leg). The base
-  // re-placed close must reflect only rung 0 (qty 1.000), not subtract the grid sell.
+test('v2: base averaged close is NOT re-placed while a grid rung is held', () => {
+  // In grid mode only the frontier micro rests — a canceled base close stays
+  // canceled until the frontier walks back above the base (classic DCA resumes).
   const obj = mkObj({
     buys: [
       mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 }),
@@ -184,14 +267,32 @@ test('hybrid: grid micro-close does NOT leak into the base rebalance', () => {
     ],
     sells: [
       mkOrder('SELL', 'CANCELED', { orderId: 101, executedQty: 0, cummulativeQuoteQty: 0 }),
-      mkOrder('SELL', 'FILLED', { orderId: 102, executedQty: 1.0, cummulativeQuoteQty: 90.3 }),
+      mkOrder('SELL', null),
+    ],
+    param: { 'field-gridLevel': '2' },
+  });
+  const r = job.hybridLong(obj, 0, obj.BUY[0]);
+  assert.equal(r.status, 'pass');
+});
+
+test('v2: DCA resumes after the whole grid re-arms — base close re-placed, then DONE', () => {
+  // All grid rungs recycled away (entries null) → F=-1 → base view runs classic
+  // DCA: the canceled base close is re-placed at the averaged price.
+  const obj = mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 }),
+      mkOrder('BUY', null, { quantity: '2.000', price: '90.00' }),
+    ],
+    sells: [
+      mkOrder('SELL', 'CANCELED', { orderId: 101, executedQty: 0, cummulativeQuoteQty: 0 }),
+      mkOrder('SELL', null),
     ],
     param: { 'field-gridLevel': '2' },
   });
   const r = job.hybridLong(obj, 0, obj.BUY[0]);
   assert.equal(r.method, 'newOrder');
   assert.equal(r.side, 'SELL');
-  assert.equal(r.data.quantity, '1.000'); // rung 0 only; grid rung 1's sell excluded
+  assert.equal(r.data.quantity, '1.000'); // rung 0 only — grid fills were re-armed away
 });
 
 // ===== short mirror =====
