@@ -132,6 +132,21 @@ function rearmGridLeg(obj, i) {
   return obj;
 }
 
+// One banked grid oscillation, all bookkeeping in one place: fold the leg's
+// realized quote profit into the cycle totals, bump the counters (gridCycles =
+// cycle total, gridCounts[i] = per-rung recycle count for the ×N badge), then
+// re-arm the leg. Must run while the fills are still on the slots — rearmGridLeg
+// wipes them. Returns the banked amount. Mutates obj. Pure/testable.
+function bankGridLeg(obj, i) {
+  const banked = gridLegProfit(obj['BUY'][i], obj['SELL'][i]);
+  obj.gridRealized = (Number(obj.gridRealized) || 0) + banked;
+  obj.gridCycles = (Number(obj.gridCycles) || 0) + 1;
+  if (!obj.gridCounts || typeof obj.gridCounts !== 'object') obj.gridCounts = {};
+  obj.gridCounts[i] = (Number(obj.gridCounts[i]) || 0) + 1;
+  rearmGridLeg(obj, i);
+  return banked;
+}
+
 class Job {
   constructor(test = false) {
     this.test = test;
@@ -681,8 +696,11 @@ class Job {
   // Grid close order (price + quantity) computed at placement time, like DCA's
   // rebalancedClose. Price = the rung's own entry LEVEL marked by microProfit +
   // commission (matches the displayed micro column). Quantity = what the entry
-  // actually filled, floored to stepSize (safe against a partial entry fill).
-  #gridClose(obj, entry, closeSide) {
+  // actually filled MINUS what a canceled partial predecessor on the same slot
+  // already sold/bought back (frontier moves and rollbacks cancel live closes —
+  // without the subtraction the re-placed micro oversells the rung), floored to
+  // stepSize. Zero left → the oscillation is de-facto complete (caller banks it).
+  #gridClose(obj, entry, close, closeSide) {
     const p = obj.param || {};
     const microProfit = p['field-microProfit'] ?? 0.1;
     const commission = p['field-commission'] ?? 0;
@@ -692,7 +710,10 @@ class Job {
 
     const price = microClosePrice(entry.price, microProfit, commission, tick, strategy);
     const execQty = new Decimal(entry.executedQty || entry.quantity || 0);
-    const quantity = execQty.toDecimalPlaces(step, Decimal.ROUND_DOWN).toFixed(step);
+    const already = new Decimal(Number(close?.executedQty) || 0);
+    const quantity = Decimal.max(execQty.minus(already), 0)
+      .toDecimalPlaces(step, Decimal.ROUND_DOWN)
+      .toFixed(step);
     return { quantity, price };
   }
 
@@ -852,7 +873,12 @@ class Job {
       }
 
       // micro take-profit price/qty from the real entry fill (not the stale slot)
-      const { quantity, price } = this.#gridClose(obj, el, closeSide);
+      const { quantity, price } = this.#gridClose(obj, el, close, closeSide);
+      if (parseFloat(quantity) <= 0) {
+        // the canceled predecessor already closed the whole rung — the oscillation
+        // is complete even though the close never reached FILLED: bank it
+        return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
+      }
       return {
         status: null,
         method: 'newOrder',
@@ -888,4 +914,5 @@ module.exports = {
   averagedClosePrice,
   gridLegProfit,
   rearmGridLeg,
+  bankGridLeg,
 };

@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { cycleProfit } = require('../modules/jsonTimerSender');
+const { bankGridLeg } = require('../lib/job');
 
 // cycleProfit = Σ(SELL filled quote) − Σ(BUY filled quote) + obj.gridRealized.
 // The gridRealized term matters because a re-armed grid leg has its fills cleared
@@ -40,4 +41,50 @@ test('missing/invalid gridRealized → treated as 0', () => {
     gridRealized: 'oops',
   };
   assert.equal(Number(cycleProfit(obj).toFixed(4)), 0.2);
+});
+
+test('v2 reconciliation: banked micros + whole-position exit == exchange net quote flow', () => {
+  // Simulate a full hybrid v2 cycle against an explicit exchange ledger.
+  // Base rung 0: buy 1.0 @ 100. Grid rung 1: bought three times @ 90, micro-sold
+  // twice @ 90.27 (two banked oscillations), third buy closed by the exit.
+  const ledger = { buys: 0, sells: 0 };
+  const obj = {
+    BUY: [
+      { status: 'FILLED', executedQty: 1.0, cummulativeQuoteQty: 100 },
+      { status: null, quantity: '1.000', price: '90.00' },
+    ],
+    SELL: [{ status: null }, { status: null, quantity: '1.000', price: '90.27' }],
+  };
+  ledger.buys += 100;
+
+  for (let osc = 0; osc < 2; osc++) {
+    Object.assign(obj.BUY[1], { status: 'FILLED', executedQty: 1.0, cummulativeQuoteQty: 90 });
+    Object.assign(obj.SELL[1], {
+      status: 'FILLED',
+      executedQty: 1.0,
+      cummulativeQuoteQty: 90.27,
+      role: 'micro',
+    });
+    ledger.buys += 90;
+    ledger.sells += 90.27;
+    bankGridLeg(obj, 1); // engine REARM handler
+  }
+  assert.equal(obj.gridCycles, 2);
+  assert.equal(obj.gridCounts[1], 2);
+
+  // third re-buy of the frontier rung, then P ≥ T_F → exit close over the whole
+  // position (2.0 @ 95.38) fills → DONE
+  Object.assign(obj.BUY[1], { status: 'FILLED', executedQty: 1.0, cummulativeQuoteQty: 90 });
+  Object.assign(obj.SELL[1], {
+    status: 'FILLED',
+    executedQty: 2.0,
+    cummulativeQuoteQty: 190.76,
+    role: 'exit',
+  });
+  ledger.buys += 90;
+  ledger.sells += 190.76;
+
+  const exchangeNet = ledger.sells - ledger.buys; // 371.3 − 370 = 1.3
+  assert.equal(Number(cycleProfit(obj).toFixed(4)), Number(exchangeNet.toFixed(4)));
+  assert.equal(Number(cycleProfit(obj).toFixed(4)), 1.3);
 });

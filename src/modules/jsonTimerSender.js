@@ -6,8 +6,7 @@ const {
   Status,
   rebalancedClose,
   deepestFilledIndex,
-  gridLegProfit,
-  rearmGridLeg,
+  bankGridLeg,
 } = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
@@ -522,16 +521,14 @@ class JsonTimerSender extends EventEmitter {
 
         let currentOrder = this.job[method](obj, key, val); // strategy.
 
-        // Hybrid grid leg banked one oscillation (entry + micro-close both FILLED):
-        // record the realized quote profit, then re-arm the leg (reset both slots so
-        // it buys/sells again at the same level). No API call — pure bookkeeping.
+        // Hybrid grid leg banked one oscillation (entry + micro-close both done):
+        // record the realized quote profit, bump the cycle/per-rung counters, then
+        // re-arm the leg (reset both slots so it buys/sells again at the same
+        // level). No API call — pure bookkeeping (bankGridLeg).
         if (currentOrder.status === 'REARM') {
           if (!this.running) return;
           const id = currentOrder.id;
-          const banked = gridLegProfit(obj['BUY'][id], obj['SELL'][id]);
-          obj.gridRealized = (Number(obj.gridRealized) || 0) + banked;
-          obj.gridCycles = (Number(obj.gridCycles) || 0) + 1;
-          rearmGridLeg(obj, id);
+          const banked = bankGridLeg(obj, id);
           obj.date_modified = new Date().toISOString();
 
           logBus.log(

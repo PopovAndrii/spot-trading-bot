@@ -5,6 +5,7 @@ const {
   Status,
   gridLegProfit,
   rearmGridLeg,
+  bankGridLeg,
   frontierIndex,
   averagedClosePrice,
 } = require('../lib/job');
@@ -526,6 +527,88 @@ test('hybrid: test mode → pass for both strategies', () => {
 });
 
 // ===== pure re-arm helpers =====
+
+test('canceled partial predecessor on the slot: micro re-placed for the remainder only', () => {
+  // the old micro sold 0.4 before being canceled (frontier move / rollback) —
+  // the fresh micro must cover 1.0 − 0.4, or it oversells the rung
+  const obj = mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', {
+        orderId: 5,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90,
+        price: '90.00',
+      }),
+    ],
+    sells: [
+      mkOrder('SELL', 'CANCELED', {
+        orderId: 6,
+        executedQty: 0.4,
+        cummulativeQuoteQty: 36.1,
+        role: 'micro',
+      }),
+    ],
+    param: { 'field-gridLevel': '1' },
+  });
+  const r = job.hybridLong(obj, 0, obj.BUY[0]);
+  assert.equal(r.method, 'newOrder');
+  assert.equal(r.role, 'micro');
+  assert.equal(r.data.quantity, '0.600');
+});
+
+test('canceled predecessor already closed the whole rung → REARM (bank it)', () => {
+  // cancel landed exactly on the fill boundary: CANCELED but everything sold —
+  // the oscillation is complete, nothing left to place
+  const obj = mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', {
+        orderId: 5,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90,
+        price: '90.00',
+      }),
+    ],
+    sells: [
+      mkOrder('SELL', 'CANCELED', {
+        orderId: 6,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90.27,
+        role: 'micro',
+      }),
+    ],
+    param: { 'field-gridLevel': '1' },
+  });
+  const r = job.hybridLong(obj, 0, obj.BUY[0]);
+  assert.equal(r.status, 'REARM');
+});
+
+test('bankGridLeg: folds profit, bumps gridCycles + per-rung counter, re-arms the leg', () => {
+  const obj = mkObj({
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 5, executedQty: 1.0, cummulativeQuoteQty: 90 })],
+    sells: [
+      mkOrder('SELL', 'FILLED', {
+        orderId: 6,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90.27,
+        role: 'micro',
+      }),
+    ],
+  });
+  const banked = bankGridLeg(obj, 0);
+  assert.equal(Number(banked.toFixed(4)), 0.27);
+  assert.equal(Number(obj.gridRealized.toFixed(4)), 0.27);
+  assert.equal(obj.gridCycles, 1);
+  assert.equal(obj.gridCounts[0], 1);
+  assert.equal(obj.BUY[0].status, null); // re-armed
+  assert.equal(obj.SELL[0].status, null);
+  // second oscillation on the same rung
+  Object.assign(obj.BUY[0], { status: 'FILLED', executedQty: 1.0, cummulativeQuoteQty: 90 });
+  Object.assign(obj.SELL[0], { status: 'FILLED', executedQty: 1.0, cummulativeQuoteQty: 90.27 });
+  bankGridLeg(obj, 0);
+  assert.equal(obj.gridCounts[0], 2);
+  assert.equal(obj.gridCycles, 2);
+  assert.equal(Number(obj.gridRealized.toFixed(4)), 0.54);
+});
 
 test('gridLegProfit: sell quote − buy quote (both sides use the same formula)', () => {
   const buy = { cummulativeQuoteQty: 100 };
