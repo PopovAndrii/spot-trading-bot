@@ -115,6 +115,38 @@ function partialFillDelta(stored, message) {
   return { executedQty, cummulativeQuoteQty };
 }
 
+// Fields to persist into the slot after an API result changed the order state.
+// Pure — the iterator applies it with Object.assign.
+//
+// On newOrder the ACTUALLY SENT price/quantity are persisted too: rebalanced DCA
+// closes and hybrid micro/exit closes are priced at send time, so without this
+// the slot keeps the stale plan value — the table then compares the plan against
+// itself and either hides a real difference or shows a false "re-placed" badge.
+function orderResultPatch(currentOrder, message) {
+  const patch = {
+    status: message.status,
+    orderId: message.orderId,
+  };
+
+  if (message.executedQty !== undefined) {
+    patch.executedQty = parseFloat(message.executedQty) || 0;
+    patch.cummulativeQuoteQty = parseFloat(message.cummulativeQuoteQty) || 0;
+  }
+
+  // Hybrid v2: a frontier placement carries the slot's dual role
+  // ('micro' | 'exit') so the next tick can tell which close is resting.
+  if (currentOrder.role) {
+    patch.role = currentOrder.role;
+  }
+
+  if (currentOrder.method === 'newOrder') {
+    if (currentOrder.data?.price !== undefined) patch.price = currentOrder.data.price;
+    if (currentOrder.data?.quantity !== undefined) patch.quantity = currentOrder.data.quantity;
+  }
+
+  return patch;
+}
+
 class JsonTimerSender extends EventEmitter {
   constructor(wss, strategy = null) {
     super();
@@ -625,21 +657,7 @@ class JsonTimerSender extends EventEmitter {
           continue;
         }
 
-        const toObj = {
-          status: result.message.status,
-          orderId: result.message.orderId,
-        };
-
-        if (result.message.executedQty !== undefined) {
-          toObj.executedQty = parseFloat(result.message.executedQty) || 0;
-          toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
-        }
-
-        // Hybrid v2: a frontier placement carries the slot's dual role
-        // ('micro' | 'exit') so the next tick can tell which close is resting.
-        if (currentOrder.role) {
-          toObj.role = currentOrder.role;
-        }
+        const toObj = orderResultPatch(currentOrder, result.message);
 
         if (!this.running) return;
 
@@ -955,3 +973,4 @@ module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
 module.exports.manualStuckSlots = manualStuckSlots;
 module.exports.cycleProfit = cycleProfit;
 module.exports.freshPrice = freshPrice;
+module.exports.orderResultPatch = orderResultPatch;
