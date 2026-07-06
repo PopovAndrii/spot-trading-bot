@@ -92,6 +92,18 @@ function cycleProfit(obj) {
   return sumFilledQuote(obj?.SELL) - sumFilledQuote(obj?.BUY) + gridRealized;
 }
 
+// Live price for the hybrid frontier decision: the cached stream tick if it is
+// fresh enough, otherwise null — the caller then falls back to a bookTicker
+// request. maxAgeMs default 10s: the @ticker stream pushes about once a second
+// and its heartbeat reconnects after 30s of silence, so 10s of quiet already
+// means the cache cannot be trusted for a money decision. Pure/testable.
+function freshPrice(price, ts, now, maxAgeMs = 10_000) {
+  const p = parseFloat(price);
+  if (!Number.isFinite(p) || p <= 0) return null;
+  if (!ts || now - ts > maxAgeMs) return null;
+  return p;
+}
+
 function partialFillDelta(stored, message) {
   if (!message || message.status !== 'PARTIALLY_FILLED') return null;
   if (message.executedQty === undefined) return null;
@@ -123,6 +135,10 @@ class JsonTimerSender extends EventEmitter {
     this.baseAsset = '';
     this.quoteAsset = '';
     this.tickDecimals = 2; // price decimals for notifications; refreshed from the grid on start
+
+    // Latest tick from the public @ticker stream (hybrid grid/exit decision).
+    this.lastPrice = null;
+    this.lastPriceTime = 0;
 
     this.API = InvokeApi.getInstance();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
@@ -440,6 +456,26 @@ class JsonTimerSender extends EventEmitter {
     return true;
   }
 
+  // job.price for the hybrid frontier decision: the stream cache when fresh,
+  // otherwise one bookTicker request (mid of bid/ask). On total failure the price
+  // stays null and the Job conservatively keeps the frontier in grid mode.
+  async #refreshJobPrice() {
+    let p = freshPrice(this.lastPrice, this.lastPriceTime, Date.now());
+    if (p == null) {
+      try {
+        const res = await this.API.bookTicker({ symbol: this.symbol });
+        const bid = parseFloat(res?.message?.bidPrice);
+        const ask = parseFloat(res?.message?.askPrice);
+        if (res?.success && bid > 0 && ask > 0) {
+          p = (bid + ask) / 2;
+        }
+      } catch (err) {
+        console.error('refreshJobPrice:', err);
+      }
+    }
+    this.job.price = p;
+  }
+
   /**
    * Iterates through the entire table of placed orders.
    * @param {Object} obj - Configuration of order data from file or database.
@@ -459,6 +495,9 @@ class JsonTimerSender extends EventEmitter {
           ? 'hybridShort'
           : 'hybridLong'
         : strategy.method;
+
+      // classic runs never pay for the price plumbing (no request, price unused)
+      if (hybrid) await this.#refreshJobPrice();
 
       if (!hybrid && (await this.#maybePrepareRecoveryClose(obj, strategy))) return;
 
@@ -733,6 +772,13 @@ class JsonTimerSender extends EventEmitter {
       streamAPI.removeAllListeners('reconnected');
       streamAPI.start();
       streamAPI.on('message', (data) => {
+        // cache the last price for the hybrid frontier decision (data.c = last
+        // trade price in the @ticker payload)
+        const p = parseFloat(data?.c);
+        if (Number.isFinite(p) && p > 0) {
+          this.lastPrice = p;
+          this.lastPriceTime = Date.now();
+        }
         this.emit('price', data);
       });
 
@@ -911,3 +957,4 @@ module.exports.markOpenAsCanceled = markOpenAsCanceled;
 module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
 module.exports.manualStuckSlots = manualStuckSlots;
 module.exports.cycleProfit = cycleProfit;
+module.exports.freshPrice = freshPrice;
