@@ -202,7 +202,9 @@ export class LoadDataCalculator {
   // while a cycle runs, same guard as the other build params.
   hybrid() {
     const sw = document.getElementById('settings-hybrid');
+    this.toggleHybridFields();
     sw?.addEventListener('ui-switch-change', () => {
+      this.toggleHybridFields();
       if (this.getListenerStatus()) {
         this.getSettings();
         this.strategy = document.getElementById('field-strategy').value;
@@ -215,6 +217,17 @@ export class LoadDataCalculator {
         );
       }
     });
+  }
+
+  // The hybrid-only params (Grid from order / Micro profit % / Grid exit %)
+  // are meaningful only while Hybrid grid is on, so the switch shows/hides
+  // their row. Inline display beats the .line stylesheet rule when hiding and
+  // reverts to it when shown. Call on init, on switch-change, and after the
+  // file loader restores the switch.
+  toggleHybridFields() {
+    const on = document.getElementById('hybrid')?.checked;
+    const group = document.getElementById('group-hybrid');
+    if (group) group.style.display = on ? '' : 'none';
   }
 
   #backlight(obj, type, index) {

@@ -79,18 +79,8 @@
               </div>
             </div>
 
-            <div class="line">
-              <div class="UIsw info lg r-1 label-top" role="switch" tabindex="0" id="settings-hybrid">
-                <label class="UIsw-label" for="hybrid">Hybrid grid
-                  <span class="UIql" tabindex="0">
-                    <span class="UIql__text">DCA/GRID hybrid. Rungs from "Grid from order" downward become recycling grid legs: each buys at its level and sells back at its own micro-profit, banking every bounce, then re-arms. Rungs above stay classic DCA (one averaged close). Off = pure DCA.</span>
-                  </span>
-                </label>
-                <input type="checkbox" id="hybrid" name="hybrid-switch" hidden>
-                <span class="UIsw-slider"></span>
-                <span class="UIsw-slider__on">on</span>
-                <span class="UIsw-slider__off">off</span>
-              </div>
+            <div class="line" id="group-hybrid">
+
               <div class="">
                 <%- include('../views/ui/SpinBox', { id:'field-gridLevel' , label:'Grid from order' , min:1, max:50 , step: 0, hint:'From which order number (down the ladder) rungs become grid legs. Rungs above this stay DCA. Only used when Hybrid grid is on.' }); %>
               </div>
@@ -174,18 +164,30 @@
 
         <div class="row">
           <div class="spotbot-danger-zone">
-            <button data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb" type="button">
+            <button data-value="<%= base + quote %>" id="cancel-all-orders" class="UIb sm" type="button">
               Check and Cancel all <%= base + quote %> pairs
                 <svg class="icon">
                   <use href="/sprite.svg#close"></use>
                 </svg>
             </button>
 
-            <button data-value="<%= base + quote %>" id="delete-current-series" class="UIb" type="button" disabled>
+            <button data-value="<%= base + quote %>" id="delete-current-series" class="UIb sm" type="button" disabled>
               Delete current series
             </button>
 
-            <div class="UIsw r-1" role="switch" tabindex="0" id="settings-expert-mode">
+              <div class="UIsw r-1 sm" role="switch" tabindex="0" id="settings-hybrid">
+                <label class="UIsw-label" for="hybrid">Hybrid grid
+                  <span class="UIql" tabindex="0">
+                    <span class="UIql__text">DCA/GRID hybrid. Rungs from "Grid from order" downward become recycling grid legs: each buys at its level and sells back at its own micro-profit, banking every bounce, then re-arms. Rungs above stay classic DCA (one averaged close). Off = pure DCA.</span>
+                  </span>
+                </label>
+                <input type="checkbox" id="hybrid" name="hybrid-switch" hidden>
+                <span class="UIsw-slider"></span>
+                <span class="UIsw-slider__on">on</span>
+                <span class="UIsw-slider__off">off</span>
+              </div>
+
+            <div class="UIsw r-1 sm" role="switch" tabindex="0" id="settings-expert-mode">
               <label class="UIsw-label" for="expert">Expert Mode
                 <span class="UIql UIql--click" tabindex="0">
                   <span class="UIql__text">Unblocks per-order controls in the table below: manual cancel (✕) of a single resting order and re-place (＋) of a pulled order at a new price.</span>

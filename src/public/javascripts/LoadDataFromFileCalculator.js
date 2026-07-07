@@ -76,6 +76,7 @@ export class LoadDataFromFileCalculator {
       else input.removeAttribute('checked');
       hybridSw.setAttribute('aria-checked', on ? 'true' : 'false');
     }
+    this.loadDataCalculator.toggleHybridFields();
 
     this.#fillInData(data);
     this.loadDataCalculator.calculate(data);
