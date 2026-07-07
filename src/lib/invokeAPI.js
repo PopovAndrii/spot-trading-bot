@@ -25,8 +25,11 @@ class InvokeApi {
     const api_secret = testnet ? process.env.API_SECRET_TEST : process.env.API_SECRET;
     const baseURL = testnet ? 'https://testnet.binance.vision/' : 'https://api.binance.com';
 
+    // Testnet streams live on port 443 (wss://stream.testnet.binance.vision/ws);
+    // :9443 is a mainnet-only port — with it the testnet user stream never
+    // connected, so executionReport (fill push) silently never arrived.
     this.wssUserURL = testnet
-      ? 'wss://stream.testnet.binance.vision:9443/ws/'
+      ? 'wss://stream.testnet.binance.vision/ws/'
       : 'wss://stream.binance.com:9443/ws/';
 
     // Do not throw an exception so the container does not crash: public endpoints (symbols, prices)

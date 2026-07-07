@@ -9,6 +9,10 @@ const https = require('https');
 // not affect trading.
 
 function enabled() {
+  // node --test sets NODE_TEST_CONTEXT in every test process; the container env
+  // carries the REAL bot token (.env is container-wide), so without this guard
+  // engine-driving tests spam the live chat with fake trade notices.
+  if (process.env.NODE_TEST_CONTEXT) return false;
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
 }
 
