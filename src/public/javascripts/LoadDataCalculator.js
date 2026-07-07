@@ -483,6 +483,7 @@ export class LoadDataCalculator {
         param: {},
         date_added: new Date().toISOString(),
         date_modified: null,
+        hybrid: 0, // cumulative micro fills of the series (a manual Save starts fresh)
         BUY: [],
         SELL: [],
       };

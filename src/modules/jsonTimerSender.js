@@ -903,6 +903,11 @@ class JsonTimerSender extends EventEmitter {
       const tmp = this.#config(calc);
       tmp.param = settings;
       tmp.restart = true;
+      // Cumulative micro-fill counter of the SERIES: the per-cycle stats
+      // (gridRealized/gridCycles/gridCounts) intentionally reset with the fresh
+      // grid, but this one survives auto-restarts — otherwise every looped cycle
+      // wipes the evidence of how many micros actually fired.
+      tmp.hybrid = Number(obj.hybrid) || 0;
 
       // Save to file
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
@@ -930,6 +935,7 @@ class JsonTimerSender extends EventEmitter {
       param: {},
       date_added: new Date().toISOString(),
       date_modified: null,
+      hybrid: 0, // cumulative micro fills; restartCycle overwrites with the carry-over
       BUY: [],
       SELL: [],
     };

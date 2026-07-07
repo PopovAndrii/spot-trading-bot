@@ -598,6 +598,7 @@ test('bankGridLeg: folds profit, bumps gridCycles + per-rung counter, re-arms th
   assert.equal(Number(banked.toFixed(4)), 0.27);
   assert.equal(Number(obj.gridRealized.toFixed(4)), 0.27);
   assert.equal(obj.gridCycles, 1);
+  assert.equal(obj.hybrid, 1); // cumulative micro-fill counter of the series
   assert.equal(obj.gridCounts[0], 1);
   assert.equal(obj.BUY[0].status, null); // re-armed
   assert.equal(obj.SELL[0].status, null);
@@ -607,6 +608,7 @@ test('bankGridLeg: folds profit, bumps gridCycles + per-rung counter, re-arms th
   bankGridLeg(obj, 0);
   assert.equal(obj.gridCounts[0], 2);
   assert.equal(obj.gridCycles, 2);
+  assert.equal(obj.hybrid, 2);
   assert.equal(Number(obj.gridRealized.toFixed(4)), 0.54);
 });
 
