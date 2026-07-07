@@ -938,7 +938,15 @@ class JsonTimerSender extends EventEmitter {
       // Get current price (and param ??)
       const data = await this.API.bookTicker({ symbol: this.symbol });
 
-      const price = this.strategy === 'long' ? data.message.askPrice : data.message.bidPrice;
+      const rawPrice = this.strategy === 'long' ? data.message.askPrice : data.message.bidPrice;
+      // bookTicker returns the price padded to 8 decimals ("582.22000000"); on a
+      // first Start the frontend stores a clean parseFloat'd value. Trim to the
+      // pair's tick precision so the restarted config matches (numeric value is
+      // identical — this only drops the trailing-zero noise). Fallback: parseFloat.
+      const tick = parseInt(obj?.param?.['field-tickSize'], 10);
+      const price = Number.isInteger(tick)
+        ? Number(rawPrice).toFixed(tick)
+        : String(parseFloat(rawPrice));
 
       // recalculete
       const settings = {
