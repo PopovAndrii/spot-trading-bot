@@ -589,28 +589,29 @@ class JsonTimerSender extends EventEmitter {
         let currentOrder = this.job[method](obj, key, val); // strategy.
 
         // Hybrid grid leg banked one oscillation (entry + micro-close both done):
-        // record the realized quote profit, bump the cycle/per-rung counters, then
-        // re-arm the leg (reset both slots so it buys/sells again at the same
-        // level). No API call — pure bookkeeping (bankGridLeg).
+        // record the realized quote profit, bump this rung's micro-fire counter
+        // (on its close order), then re-arm the leg (reset both slots so it
+        // buys/sells again at the same level). No API call — pure bookkeeping.
         if (currentOrder.status === 'REARM') {
           if (!this.running) return;
           const id = currentOrder.id;
-          const banked = bankGridLeg(obj, id);
+          const banked = bankGridLeg(obj, id, this.strategy);
+          const closeSide = this.strategy === 'short' ? 'BUY' : 'SELL';
+          const fires = Number(obj[closeSide]?.[id]?.hybrid) || 0;
           obj.date_modified = new Date().toISOString();
 
           logBus.log(
             `♻️ ${this.symbol}: grid leg #${id + 1} banked ` +
               `${banked >= 0 ? '+' : ''}${banked.toFixed(this.tickDecimals)} ${this.quoteAsset || ''} ` +
-              `(total grid: ${(Number(obj.gridRealized) || 0).toFixed(this.tickDecimals)})`
+              `(×${fires}, total grid: ${(Number(obj.gridRealized) || 0).toFixed(this.tickDecimals)})`
           );
 
           // Telegram: a micro take-profit banked one oscillation — the rung is
-          // re-armed and will re-buy on the next dip.
+          // re-armed and will re-buy on the next dip. ×N = this rung's fire count.
           telegram.send(
-            `♻️ <b>Micro banked</b> ${this.symbol} #${id + 1}\n` +
+            `♻️ <b>Micro banked</b> ${this.symbol} ${closeSide} #${id + 1} ×${fires}\n` +
               `${banked >= 0 ? '+' : ''}${banked.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}` +
-              ` (grid: ${(Number(obj.gridRealized) || 0).toFixed(this.tickDecimals)},` +
-              ` micros total: ${Number(obj.hybrid) || 0})`
+              ` (grid: ${(Number(obj.gridRealized) || 0).toFixed(this.tickDecimals)})`
           );
 
           await this.#mergeLiveEdits(obj);
@@ -951,11 +952,6 @@ class JsonTimerSender extends EventEmitter {
       const tmp = this.#config(calc);
       tmp.param = settings;
       tmp.restart = true;
-      // Cumulative micro-fill counter of the SERIES: the per-cycle stats
-      // (gridRealized/gridCycles/gridCounts) intentionally reset with the fresh
-      // grid, but this one survives auto-restarts — otherwise every looped cycle
-      // wipes the evidence of how many micros actually fired.
-      tmp.hybrid = Number(obj.hybrid) || 0;
 
       // Save to file
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
@@ -983,7 +979,6 @@ class JsonTimerSender extends EventEmitter {
       param: {},
       date_added: new Date().toISOString(),
       date_modified: null,
-      hybrid: 0, // cumulative micro fills; restartCycle overwrites with the carry-over
       BUY: [],
       SELL: [],
     };

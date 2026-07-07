@@ -133,19 +133,19 @@ function rearmGridLeg(obj, i) {
 }
 
 // One banked grid oscillation, all bookkeeping in one place: fold the leg's
-// realized quote profit into the cycle totals, bump the counters (gridCycles =
-// cycle total, gridCounts[i] = per-rung recycle count for the ×N badge, hybrid =
-// cumulative micro fills for the SERIES — the only one carried over by
-// restartCycle, so auto-restarts don't wipe the history), then re-arm the leg.
-// Must run while the fills are still on the slots — rearmGridLeg wipes them.
-// Returns the banked amount. Mutates obj. Pure/testable.
-function bankGridLeg(obj, i) {
+// realized quote profit into the running quote total, then bump the per-rung
+// micro-fire counter and re-arm the leg. The counter (`hybrid`) lives on the
+// CLOSE order of the rung — the order that actually fires the micro (long: SELL,
+// short: BUY) — so the orders table shows ×N right on that row. rearmGridLeg
+// keeps it (it only wipes the fill/status fields), so the count accumulates
+// across re-arms. Must run while the fills are still on the slots. Returns the
+// banked amount. Mutates obj. Pure/testable.
+function bankGridLeg(obj, i, strategy) {
   const banked = gridLegProfit(obj['BUY'][i], obj['SELL'][i]);
   obj.gridRealized = (Number(obj.gridRealized) || 0) + banked;
-  obj.gridCycles = (Number(obj.gridCycles) || 0) + 1;
-  obj.hybrid = (Number(obj.hybrid) || 0) + 1;
-  if (!obj.gridCounts || typeof obj.gridCounts !== 'object') obj.gridCounts = {};
-  obj.gridCounts[i] = (Number(obj.gridCounts[i]) || 0) + 1;
+  const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
+  const close = obj[closeSide]?.[i];
+  if (close) close.hybrid = (Number(close.hybrid) || 0) + 1;
   rearmGridLeg(obj, i);
   return banked;
 }

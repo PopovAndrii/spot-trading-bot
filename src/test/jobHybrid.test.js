@@ -582,7 +582,7 @@ test('canceled predecessor already closed the whole rung → REARM (bank it)', (
   assert.equal(r.status, 'REARM');
 });
 
-test('bankGridLeg: folds profit, bumps gridCycles + per-rung counter, re-arms the leg', () => {
+test('bankGridLeg (long): folds profit, bumps the per-rung counter on the SELL close, re-arms', () => {
   const obj = mkObj({
     buys: [mkOrder('BUY', 'FILLED', { orderId: 5, executedQty: 1.0, cummulativeQuoteQty: 90 })],
     sells: [
@@ -594,22 +594,37 @@ test('bankGridLeg: folds profit, bumps gridCycles + per-rung counter, re-arms th
       }),
     ],
   });
-  const banked = bankGridLeg(obj, 0);
+  const banked = bankGridLeg(obj, 0, 'long');
   assert.equal(Number(banked.toFixed(4)), 0.27);
   assert.equal(Number(obj.gridRealized.toFixed(4)), 0.27);
-  assert.equal(obj.gridCycles, 1);
-  assert.equal(obj.hybrid, 1); // cumulative micro-fill counter of the series
-  assert.equal(obj.gridCounts[0], 1);
-  assert.equal(obj.BUY[0].status, null); // re-armed
-  assert.equal(obj.SELL[0].status, null);
-  // second oscillation on the same rung
+  assert.equal(obj.SELL[0].hybrid, 1); // counter on the close (SELL) order
+  assert.ok(!('hybrid' in obj.BUY[0])); // never on the entry side for long
+  assert.ok(!('gridCounts' in obj)); // no top-level junk
+  assert.equal(obj.SELL[0].status, null); // re-armed, counter survives the wipe
+  assert.equal(obj.BUY[0].status, null);
+  // second oscillation on the same rung → counter accumulates across re-arm
   Object.assign(obj.BUY[0], { status: 'FILLED', executedQty: 1.0, cummulativeQuoteQty: 90 });
   Object.assign(obj.SELL[0], { status: 'FILLED', executedQty: 1.0, cummulativeQuoteQty: 90.27 });
-  bankGridLeg(obj, 0);
-  assert.equal(obj.gridCounts[0], 2);
-  assert.equal(obj.gridCycles, 2);
-  assert.equal(obj.hybrid, 2);
+  bankGridLeg(obj, 0, 'long');
+  assert.equal(obj.SELL[0].hybrid, 2);
   assert.equal(Number(obj.gridRealized.toFixed(4)), 0.54);
+});
+
+test('bankGridLeg (short): counter lives on the BUY close order', () => {
+  const obj = mkObj({
+    sells: [mkOrder('SELL', 'FILLED', { orderId: 5, executedQty: 1.0, cummulativeQuoteQty: 100 })],
+    buys: [
+      mkOrder('BUY', 'FILLED', {
+        orderId: 6,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 99.8,
+        role: 'micro',
+      }),
+    ],
+  });
+  bankGridLeg(obj, 0, 'short');
+  assert.equal(obj.BUY[0].hybrid, 1);
+  assert.ok(!('hybrid' in obj.SELL[0]));
 });
 
 test('gridLegProfit: sell quote − buy quote (both sides use the same formula)', () => {

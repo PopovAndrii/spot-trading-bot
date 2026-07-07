@@ -1,13 +1,15 @@
 # Exchange 💰 Cryptocurrencies
 
 ## Description
+
 Automatic cryptocurrency exchange.
 
 The main principle of the program:
+
 - bought cheap -> sold more expensive.
 - sold expensive -> bought cheaper.
 
-The rates are calculated before they are posted on the exchange (Binance). 
+The rates are calculated before they are posted on the exchange (Binance).
 That is, you have the opportunity to calculate your trading strategy before it is launched.
 
 ## Installation
@@ -19,6 +21,7 @@ cd ./exchange-crypto
 
 The entire environment is based on Docker. It must be installed - [Docker.](https://docs.docker.com/engine/install/) And Docker Desktop on Windows
 What's inside?
+
 ```sh
 nodejs
 npm # packege.json
@@ -63,6 +66,7 @@ TELEGRAM_CHAT_ID=''
 # SSH keys / git config are NOT mounted into the container anymore.
 
 ```
+
 After that, run ./init and follow the instructions.
 
 ### Bootstrap a fresh setup (no .env yet)
@@ -85,6 +89,7 @@ template: `cp src/.env.example src/.env` and fill it in.
 >
 > If you ever need `git` over SSH **inside** the dev container, restore what was
 > there before. In `.env`:
+>
 > ```sh
 > # SSH_PATH=/c/Users/YourUsername/.ssh   # Windows
 > SSH_PATH=~/.ssh                          # Linux
@@ -92,19 +97,24 @@ template: `cp src/.env.example src/.env` and fill it in.
 > # GITCONFIG_PATH=/c/Users/YourUsername/.gitconfig  # Windows
 > GITCONFIG_PATH=~/.gitconfig              # Linux
 > ```
+>
 > And the `volumes:` of the `app` service in `compose.yml`:
+>
 > ```yaml
 > - ${SSH_PATH}:/home/node/.ssh:ro
 > - ${GITCONFIG_PATH}:/home/${USER:-node}/.gitconfig:ro
 > ```
-***
 
-In Windows, create two identical files (the contents of the file above): 
+---
+
+In Windows, create two identical files (the contents of the file above):
+
 ```
 /.env
 /src/.env
 ```
-***
+
+---
 
 ## Usage
 
@@ -200,12 +210,12 @@ The footer shows the running build so you know exactly what is deployed —
 handy for dev testing. `GET /api/version` returns `{ version, branch, commit,
 dirty, startedAt }` (computed once at boot in `src/lib/buildInfo.js`):
 
-| Field    | Source (fallback chain)                                                        |
-| -------- | ----------------------------------------------------------------------------- |
-| `version`| `package.json` `version`                                                      |
-| `commit` | `GIT_COMMIT` env → `git rev-parse --short HEAD` → `dev`                        |
-| `branch` | `GIT_BRANCH` env → `git rev-parse --abbrev-ref HEAD` → `` (empty)              |
-| `dirty`  | `git status --porcelain` is non-empty (only when commit came from git; `*` in UI) |
+| Field     | Source (fallback chain)                                                           |
+| --------- | --------------------------------------------------------------------------------- |
+| `version` | `package.json` `version`                                                          |
+| `commit`  | `GIT_COMMIT` env → `git rev-parse --short HEAD` → `dev`                           |
+| `branch`  | `GIT_BRANCH` env → `git rev-parse --abbrev-ref HEAD` → `` (empty)                 |
+| `dirty`   | `git status --porcelain` is non-empty (only when commit came from git; `*` in UI) |
 
 - **Dev** (`compose.yml`): the whole repo is bind-mounted, so `.git` is present;
   `git` is installed in the image (`docker-config/Dockerfile`, base layer). The
@@ -296,15 +306,19 @@ Group changes by `Added` / `Changed` / `Fixed`; drop empty sections.
 ## vX.Y.Z
 
 ### Added
+
 - New features (backward-compatible).
 
 ### Changed
+
 - Behaviour/UI/build tweaks.
 
 ### Fixed
+
 - Bug fixes.
 
 ### @TODO
+
 - High priority scheduled
 ```
 
@@ -329,6 +343,7 @@ docker compose exec app bash -c "npm run setup-user"
 ```
 
 It asks for:
+
 - **Login** and **password** (min 8 chars) → stored as `ADMIN_LOGIN` + bcrypt `ADMIN_PASSWORD_HASH`; also generates `SESSION_SECRET` if it is empty.
 - **Mode** — `test` / `real` → `BINANCE_MODE`.
 - **NODE_ENV** — `production` / `development`.
@@ -339,11 +354,13 @@ It asks for:
 Restart the app afterwards so it re-reads `.env`.
 
 `HTTP_LOG` controls request logging (morgan) in the dev console:
+
 - `off` → no request logs at all.
 - `app` (default) → log app routes, but skip static assets — hides the `GET /javascripts/...` flood.
 - `all` → log everything, including static assets.
 
 `BINANCE_MODE` selects which Binance to talk to, independent of `NODE_ENV` (which only controls dev tooling / browser-sync):
+
 - `BINANCE_MODE=test` → Binance testnet.
 - `BINANCE_MODE=real` → real Binance.
 - not set → falls back to `NODE_ENV=development` → testnet.
@@ -363,13 +380,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 The footer shows which Binance environment is actually used:
 
-| Label | Meaning |
-|-------|---------|
-| `TESTNET` | test mode (`BINANCE_MODE=test`) |
-| `REAL` | real mode with real keys |
+| Label                      | Meaning                                                                    |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `TESTNET`                  | test mode (`BINANCE_MODE=test`)                                            |
+| `REAL`                     | real mode with real keys                                                   |
 | `REAL → TESTNET (no keys)` | `real` selected, but real keys are missing → running on testnet (fallback) |
 
 ## Formating ESLint (inside Docker)
+
 - ESlint and Pretier work automatically. (spaces and tabs are formatted only by VScode) But if necessary, you can run it manually.
 - Check and fix one file
 
@@ -379,7 +397,9 @@ npx eslint /var/www/src/lib/job.js --fix
 ```
 
 ## Config .vscode/settings.json in root dirrectory
+
 VScode must have the ESlint plugin from Microsoft installed.
+
 ```json
 {
   "editor.formatOnSave": true,
@@ -390,18 +410,17 @@ VScode must have the ESlint plugin from Microsoft installed.
     "source.fixAll": true,
     "source.fixAll.eslint": true
   },
-  "eslint.validate": [
-    "javascript"
-  ]
+  "eslint.validate": ["javascript"]
 }
 ```
 
 ## Experimental files (not in the flow)
+
 These live in the repo by request but are **not wired into the app** — nothing
 imports them, they don't run as part of the bot:
+
 - `src/lib/test2.js`
 - `src/lib/MomentumIndicator.js`
 
 Kept as experiments/scratch. Safe to ignore when reading the trading flow
 (cli → ws → jsonTimerSender → job → invokeAPI).
-

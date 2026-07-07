@@ -248,13 +248,14 @@ export class LoadDataCalculator {
     return `<span class="fill-badge" title="real ${kind}">${out}</span>`;
   }
 
-  // Per-rung recycle counter for hybrid grid rungs: how many oscillations this
-  // rung has banked (obj.gridCounts, bumped by the engine on every re-arm).
+  // Per-rung micro-fire counter: how many times THIS rung's micro close fired
+  // (bumped by the engine on every re-arm and stored on the close order itself —
+  // long: SELL, short: BUY). Shown right in the close-price cell of that row.
   // Display only; absent/zero → no badge.
-  #recycleBadge(obj, index) {
-    const n = Number(obj?.gridCounts?.[index]) || 0;
+  #recycleBadge(obj, side, index) {
+    const n = Number(obj?.[side]?.[index]?.hybrid) || 0;
     if (n <= 0) return '';
-    return `<span class="fill-badge" title="grid recycles — banked oscillations">×${n}</span>`;
+    return `<span class="fill-badge" title="micro fires — banked oscillations">×${n}</span>`;
   }
 
   // A live order may rest at a price different from the planned grid
@@ -483,7 +484,6 @@ export class LoadDataCalculator {
         param: {},
         date_added: new Date().toISOString(),
         date_modified: null,
-        hybrid: 0, // cumulative micro fills of the series (a manual Save starts fresh)
         BUY: [],
         SELL: [],
       };
@@ -522,13 +522,17 @@ export class LoadDataCalculator {
 
         const buyAct = this.#rowAction(obj, 'BUY', index, buyPrice);
         const sellAct = this.#rowAction(obj, 'SELL', index, sellPrice);
+        // micro-fire ×N badge on the close side that actually recycles:
+        // long closes with SELL, short with BUY.
+        const buyRecycle = this.strategy === 'short' ? this.#recycleBadge(obj, 'BUY', index) : '';
+        const sellRecycle = this.strategy === 'long' ? this.#recycleBadge(obj, 'SELL', index) : '';
         rows[index] = `<tr${gridTitle}>
-              <th class="center">${index + 1}${this.#recycleBadge(obj, index)}</th>
+              <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
-              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${buyPrice}${this.#currentPriceBadge(obj, 'BUY', index, buyPrice)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
+              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${buyPrice}${buyRecycle}${this.#currentPriceBadge(obj, 'BUY', index, buyPrice)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
               <td class="${this.#backlight(obj, 'BUY', index)}"><span class="fill-cell">${el.buy}${this.#fillBadge(obj, 'BUY', index, 'qty')}</span></td>
               <td class="${this.#backlight(obj, 'SELL', index)}"><span class="fill-cell">${sellQty}${this.#fillBadge(obj, 'SELL', index, 'qty')}</span></td>
-              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${sellPrice}${this.#currentPriceBadge(obj, 'SELL', index, sellPrice)}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
+              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${sellPrice}${sellRecycle}${this.#currentPriceBadge(obj, 'SELL', index, sellPrice)}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
               <td>${el.didBuy}</td>
               <td>${el.calcBalance}</td>
           </tr>`;

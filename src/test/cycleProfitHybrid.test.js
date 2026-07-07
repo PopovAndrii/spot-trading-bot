@@ -67,10 +67,9 @@ test('v2 reconciliation: banked micros + whole-position exit == exchange net quo
     });
     ledger.buys += 90;
     ledger.sells += 90.27;
-    bankGridLeg(obj, 1); // engine REARM handler
+    bankGridLeg(obj, 1, 'long'); // engine REARM handler
   }
-  assert.equal(obj.gridCycles, 2);
-  assert.equal(obj.gridCounts[1], 2);
+  assert.equal(obj.SELL[1].hybrid, 2); // rung #2's micro fired twice
 
   // third re-buy of the frontier rung, then P ≥ T_F → exit close over the whole
   // position (2.0 @ 95.38) fills → DONE
