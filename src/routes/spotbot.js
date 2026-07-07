@@ -10,6 +10,7 @@ const { pair, statusPair } = require('../lib/pair');
 const { archiveIfActive } = require('../lib/cycleArchive');
 const { decimalCount, roundToStep } = require('../lib/format');
 const logBus = require('../lib/logBus');
+const telegram = require('../lib/telegram');
 
 const API = InvokeApi.getInstance();
 
@@ -337,6 +338,9 @@ router.post('/cancel/allorders', async (req, res, next) => {
     pair.updateSymbol({ symbol, status: statusPair.STOP });
   }
 
+  // result.message = how many resting orders were actually pulled (0 = no-op)
+  telegram.send(`✖️ <b>Canceled all orders</b> ${symbol} (${result.message} pulled)`);
+
   res.json(result);
 });
 
@@ -380,6 +384,8 @@ router.post('/series/delete', async (req, res) => {
   pair.deleteSymbol(symbol);
 
   logBus.clearSymbol(symbol);
+
+  telegram.send(`🗑 <b>Series deleted</b> ${symbol}`);
 
   res.json({ success: true, message: 'No active orders.<br>Series deleted' });
 });

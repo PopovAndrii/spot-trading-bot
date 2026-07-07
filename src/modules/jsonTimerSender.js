@@ -882,6 +882,10 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async stop() {
+    // running→stopped transition only: stop() is also hit on idempotent repeats
+    // (cleanup, shutdown sweep) — those must not notify.
+    const wasRunning = this.running;
+
     clearTimeout(this.timer);
 
     if (this.onExecReport) {
@@ -897,6 +901,10 @@ class JsonTimerSender extends EventEmitter {
     const stopMsg = `🛑 Stop: ${this.symbol}`;
     console.log(stopMsg);
     logBus.log(stopMsg);
+
+    if (wasRunning) {
+      telegram.send(`🛑 <b>Stop</b> ${this.symbol}`);
+    }
 
     await this.#emitRecovery();
 
