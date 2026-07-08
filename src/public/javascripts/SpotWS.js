@@ -57,6 +57,20 @@ export class SpotWS {
     this.isRunning = false;
     this.btnClickHandler = null;
     this.btnStart();
+
+    this.#watchOnStrategy();
+  }
+
+  // Long/Short picked → ask the server to open the public price stream so the
+  // live price shows in .stream-currency before Start (same spot as when running).
+  #watchOnStrategy() {
+    const group = document.querySelector('.UIbg');
+    if (!group) return;
+
+    group.addEventListener('ui-button-group-change', () => {
+      if (!this.#isWebSocketOpen(this.ws)) return;
+      this.ws.send(JSON.stringify({ type: 'watchPrice', symbol: base + quote }));
+    });
   }
 
   #isWebSocketOpen(ws) {
