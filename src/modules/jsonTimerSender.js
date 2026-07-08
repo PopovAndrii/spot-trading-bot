@@ -495,17 +495,19 @@ class JsonTimerSender extends EventEmitter {
   #notifyOrderEvent(currentOrder, message, slot) {
     const num = currentOrder.id + 1;
     const side = message.side || currentOrder.side || '';
-    const role = slot?.role === 'micro' ? ' · micro' : '';
+    const role = slot?.role === 'micro' ? ' micro' : '';
 
+    // One-line-per-event notices batched under the pair header by #jobIterator
+    // (telegram.open/flush). The symbol lives in the batch header, so lines omit it.
     if (currentOrder.method === 'cancelOrder') {
-      telegram.send(`✖️ <b>Canceled</b> ${side} #${num}${role} ${this.symbol}`);
+      telegram.push(this.symbol, `canceled ${side} #${num}${role}`);
       return;
     }
 
     if (currentOrder.method === 'newOrder') {
-      telegram.send(
-        `📌 <b>Placed</b> ${side} #${num}${role} ${this.symbol}\n` +
-          `${currentOrder.data?.quantity} ${this.baseAsset || ''} @ ${currentOrder.data?.price}`
+      telegram.push(
+        this.symbol,
+        `placed ${side} #${num}${role} ${currentOrder.data?.quantity} @ ${currentOrder.data?.price}`
       );
       if (message.status !== 'FILLED') return; // instant taker fill → also report below
     }
@@ -514,10 +516,10 @@ class JsonTimerSender extends EventEmitter {
       const qty = parseFloat(message.executedQty) || 0;
       const quote = parseFloat(message.cummulativeQuoteQty) || 0;
       const avg = qty > 0 ? quote / qty : parseFloat(slot?.price) || 0;
-      telegram.send(
-        `${side === 'BUY' ? '🟢' : '🔴'} <b>Filled</b> ${side} #${num}${role} ${this.symbol}\n` +
-          `${qty} ${this.baseAsset || ''} @ ${avg.toFixed(this.tickDecimals)}\n` +
-          `≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
+      telegram.push(
+        this.symbol,
+        `filled ${side} #${num}${role} ${qty} @ ${avg.toFixed(this.tickDecimals)}` +
+          ` ≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
       );
     }
   }
@@ -567,6 +569,10 @@ class JsonTimerSender extends EventEmitter {
 
       if (!hybrid && (await this.#maybePrepareRecoveryClose(obj, strategy))) return;
 
+      // Batch this pass's per-order notices into one Telegram message; flushed in
+      // readLoop's finally (and before the Done finale below). See telegram.js.
+      telegram.open(this.symbol);
+
       let i = 0;
 
       // never started 0
@@ -608,8 +614,10 @@ class JsonTimerSender extends EventEmitter {
 
           // Telegram: a micro take-profit banked one oscillation — the rung is
           // re-armed and will re-buy on the next dip. ×N = this rung's fire count.
-          telegram.send(
-            `♻️ <b>Micro banked</b> ${this.symbol} ${closeSide} #${id + 1} ×${fires}\n` +
+          // Batched under the pair header by open/flush; symbol omitted per line.
+          telegram.push(
+            this.symbol,
+            `micro banked ${closeSide} #${id + 1} ×${fires} ` +
               `${banked >= 0 ? '+' : ''}${banked.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}` +
               ` (grid: ${(Number(obj.gridRealized) || 0).toFixed(this.tickDecimals)})`
           );
@@ -642,6 +650,10 @@ class JsonTimerSender extends EventEmitter {
           await this.#mergeLiveEdits(obj);
 
           this.autoRestart = obj.restart == true ? true : false;
+
+          // Flush any batched order lines from this pass before the standalone
+          // finale, so the chat reads batch → Done → Restart, not Done mixed in.
+          telegram.flush(this.symbol);
 
           // Telegram: cycle finished — realized profit in the quote asset from the
           // actual fills (read-only, does not touch trading).
@@ -748,6 +760,9 @@ class JsonTimerSender extends EventEmitter {
         this.#jobIterator(data)
           .catch((err) => console.error('jobIterator:', err))
           .finally(() => {
+            // Send this pass's batched order notices as one framed message. No-op
+            // when nothing was queued (the common quiet tick) or already flushed.
+            telegram.flush(this.symbol);
             this.busy = false;
           });
       }

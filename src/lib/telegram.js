@@ -48,4 +48,55 @@ function send(text) {
   req.end();
 }
 
-module.exports = { send, enabled };
+// Per-symbol line buffers for batched cycle notices. The trading loop pushes one
+// line per order event during a single #jobIterator pass, then flushes once — so a
+// tick that touches several rungs of BNBUSDT sends ONE message with a shared header
+// instead of one message per order. Keyed by symbol because the module is shared
+// across all running pairs (each JsonTimerSender is its own instance, but they all
+// require this same module). One-off notices (Start/Stop/Restart/Done) keep using
+// send() directly and are not batched.
+const buffers = new Map();
+
+// Telegram hard limit is 4096 chars per message; keep a margin for the header.
+const MAX_LEN = 3800;
+
+// Begin (or reset) a symbol's buffer for one cycle pass. Cheap no-op when disabled.
+function open(symbol) {
+  if (!enabled()) return;
+  buffers.set(symbol, []);
+}
+
+// Queue one line for the symbol's current batch. No-op if open() was skipped.
+function push(symbol, line) {
+  const buf = buffers.get(symbol);
+  if (buf) buf.push(String(line));
+}
+
+// Emit the symbol's batch as a single framed message, then clear the buffer.
+// Silent when the buffer is empty (the common case: most ticks change nothing).
+function flush(symbol) {
+  const buf = buffers.get(symbol);
+  buffers.delete(symbol);
+  if (!buf || buf.length === 0) return;
+
+  const header = `----- ${symbol} ------`;
+  const footer = '----------------------------';
+
+  // Split into chunks so a very busy tick never exceeds Telegram's limit.
+  let chunk = [];
+  let len = 0;
+  const sendChunk = () => {
+    if (chunk.length === 0) return;
+    send([header, ...chunk, footer].join('\n'));
+    chunk = [];
+    len = 0;
+  };
+  for (const line of buf) {
+    if (len + line.length + 1 > MAX_LEN) sendChunk();
+    chunk.push(line);
+    len += line.length + 1;
+  }
+  sendChunk();
+}
+
+module.exports = { send, enabled, open, push, flush };
