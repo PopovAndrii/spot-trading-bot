@@ -491,11 +491,11 @@ class JsonTimerSender extends EventEmitter {
   // is a latency optimization and must not be a prerequisite for notifications
   // (on testnet it was silently down for weeks). Called once per persisted slot
   // transition: placement, cancel, and the NEW→FILLED / PARTIAL→FILLED edge.
-  // slot is read AFTER Object.assign, so role ('micro'/'exit') is up to date.
+  // slot is read AFTER Object.assign, so role ('micro') is up to date.
   #notifyOrderEvent(currentOrder, message, slot) {
     const num = currentOrder.id + 1;
     const side = message.side || currentOrder.side || '';
-    const role = slot?.role === 'micro' ? ' · micro' : slot?.role === 'exit' ? ' · exit close' : '';
+    const role = slot?.role === 'micro' ? ' · micro' : '';
 
     if (currentOrder.method === 'cancelOrder') {
       telegram.send(`✖️ <b>Canceled</b> ${side} #${num}${role} ${this.symbol}`);
@@ -522,9 +522,9 @@ class JsonTimerSender extends EventEmitter {
     }
   }
 
-  // job.price for the hybrid frontier decision: the stream cache when fresh,
+  // job.price for the hybrid scalp decision: the stream cache when fresh,
   // otherwise one bookTicker request (mid of bid/ask). On total failure the price
-  // stays null and the Job conservatively keeps the frontier in grid mode.
+  // stays null and the Job conservatively behaves like classic DCA (no scalp).
   async #refreshJobPrice() {
     let p = freshPrice(this.lastPrice, this.lastPriceTime, Date.now());
     if (p == null) {
@@ -551,10 +551,10 @@ class JsonTimerSender extends EventEmitter {
     const strategy = this.#strategy();
 
     if (obj.status == Status.READY && strategy != null) {
-      // Hybrid DCA/GRID: route to hybridLong/hybridShort so rungs ≥ gridLevel run
-      // as recycling grid legs. The averaged-recovery consolidation is a DCA-only
-      // safety (it assumes the whole grid folds into one close) — skip it in hybrid,
-      // where grid legs are meant to keep several live closes at once.
+      // Hybrid DCA/GRID: route to hybridLong/hybridShort — classic DCA plus the
+      // pause-scalp micro on the deepest held rung. The averaged-recovery
+      // consolidation stops the bot on a fully-filled grid; skip it in hybrid,
+      // where a fully-filled grid is exactly where the scalp keeps working.
       const hybrid = obj?.param?.['field-hybrid'] === 'on' || obj?.param?.['field-hybrid'] === true;
       const method = hybrid
         ? strategy.method === 'short'

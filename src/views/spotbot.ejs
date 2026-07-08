@@ -82,13 +82,13 @@
             <div class="line" id="group-hybrid">
 
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-gridLevel' , label:'Grid from order' , min:1, max:50 , step: 0, hint:'From which order number (down the ladder) rungs become grid legs. Rungs above this stay DCA. Only used when Hybrid grid is on.' }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-gridLevel' , label:'Grid from order' , min:1, max:50 , step: 0, hint:'From which order number (down the ladder) the deepest filled order may run the pause-scalp. Orders above it never scalp — pure DCA. Only used when Hybrid grid is on.' }); %>
               </div>
               <div class="">
                 <%- include('../views/ui/SpinBox', { id:'field-microProfit' , label:'Micro profit %' , min:0.01, max:2 , step: 2, hint:'Net take-profit of each grid micro-order, on top of commission. Smaller = banks bounces more often. Default 0.1.' }); %>
               </div>
               <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-gridExit' , label:'Grid exit %' , min:0, max:100 , step: 0, hint:'Where grid mode yields to the whole-position close: the exit threshold sits between the averaged close without the deepest grid rung (0%) and with it (100%). Default 50 = midway. Lower = exits sooner on a bounce, higher = keeps micro-recycling longer.' }); %>
+                <%- include('../views/ui/SpinBox', { id:'field-gridExit' , label:'Grid exit %' , min:0, max:100 , step: 0, hint:'Split of the pause gap between the deepest filled order and the whole-position close (live stream price). Below the split the micro-scalp trades the deepest order&#39;s own volume; above it the normal full close rests. 0 = at the deepest fill (no scalp), 100 = at the close, default 50 = midway. The micro never crosses this line.' }); %>
               </div>
             </div>
           </div>
@@ -178,7 +178,7 @@
               <div class="UIsw r-1 sm" role="switch" tabindex="0" id="settings-hybrid">
                 <label class="UIsw-label" for="hybrid">Hybrid grid
                   <span class="UIql" tabindex="0">
-                    <span class="UIql__text">DCA/GRID hybrid. Rungs from "Grid from order" downward become recycling grid legs: each buys at its level and sells back at its own micro-profit, banking every bounce, then re-arms. Rungs above stay classic DCA (one averaged close). Off = pure DCA.</span>
+                    <span class="UIql__text">DCA + pause-scalp. The DCA grid is untouched: the averaged whole-position close keeps descending with martingale and always covers everything. While the price sits in the lower part of the gap below that close (see Grid exit %), the deepest filled order scalps its own volume: sells at its micro-profit, re-buys the dip, banks every bounce (&times;N). Off = pure DCA.</span>
                   </span>
                 </label>
                 <input type="checkbox" id="hybrid" name="hybrid-switch" hidden>

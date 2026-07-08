@@ -72,37 +72,15 @@ function rebalancedClose(obj, i, strategy) {
   };
 }
 
-// Hybrid v2 frontier F: the deepest currently-HELD grid rung — the deepest FILLED
-// entry at index ≥ gridStart. -1 when no grid rung is held (the deepest fill, if
-// any, is still in the DCA base) — the caller then degrades to classic DCA. When
-// the frontier's micro-close fires the rung is re-armed (entry back to null), so
-// the next call naturally walks the frontier UP to the shallower held rung. Pure.
-function frontierIndex(entries, gridStart) {
-  const d = deepestFilledIndex(entries);
-  return d >= gridStart ? d : -1;
-}
-
-// Averaged close price of the position built by the FILLED entries 0..upTo — S_j
-// from the v2 spec (j = upTo+1 in 1-based order numbers), computed from the REAL
-// fills (executedQty/cummulativeQuoteQty), not the planned config prices: micro
-// recycling re-arms rungs, so the plan drifts from what is actually held.
-// feesPct = profit + commission (round-trip). Partial closes are intentionally NOT
-// subtracted: S feeds only the exit threshold (a switching boundary between two
-// rungs); the exit order itself is priced closes-aware by rebalancedClose. Returns
-// a number, or null when nothing (with fill data) is filled in 0..upTo — e.g.
-// S_{F-1} at the very first grid rung; the caller decides the fallback. Pure.
-function averagedClosePrice(obj, upTo, strategy, feesPct) {
-  const entrySide = strategy === 'long' ? 'BUY' : 'SELL';
-  const entries = [];
-  for (let k = 0; k <= upTo; k++) {
-    const e = obj?.[entrySide]?.[k];
-    if (!e || e.status !== state.FILLED) continue;
-    if (e.executedQty === undefined || e.cummulativeQuoteQty === undefined) continue;
-    entries.push(e);
-  }
-  if (entries.length === 0) return null;
-  const res = rebalanceClose(entries, [], strategy, feesPct);
-  return res ? res.price : null;
+// Real average fill price of an entry slot (cummulativeQuoteQty / executedQty),
+// falling back to the slot's resting price when fill data is missing (old config).
+// null when neither is known. Pure.
+function entryFillPrice(slot) {
+  const qty = Number(slot?.executedQty) || 0;
+  const quote = Number(slot?.cummulativeQuoteQty) || 0;
+  if (qty > 0 && quote > 0) return quote / qty;
+  const p = parseFloat(slot?.price);
+  return Number.isFinite(p) && p > 0 ? p : null;
 }
 
 // Realized quote profit of one completed grid oscillation: quote received on the
@@ -158,9 +136,9 @@ class Job {
     // failed request) → #belowMin never triggers, behavior stays as before.
     this.minQty = 0;
     this.minNotional = 0;
-    // Live market price for the hybrid grid/exit decision, refreshed each tick by
+    // Live market price for the hybrid scalp decision, refreshed each tick by
     // the engine (ticker stream, bookTicker fallback). null = unknown → the
-    // frontier conservatively stays in grid mode (micro keeps resting).
+    // scalp stays off and the machine behaves exactly like classic DCA.
     this.price = null;
   }
 
@@ -581,94 +559,53 @@ class Job {
     }
   };
 
-  // ── Hybrid DCA/GRID (v2 frontier machine) ──────────────────────────────────
+  // ── Hybrid DCA/GRID (v3: classic DCA + a bounded pause-scalp) ───────────────
   //
-  // Rungs 0..g-1 (g = field-gridLevel − 1, 1-based in the UI) are the DCA base;
-  // rungs g..deep are grid-capable. While NO grid rung is held, the base runs the
-  // UNCHANGED long()/short() over a base-only VIEW (a shallow slice shares element
-  // references, so the proven DCA machine reads only base rungs while the iterator
-  // still writes results by absolute id), and grid rungs simply keep their safety
-  // entries resting.
+  // The classic DCA machine (long()/short()) runs UNCHANGED over the whole
+  // ladder: entries keep resting and follow the price down, the ONE
+  // whole-position averaged close keeps descending with martingale, and all
+  // DONE/orphan/partial handling stays classic. The position is NEVER peeled
+  // apart and the base is never stranded.
   //
-  // Once a grid rung is held, the FRONTIER F (deepest held rung) owns the ONLY
-  // resting close — its micro take-profit. A micro fill banks one oscillation
-  // (REARM → iterator bookkeeping) and re-arms the rung, so the frontier walks UP
-  // as price rises. Any other live close is stale and gets canceled — including
-  // the base averaged close raced by the first grid fill: in grid mode nothing
-  // but the micro may reserve inventory. The whole-position exit above
-  // T_F = interpolate(S_{F-1}, S_F, field-gridExit) is the next step; until it
-  // lands, the frontier micro-recycles all the way up and the cycle finishes
-  // through the classic DCA close once no grid rung is held.
+  // The hybrid only adds a scalp DURING THE PAUSE — the dead gap between the
+  // deepest fill and the whole-position close, where plain DCA just waits.
+  // split = interpolate(deepest entry fill, whole-position close price,
+  // field-gridExit) (default 50 = midpoint), compared against the LIVE price:
+  //   long: P < split → the resting close is swapped for a micro take-profit of
+  //   ONLY the deepest rung's own volume (short mirrored: P > split, micro is a
+  //   buy-back). Micro fill → REARM: bank the oscillation, re-arm the rung so
+  //   its entry re-buys the same dip. Can repeat for weeks.
+  //   P across the split → the micro yields (cancel) and the classic
+  //   closes-aware full close returns.
+  // The micro close itself must never cross the split line; if it would, the
+  // scalp is skipped entirely. Unknown price / missing data → classic DCA.
 
-  // 0-based index of the first GRID rung. Invalid/missing level → Infinity, i.e.
-  // every rung stays DCA and hybrid degrades to the classic behavior.
+  // 0-based index of the first GRID (scalp-capable) rung. Invalid/missing level
+  // → Infinity, i.e. every rung stays DCA and hybrid degrades to classic.
   #gridStartIndex(obj) {
     const n = parseInt(obj?.param?.['field-gridLevel'], 10);
     if (!Number.isInteger(n) || n < 1) return Infinity;
     return n - 1;
   }
 
-  hybridLong = (obj, i, el) => {
-    if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
+  hybridLong = (obj, i, el) => this.#pauseScalp(obj, i, el, 'long', 'BUY', 'SELL', this.long);
 
-    const g = this.#gridStartIndex(obj);
-    const F = frontierIndex(obj['BUY'], g); // -1 when no grid rung is held
+  hybridShort = (obj, i, el) =>
+    this.#pauseScalp(obj, i, el, 'short', 'SELL', 'BUY', this.short);
 
-    if (F >= 0) return this.#frontierGrid(obj, i, el, g, F, 'BUY', 'SELL');
-
-    if (i >= g) return this.#armEntry(i, el, 'BUY'); // grid rung, not held yet
-
-    // DCA base over a base-only view (indices < g)
-    const view = { ...obj, BUY: obj['BUY'].slice(0, g), SELL: obj['SELL'].slice(0, g) };
-    return this.long(view, i, el);
-  };
-
-  hybridShort = (obj, i, el) => {
-    if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
-
-    const g = this.#gridStartIndex(obj);
-    const F = frontierIndex(obj['SELL'], g); // mirror: entries are SELLs
-
-    if (F >= 0) return this.#frontierGrid(obj, i, el, g, F, 'SELL', 'BUY');
-
-    if (i >= g) return this.#armEntry(i, el, 'SELL');
-
-    const view = { ...obj, BUY: obj['BUY'].slice(0, g), SELL: obj['SELL'].slice(0, g) };
-    return this.short(view, i, el);
-  };
-
-  // Should the frontier switch from micro-recycling to the whole-position exit?
-  // T_F interpolates between S_{F-1} and S_F (field-gridExit, default 50 = the
-  // spec midpoint); long exits when P ≥ T_F, short when P ≤ T_F. Unknown price or
-  // missing fill data (S_F null) → false: stay in grid mode, never guess an exit.
-  // S_{F-1} null (the frontier is the first held rung, nothing filled above) →
-  // T = S_F: exit exactly at the averaged close, pct has nothing to interpolate.
-  #exitMode(obj, F, strategy) {
-    const P = parseFloat(this.price);
-    if (!Number.isFinite(P) || P <= 0) return false;
-    const p = obj.param || {};
-    const fees =
-      (parseFloat(p['field-profit']) || 0) + (parseFloat(p['field-commission']) || 0);
-    const sF = averagedClosePrice(obj, F, strategy, fees);
-    if (sF == null) return false;
-    const sPrev = averagedClosePrice(obj, F - 1, strategy, fees);
-    const T = sPrev == null ? sF : gridExitThreshold(sPrev, sF, p['field-gridExit']);
-    return strategy === 'long' ? P >= T : P <= T;
-  }
-
-  // The whole-position exit close for the frontier: everything actually held
-  // across filled entries 0..F minus everything already sold/bought back by
-  // partial or raced closes — the lib rebalanceClose over the REAL fills. Unlike
-  // the module-level rebalancedClose it does NOT bail out when there are no
-  // partial closes (the exit is always recomputed from fills). Returns rounded
-  // { quantity, price } or null when fill data is missing (old config) — the
-  // caller then falls back to the slot's precomputed plan, like the DCA path.
-  #exitClose(obj, F, strategy) {
+  // The whole-position close over the REAL fills: everything held across filled
+  // entries 0..D minus everything already sold/bought back by partial or micro
+  // closes. Unlike the module-level rebalancedClose it does NOT bail out when
+  // there are no partial closes — in hybrid the slot plan cannot be trusted (a
+  // placed micro clobbers the slot's price/qty), so the full close is always
+  // recomputed. Returns rounded { quantity, price } or null when fill data is
+  // missing (old config) — the caller then keeps the classic fallback.
+  #fullClose(obj, D, strategy) {
     const entrySide = strategy === 'long' ? 'BUY' : 'SELL';
     const closeSide = strategy === 'long' ? 'SELL' : 'BUY';
 
     const entries = [];
-    for (let k = 0; k <= F; k++) {
+    for (let k = 0; k <= D; k++) {
       const e = obj[entrySide][k];
       if (!e || e.status !== state.FILLED) continue;
       if (e.executedQty === undefined || e.cummulativeQuoteQty === undefined) return null;
@@ -696,6 +633,166 @@ class Job {
     };
   }
 
+  // The split line inside the pause gap: interpolate between the deepest rung's
+  // REAL entry fill price and the whole-position close price recomputed from the
+  // fills (#fullClose; slot-plan fallback only for old configs without fill
+  // data). null when either endpoint is unknown → the caller stays classic.
+  #splitPrice(obj, D, strategy) {
+    const entrySide = strategy === 'long' ? 'BUY' : 'SELL';
+    const closeSide = strategy === 'long' ? 'SELL' : 'BUY';
+    const entry = entryFillPrice(obj[entrySide]?.[D]);
+    if (entry == null) return null;
+    const full = this.#fullClose(obj, D, strategy);
+    const close = parseFloat(full ? full.price : obj[closeSide]?.[D]?.price);
+    if (!Number.isFinite(close) || close <= 0) return null;
+    return gridExitThreshold(entry, close, obj.param?.['field-gridExit']);
+  }
+
+  // Scalp gate for the deepest held rung: the live price must sit on the entry
+  // side of the split (long: P < split, short: P > split), and the micro's own
+  // close price must stay strictly inside that zone too — the micro must NEVER
+  // cross the split line. Unknown price / missing data → false (classic DCA).
+  #scalpMode(obj, D, strategy, microPrice) {
+    const P = parseFloat(this.price);
+    if (!Number.isFinite(P) || P <= 0) return false;
+    const split = this.#splitPrice(obj, D, strategy);
+    if (split == null) return false;
+    const m = parseFloat(microPrice);
+    if (!Number.isFinite(m) || m <= 0) return false;
+    return strategy === 'long' ? P < split && m < split : P > split && m > split;
+  }
+
+  // Hybrid dispatcher: everything is classic DCA except the deepest held grid
+  // rung, which may carry the pause-scalp micro instead of the full close.
+  #pauseScalp(obj, i, el, strategy, entrySide, closeSide, classic) {
+    if (this.test === true) return { status: 'pass', method: false, side: null, id: i, data: {} };
+
+    const g = this.#gridStartIndex(obj);
+    const D = deepestFilledIndex(obj[entrySide]);
+    const close = obj[closeSide][i] || {};
+    const symbol = el.symbol;
+
+    // A filled micro is a banked oscillation — bookkeep it (REARM) regardless of
+    // the current price, BEFORE the classic machine reads entry+close FILLED at
+    // the deepest index as "cycle DONE".
+    if (
+      i >= g &&
+      el.status === state.FILLED &&
+      close.status === state.FILLED &&
+      close.role === 'micro'
+    ) {
+      return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
+    }
+
+    // Everything except the deepest held scalp-capable rung = pure DCA.
+    if (i !== D || D < g) return classic(obj, i, el);
+
+    // A FILLED close without the micro role is the classic whole-position close
+    // → DONE path belongs to the classic machine, never to the scalp.
+    if (close.status === state.FILLED) return classic(obj, i, el);
+
+    const micro = this.#gridClose(obj, el, close, closeSide);
+
+    if (!this.#scalpMode(obj, D, strategy, micro.price)) {
+      // Classic mode. A leftover live micro must yield first — otherwise the
+      // classic machine would poll it as if it were the full close.
+      if (
+        close.role === 'micro' &&
+        close.orderId != null &&
+        (close.status === state.NEW || close.status === state.PARTIALLY_FILLED)
+      ) {
+        return {
+          status: null,
+          method: 'cancelOrder',
+          side: closeSide,
+          id: i,
+          data: { id: i, symbol, orderId: close.orderId },
+        };
+      }
+      return this.#classicClose(obj, i, el, D, strategy, closeSide, classic, symbol);
+    }
+
+    // ── scalp zone ──
+    if (close.status === state.NEW || close.status === state.PARTIALLY_FILLED) {
+      if (close.role !== 'micro') {
+        // the resting whole-position close yields to the micro (re-placed by
+        // the classic path as soon as the price crosses back over the split)
+        return {
+          status: null,
+          method: 'cancelOrder',
+          side: closeSide,
+          id: i,
+          data: { id: i, symbol, orderId: close.orderId },
+        };
+      }
+      return {
+        status: close.status,
+        method: 'getOrder',
+        side: closeSide,
+        id: i,
+        data: { id: i, symbol, orderId: close.orderId },
+      };
+    }
+
+    if (close.manual) {
+      return { status: 'pass', method: false, side: null, id: i, data: {} };
+    }
+
+    if (parseFloat(micro.quantity) <= 0) {
+      if (close.role === 'micro') {
+        // a canceled partial micro predecessor already closed the whole rung —
+        // the oscillation is complete even though it never reached FILLED
+        return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
+      }
+      // the rung was emptied by a canceled partial FULL close — nothing left to
+      // scalp; the classic closes-aware machine reconciles the leftover
+      return this.#classicClose(obj, i, el, D, strategy, closeSide, classic, symbol);
+    }
+
+    return {
+      status: null,
+      method: 'newOrder',
+      side: closeSide,
+      id: i,
+      role: 'micro',
+      data: {
+        id: i,
+        symbol,
+        side: closeSide,
+        type: 'LIMIT',
+        timeInForce: 'GTC',
+        quantity: micro.quantity,
+        price: micro.price,
+      },
+    };
+  }
+
+  // Classic delegation for the deepest rung with one hybrid correction: when the
+  // classic machine decides to PLACE the whole-position close, its slot-plan
+  // fallback cannot be trusted (a previously placed micro clobbered the slot's
+  // price/qty via orderResultPatch, and rebalancedClose only recomputes when
+  // partial closes exist) — so the order is re-priced from the real fills
+  // (#fullClose), with the same below-minimum guard as the classic path.
+  #classicClose(obj, i, el, D, strategy, closeSide, classic, symbol) {
+    const r = classic(obj, i, el);
+    if (!r || r.method !== 'newOrder' || r.side !== closeSide) return r;
+    const full = this.#fullClose(obj, D, strategy);
+    if (!full) return r; // old config without fill data → keep the classic plan
+    if (this.#belowMin(full.quantity, full.price)) {
+      return {
+        status: Status.DONE,
+        method: 'cancelOpenOrders',
+        side: null,
+        id: i,
+        leftover: { quantity: full.quantity, price: full.price, symbol },
+        data: { id: i, symbol },
+      };
+    }
+    r.data.quantity = full.quantity;
+    r.data.price = full.price;
+    return r;
+  }
+
   // Grid close order (price + quantity) computed at placement time, like DCA's
   // rebalancedClose. Price = the rung's own entry LEVEL marked by microProfit +
   // commission (matches the displayed micro column). Quantity = what the entry
@@ -720,192 +817,6 @@ class Job {
     return { quantity, price };
   }
 
-  // Ladder entry management shared by the not-held and frontier paths: keep the
-  // rung's safety entry resting. Not placed → newOrder; NEW/PARTIAL → poll;
-  // manually pulled → pass (like the DCA path). FILLED never reaches here.
-  #armEntry(i, el, entrySide) {
-    const symbol = el.symbol;
-    if (el.status === state.NEW || el.status === state.PARTIALLY_FILLED) {
-      return {
-        status: el.status,
-        method: 'getOrder',
-        side: entrySide,
-        id: i,
-        data: { id: i, symbol, orderId: el.orderId },
-      };
-    }
-    if (el.manual) {
-      return { status: 'pass', method: false, side: null, id: i, data: {} };
-    }
-    return {
-      status: null,
-      method: 'newOrder',
-      side: entrySide,
-      id: i,
-      data: {
-        id: i,
-        symbol,
-        side: entrySide,
-        type: 'LIMIT',
-        timeInForce: 'GTC',
-        quantity: el.quantity,
-        price: el.price,
-      },
-    };
-  }
-
-  // Grid mode — a grid rung is held, F = frontier (deepest held rung, F ≥ g).
-  // Handles EVERY index while active. Per index:
-  //   exit close FILLED              → DONE              [whole position closed;
-  //     pass instead if a deeper safety entry raced it — the new frontier
-  //     reconciles the sold inventory via the closes-aware #exitClose]
-  //   grid rung, entry+micro FILLED  → REARM             [oscillation banked]
-  //   base rung, entry+close FILLED  → pass              [base close raced the
-  //     cancel during the frontier transition; its fills stay on the slot and the
-  //     closes-aware exit reconciles the inventory later]
-  //   live close at i ≠ F            → cancelOrder       [stale: an old frontier's
-  //     micro or the base averaged close — only the frontier's close may rest]
-  //   i == F                         → grid mode (P < T_F): micro take-profit;
-  //                                    exit mode (P ≥ T_F): ONE whole-position
-  //                                    close. A live close of the WRONG role is
-  //                                    canceled first (rollback / micro yields).
-  //   entry FILLED elsewhere         → pass              [held rung]
-  //   entry not FILLED               → #armEntry         [keep the ladder resting]
-  #frontierGrid(obj, i, el, g, F, entrySide, closeSide) {
-    const close = obj[closeSide][i] || {};
-    const symbol = el.symbol;
-    const strategy = closeSide === 'SELL' ? 'long' : 'short';
-
-    if (el.status === state.FILLED && close.status === state.FILLED) {
-      if (close.role === 'exit') {
-        // A safety entry may fill between the exit placement and its fill (blind
-        // window) — then the close did NOT cover the new deepest rung: keep the
-        // cycle open, the fills on this slot feed the next exit computation.
-        if (deepestFilledIndex(obj[entrySide]) > i) {
-          return { status: 'pass', method: false, side: null, id: i, data: {} };
-        }
-        return {
-          status: Status.DONE,
-          method: 'cancelOpenOrders',
-          side: null,
-          id: i,
-          data: { id: i, symbol },
-        };
-      }
-      if (i >= g) {
-        return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
-      }
-      return { status: 'pass', method: false, side: null, id: i, data: {} };
-    }
-
-    if (
-      i !== F &&
-      close.orderId != null &&
-      (close.status === state.NEW || close.status === state.PARTIALLY_FILLED)
-    ) {
-      return {
-        status: null,
-        method: 'cancelOrder',
-        side: closeSide,
-        id: i,
-        data: { id: i, symbol, orderId: close.orderId },
-      };
-    }
-
-    if (i === F) {
-      const exitMode = this.#exitMode(obj, F, strategy);
-
-      if (close.status === state.NEW || close.status === state.PARTIALLY_FILLED) {
-        // wrong role for the current mode → cancel: an exit close while the price
-        // fell back under T_F (rollback), or a micro while the price crossed it
-        // (yield to the whole-position close). Re-placed on the next pass.
-        if ((close.role === 'exit') !== exitMode) {
-          return {
-            status: null,
-            method: 'cancelOrder',
-            side: closeSide,
-            id: i,
-            data: { id: i, symbol, orderId: close.orderId },
-          };
-        }
-        return {
-          status: close.status,
-          method: 'getOrder',
-          side: closeSide,
-          id: i,
-          data: { id: i, symbol, orderId: close.orderId },
-        };
-      }
-      if (close.manual) {
-        return { status: 'pass', method: false, side: null, id: i, data: {} };
-      }
-
-      if (exitMode) {
-        // ONE averaged close over the WHOLE held position (null → slot plan)
-        const reb = this.#exitClose(obj, F, strategy);
-        const quantity = reb ? reb.quantity : close.quantity;
-        const price = reb ? reb.price : close.price;
-
-        if (this.#belowMin(quantity, price)) {
-          return {
-            status: Status.DONE,
-            method: 'cancelOpenOrders',
-            side: null,
-            id: i,
-            leftover: { quantity, price, symbol },
-            data: { id: i, symbol },
-          };
-        }
-
-        return {
-          status: null,
-          method: 'newOrder',
-          side: closeSide,
-          id: i,
-          role: 'exit',
-          data: {
-            id: i,
-            symbol,
-            side: closeSide,
-            type: 'LIMIT',
-            timeInForce: 'GTC',
-            quantity,
-            price,
-          },
-        };
-      }
-
-      // micro take-profit price/qty from the real entry fill (not the stale slot)
-      const { quantity, price } = this.#gridClose(obj, el, close, closeSide);
-      if (parseFloat(quantity) <= 0) {
-        // the canceled predecessor already closed the whole rung — the oscillation
-        // is complete even though the close never reached FILLED: bank it
-        return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
-      }
-      return {
-        status: null,
-        method: 'newOrder',
-        side: closeSide,
-        id: i,
-        role: 'micro',
-        data: {
-          id: i,
-          symbol,
-          side: closeSide,
-          type: 'LIMIT',
-          timeInForce: 'GTC',
-          quantity,
-          price,
-        },
-      };
-    }
-
-    if (el.status === state.FILLED) {
-      return { status: 'pass', method: false, side: null, id: i, data: {} }; // held rung
-    }
-
-    return this.#armEntry(i, el, entrySide);
-  }
 }
 
 module.exports = {
@@ -913,8 +824,7 @@ module.exports = {
   Status,
   rebalancedClose,
   deepestFilledIndex,
-  frontierIndex,
-  averagedClosePrice,
+  entryFillPrice,
   gridLegProfit,
   rearmGridLeg,
   bankGridLeg,
