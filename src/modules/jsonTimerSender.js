@@ -786,6 +786,32 @@ class JsonTimerSender extends EventEmitter {
     }
   }
 
+  // Open ONLY the public price stream and forward ticks (emit 'price') without
+  // starting the trading loop — lets the UI show a live price the moment the
+  // user picks Long/Short, before Start. Touches no orders, no user stream and
+  // no cycle state; start() supersedes it (its removeAllListeners('message')
+  // drops this handler and re-adds its own). Idempotent; a no-op while running.
+  watchPrice(symbol) {
+    if (this.running || this.watching) return;
+
+    this.symbol = symbol;
+    this.watching = true;
+
+    const api = InvokeApi.getInstance();
+    const streamAPI = api.getPublicStream(symbol);
+
+    streamAPI.removeAllListeners('message');
+    streamAPI.start();
+    streamAPI.on('message', (data) => {
+      const p = parseFloat(data?.c);
+      if (Number.isFinite(p) && p > 0) {
+        this.lastPrice = p;
+        this.lastPriceTime = Date.now();
+      }
+      this.emit('price', data);
+    });
+  }
+
   async start(symbol, strategy, options = {}) {
     if (!this.running) {
       // this.strategy = (this.strategy == null) ? strategy : this.strategy;
@@ -898,6 +924,7 @@ class JsonTimerSender extends EventEmitter {
 
     this.timer = null;
     this.running = false;
+    this.watching = false; // stream destroyed above → allow watchPrice() to re-arm
 
     const stopMsg = `🛑 Stop: ${this.symbol}`;
     console.log(stopMsg);

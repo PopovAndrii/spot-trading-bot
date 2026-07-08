@@ -5,6 +5,7 @@ const { UserStreamAPI } = require('./UserStreamApi.js');
 
 const MESSAGE_TYPES = new Set([
   'subscribe',
+  'watchPrice',
   'start',
   'restartSync',
   'stop',
@@ -123,6 +124,11 @@ class WebSocketRouter {
                   });
                 }
 
+                // still-watching clients → keep the idle price ticking
+                if ((this.clients.get(symbol)?.size || 0) > 0) {
+                  this.timerSenders.get(symbol)?.watchPrice(symbol);
+                }
+
                 this.#maybeCleanup(symbol);
               });
 
@@ -196,6 +202,12 @@ class WebSocketRouter {
                 },
               });
             }
+          }
+
+          if (data.type === 'watchPrice' && currentSymbol) {
+            // Long/Short picked → open the public price stream so the UI shows a
+            // live price before Start. No trading side effects (see watchPrice()).
+            this.timerSenders.get(currentSymbol)?.watchPrice(currentSymbol);
           }
 
           if (data.type === 'start' && currentSymbol) {
@@ -281,6 +293,8 @@ class WebSocketRouter {
           if (data.type === 'stop' && currentSymbol) {
             const ts = this.timerSenders.get(currentSymbol);
             ts.stop();
+            // keep the idle price ticking (parity with pre-Start Long/Short)
+            ts.watchPrice(currentSymbol);
 
             pair.updateSymbol({ symbol: currentSymbol, status: statusPair.STOP });
 
