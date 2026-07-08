@@ -429,6 +429,41 @@ class JsonTimerSender extends EventEmitter {
     return true;
   }
 
+  // Trade-event notices over Telegram, driven by the POLL loop — the user stream
+  // is a latency optimization and must not be a prerequisite for notifications
+  // (on testnet it was silently down for weeks). Called once per persisted slot
+  // transition: placement, cancel, and the NEW→FILLED / PARTIAL→FILLED edge.
+  #notifyOrderEvent(currentOrder, message, slot) {
+    const num = currentOrder.id + 1;
+    const side = message.side || currentOrder.side || '';
+
+    // One-line-per-event notices batched under the pair header by #jobIterator
+    // (telegram.open/flush). The symbol lives in the batch header, so lines omit it.
+    if (currentOrder.method === 'cancelOrder') {
+      telegram.push(this.symbol, `canceled ${side} #${num}`);
+      return;
+    }
+
+    if (currentOrder.method === 'newOrder') {
+      telegram.push(
+        this.symbol,
+        `placed ${side} #${num} ${currentOrder.data?.quantity} @ ${currentOrder.data?.price}`
+      );
+      if (message.status !== 'FILLED') return; // instant taker fill → also report below
+    }
+
+    if (message.status === 'FILLED') {
+      const qty = parseFloat(message.executedQty) || 0;
+      const quote = parseFloat(message.cummulativeQuoteQty) || 0;
+      const avg = qty > 0 ? quote / qty : parseFloat(slot?.price) || 0;
+      telegram.push(
+        this.symbol,
+        `filled ${side} #${num} ${qty} @ ${avg.toFixed(this.tickDecimals)}` +
+          ` ≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
+      );
+    }
+  }
+
   /**
    * Iterates through the entire table of placed orders.
    * @param {Object} obj - Configuration of order data from file or database.
@@ -439,6 +474,10 @@ class JsonTimerSender extends EventEmitter {
 
     if (obj.status == Status.READY && strategy != null) {
       if (await this.#maybePrepareRecoveryClose(obj, strategy)) return;
+
+      // Batch this pass's per-order notices into one Telegram message; flushed in
+      // readLoop's finally (and before the Done finale below). See telegram.js.
+      telegram.open(this.symbol);
 
       let i = 0;
 
@@ -484,6 +523,10 @@ class JsonTimerSender extends EventEmitter {
           await this.#mergeLiveEdits(obj);
 
           this.autoRestart = obj.restart == true ? true : false;
+
+          // Flush any batched order lines from this pass before the standalone
+          // finale, so the chat reads batch → Done → Restart, not Done mixed in.
+          telegram.flush(this.symbol);
 
           // Telegram: cycle finished — realized profit in the quote asset from the
           // actual fills (read-only, does not touch trading).
@@ -560,6 +603,12 @@ class JsonTimerSender extends EventEmitter {
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
 
+        this.#notifyOrderEvent(
+          currentOrder,
+          result.message,
+          obj[result.message.side][currentOrder['id']]
+        );
+
         await this.#mergeLiveEdits(obj);
         await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
 
@@ -592,6 +641,9 @@ class JsonTimerSender extends EventEmitter {
         this.#jobIterator(data)
           .catch((err) => console.error('jobIterator:', err))
           .finally(() => {
+            // Send this pass's batched order notices as one framed message. No-op
+            // when nothing was queued (the common quiet tick) or already flushed.
+            telegram.flush(this.symbol);
             this.busy = false;
           });
       }
@@ -655,19 +707,9 @@ class JsonTimerSender extends EventEmitter {
           if (report.s !== symbol) return;
           logBus.log(`⚡ ${symbol} executionReport: ${report.S} ${report.X} (order ${report.i})`);
 
-          // Telegram: a real fill (a TRADE that completed the order). 🟢 BUY / 🔴 SELL.
-          if (report.x === 'TRADE' && report.X === 'FILLED') {
-            const qty = parseFloat(report.z) || 0; // cumulative filled qty
-            const quote = parseFloat(report.Z) || 0; // cumulative quote spent/received
-            const avg = qty > 0 ? quote / qty : parseFloat(report.p) || 0;
-            const isBuy = report.S === 'BUY';
-            telegram.send(
-              `${isBuy ? '🟢' : '🔴'} <b>${report.S}</b> ${symbol}\n` +
-                `${qty} ${this.baseAsset || ''} @ ${avg.toFixed(this.tickDecimals)}\n` +
-                `≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
-            );
-          }
-
+          // No Telegram here: fill notices are sent by the poll loop
+          // (#notifyOrderEvent), which works even when this stream is down —
+          // the push only shortens the reaction time.
           this.#kickTick();
         };
 
