@@ -1,5 +1,5 @@
 // Numeric formatting for exchange filters (tickSize/stepSize).
-// Extracted from two copies in routes/spotbot.js (ANALYSIS item 14).
+// Extracted from two copies in routes/spotbot.js.
 
 /**
  * Number of decimal places in a filter value (0.001 → 3).

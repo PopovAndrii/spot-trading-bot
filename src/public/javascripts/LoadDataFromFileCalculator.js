@@ -47,7 +47,7 @@ export class LoadDataFromFileCalculator {
     this.strategyName = data.param['field-strategy'];
 
     if (this.strategyName) {
-      document.querySelector(`#${this.strategyName}`).checked = true
+      document.querySelector(`#${this.strategyName}`).checked = true;
     }
 
     if ('restart' in data) {
@@ -55,13 +55,13 @@ export class LoadDataFromFileCalculator {
       const input = sw.querySelector('input');
 
       if (String(data.restart) === 'true') {
-        input.checked = true
-        input.setAttribute('checked', '')
+        input.checked = true;
+        input.setAttribute('checked', '');
         sw.setAttribute('aria-checked', 'true');
       } else {
         input.removeAttribute('checked');
         sw.setAttribute('aria-checked', 'false');
-        input.checked = false
+        input.checked = false;
       }
     }
 
@@ -73,7 +73,7 @@ export class LoadDataFromFileCalculator {
     const select = document.getElementById('strategyList');
     // set default value on strategi list
     this.loadDataCalculator.ignoreNextSelectChange();
-    this.selectObjectElement.setValue(select, obj.param.strategyList)
+    this.selectObjectElement.setValue(select, obj.param.strategyList);
 
     if (Object.keys(obj).length === 0) return;
 
@@ -94,6 +94,6 @@ export class LoadDataFromFileCalculator {
     // loadDataCalculator.calculate() (called right after in getStateCalculator) with
     // a single `tbody.innerHTML = html` — with status colors and real-fill badges.
     // A duplicate render here appended rows `innerHTML += row` without clearing
-    // tbody → a "double" table flickered on every robot auto-poll (REQUIREMENTS.md item 26).
+    // tbody → a "double" table flickered on every robot auto-poll.
   }
 }

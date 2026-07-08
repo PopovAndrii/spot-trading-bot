@@ -6,7 +6,7 @@ const path = require('path');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 const { Status } = require('../lib/job');
 
-// DEEP_ANALYSIS_PLAN.md §B.3 — a "spurious" file write after stop().
+// A "spurious" file write after stop().
 // Invariant: if Stop is pressed while #jobIterator is awaiting the exchange in
 // #runToApi, after the resolve the iterator must NOT touch the grid file (guard
 // before the write).
@@ -34,8 +34,11 @@ const gridObj = () => ({
 const filledReply = () => ({
   success: true,
   message: {
-    status: 'FILLED', orderId: 777, side: 'BUY',
-    executedQty: '1', cummulativeQuoteQty: '10',
+    status: 'FILLED',
+    orderId: 777,
+    side: 'BUY',
+    executedQty: '1',
+    cummulativeQuoteQty: '10',
   },
 });
 
@@ -52,7 +55,7 @@ async function setup(flipStopDuringCall) {
 
   const sender = new JsonTimerSender({}, 'long');
   sender.symbol = symbol;
-  sender.running[symbol] = true;
+  sender.running = true;
 
   const flags = { apiCalled: false };
   sender.job = {
@@ -61,7 +64,7 @@ async function setup(flipStopDuringCall) {
   sender.API = {
     getOrder: async () => {
       flags.apiCalled = true;
-      if (flipStopDuringCall) sender.running[symbol] = false; // Stop during the await
+      if (flipStopDuringCall) sender.running = false; // Stop during the await
       return filledReply();
     },
   };
@@ -70,7 +73,7 @@ async function setup(flipStopDuringCall) {
 }
 
 async function teardown({ sender, symbol, dir }) {
-  sender.running[symbol] = false;
+  sender.running = false;
   clearTimeout(sender.timer);
   await fs.rm(dir, { recursive: true, force: true });
 }

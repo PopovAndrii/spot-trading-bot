@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Calculator } = require('../lib/calculator');
 
-// DEEP_ANALYSIS_PLAN.md §7a — constructor antipattern.
+// Constructor antipattern.
 // The constructor used to return an array (`return this.factory()`), so
 // `new Calculator()` yielded the grid instead of a Calculator — instanceof broke.
 // Now the grid is built by the static build(); the constructor returns a normal instance.

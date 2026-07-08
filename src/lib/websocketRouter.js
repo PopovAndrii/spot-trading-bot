@@ -3,14 +3,22 @@ const JsonTimerSender = require('../modules/jsonTimerSender.js');
 const { pair, statusPair } = require('./pair.js');
 const { UserStreamAPI } = require('./UserStreamApi.js');
 
-const MESSAGE_TYPES = new Set(['subscribe', 'start', 'restartSync', 'stop', 'cancelOrder', 'replaceOrder']);
+const MESSAGE_TYPES = new Set([
+  'subscribe',
+  'watchPrice',
+  'start',
+  'restartSync',
+  'stop',
+  'cancelOrder',
+  'replaceOrder',
+]);
 const SYMBOL_RE = /^[A-Z0-9]{3,20}$/;
 const STRATEGIES = new Set(['short', 'long']);
 
 class WebSocketRouter {
   constructor() {
     // noServer: the HTTP server's 'upgrade' event is handled in bin/www, which
-    // authorizes the session BEFORE handing the socket to handleUpgrade() (req 24).
+    // authorizes the session BEFORE handing the socket to handleUpgrade().
     this.wss = new WebSocket.Server({ noServer: true });
     this.clients = new Map();
     this.timerSenders = new Map();
@@ -44,7 +52,9 @@ class WebSocketRouter {
       console.log('🟢 WebSocket connected');
 
       ws.isAlive = true;
-      ws.on('pong', () => { ws.isAlive = true; });
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
 
       ws.on('message', (msg) => {
         let data;
@@ -60,8 +70,7 @@ class WebSocketRouter {
           }
 
           if (data.type === 'subscribe') {
-            const symbol =
-              typeof data.symbol === 'string' ? data.symbol.toUpperCase() : '';
+            const symbol = typeof data.symbol === 'string' ? data.symbol.toUpperCase() : '';
 
             if (!SYMBOL_RE.test(symbol)) {
               return this.safeSend(ws, { error: 'invalid symbol' });
@@ -115,6 +124,11 @@ class WebSocketRouter {
                   });
                 }
 
+                // still-watching clients → keep the idle price ticking
+                if ((this.clients.get(symbol)?.size || 0) > 0) {
+                  this.timerSenders.get(symbol)?.watchPrice(symbol);
+                }
+
                 this.#maybeCleanup(symbol);
               });
 
@@ -145,7 +159,7 @@ class WebSocketRouter {
                 }
               });
 
-              // Reminder about a stuck manual slot (risk #4): a self-dismissing
+              // Reminder about a stuck manual slot: a self-dismissing
               // warning toast (no persist), like a normal notification. The text is
               // computed in jsonTimerSender (#remindManualStuck, read-only).
               ts.on('manualStuck', (data) => {
@@ -166,8 +180,8 @@ class WebSocketRouter {
                     data: {
                       symbol: data.symbol,
                       price: data.price,
-                      message: 'New + cycle started'
-                    }
+                      message: 'New + cycle started',
+                    },
                   });
                 }
               });
@@ -190,6 +204,12 @@ class WebSocketRouter {
             }
           }
 
+          if (data.type === 'watchPrice' && currentSymbol) {
+            // Long/Short picked → open the public price stream so the UI shows a
+            // live price before Start. No trading side effects (see watchPrice()).
+            this.timerSenders.get(currentSymbol)?.watchPrice(currentSymbol);
+          }
+
           if (data.type === 'start' && currentSymbol) {
             if (!STRATEGIES.has(data.strategy)) {
               return this.safeSend(ws, { error: 'invalid strategy' });
@@ -198,7 +218,7 @@ class WebSocketRouter {
             const ts = this.timerSenders.get(currentSymbol);
 
             ts.start(currentSymbol, data.strategy, {
-              autoRestart: data.autoRestart === true
+              autoRestart: data.autoRestart === true,
             });
 
             pair.updateSymbol({ symbol: currentSymbol, status: statusPair.START });
@@ -220,7 +240,7 @@ class WebSocketRouter {
           }
 
           if (data.type === 'cancelOrder' && currentSymbol) {
-            // Expert Mode gate, server-enforced (Item 10, risk #5): manual order
+            // Expert Mode gate, server-enforced: manual order
             // ops require the client to assert expert:true. Defense-in-depth for a
             // single-user app — guards against a stray/replayed/buggy emission, not
             // a hostile client (already authenticated).
@@ -250,7 +270,7 @@ class WebSocketRouter {
           }
 
           if (data.type === 'replaceOrder' && currentSymbol) {
-            // Expert Mode gate, server-enforced (Item 10, risk #5) — see cancelOrder.
+            // Expert Mode gate, server-enforced — see cancelOrder.
             if (data.expert !== true) {
               return this.safeSend(ws, { error: 'expert mode required' });
             }
@@ -263,9 +283,7 @@ class WebSocketRouter {
               index: Number(data.index),
               price: data.price,
             })
-              .then((result) =>
-                this.safeSend(ws, { event: 'replaceOrderResult', data: result })
-              )
+              .then((result) => this.safeSend(ws, { event: 'replaceOrderResult', data: result }))
               .catch((err) => {
                 console.error('❌ replaceOrder WS:', err);
                 this.safeSend(ws, { error: 'replace failed' });
@@ -275,6 +293,9 @@ class WebSocketRouter {
           if (data.type === 'stop' && currentSymbol) {
             const ts = this.timerSenders.get(currentSymbol);
             ts.stop();
+
+            // keep the idle price ticking (parity with pre-Start Long/Short)
+            ts.watchPrice(currentSymbol);
 
             pair.updateSymbol({ symbol: currentSymbol, status: statusPair.STOP });
 

@@ -27,10 +27,7 @@ async function archiveIfActive(filePath) {
   if (!hadActivity) return null;
 
   // Same name as autoRestart archives — the recovery scan skips them (^\d+-)
-  const archivePath = path.join(
-    path.dirname(filePath),
-    `${Date.now()}-${path.basename(filePath)}`
-  );
+  const archivePath = path.join(path.dirname(filePath), `${Date.now()}-${path.basename(filePath)}`);
   await fs.copyFile(filePath, archivePath);
   return archivePath;
 }

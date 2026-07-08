@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 
-// DEEP_ANALYSIS_PLAN.md Item 10 — manual single-order re-place (replaceManualOrder).
+// Manual single-order re-place (replaceManualOrder).
 // Contract: re-place only a manually-pulled, already-CANCELED slot — its order is
 // surely off the book, so a new placement can't double a live one. "Pulled" means
 // an in-session pull (manualPulls) OR a persisted `manual` flag in the grid file
@@ -33,7 +33,7 @@ async function setup() {
 
   const sender = new JsonTimerSender({}, 'long');
   sender.symbol = SYMBOL;
-  sender.running[SYMBOL] = true;
+  sender.running = true;
   // A successful re-place kicks an out-of-band tick (#kickTick) to persist soon.
   // Stub readLoop so that tick is a no-op here — we assert the schedule, not the
   // full loop (which would reschedule itself and keep the test process alive).
@@ -78,11 +78,15 @@ test('replaceManualOrder: places slot qty at user price, records the replace', a
 test('replaceManualOrder: snaps price to tickSize decimals (PRICE_FILTER)', async () => {
   const { sender, calls } = await setup();
   // grid carrying price precision (tickSize = 2 decimals) in param
-  await fs.writeFile(filePath, JSON.stringify({
-    param: { 'field-tickSize': 2 },
-    BUY: [{ status: 'CANCELED', orderId: 1, quantity: '0.5', price: '100', manual: true }],
-    SELL: [],
-  }), 'utf8');
+  await fs.writeFile(
+    filePath,
+    JSON.stringify({
+      param: { 'field-tickSize': 2 },
+      BUY: [{ status: 'CANCELED', orderId: 1, quantity: '0.5', price: '100', manual: true }],
+      SELL: [],
+    }),
+    'utf8'
+  );
   sender.manualPulls.BUY.add(0);
 
   const r = await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101.567' });
@@ -143,12 +147,21 @@ test('replaceManualOrder: not running / invalid price → fail, no API call', as
   const { sender, calls } = await setup();
   sender.manualPulls.BUY.add(0);
 
-  sender.running[SYMBOL] = false;
-  assert.equal((await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101' })).success, false);
+  sender.running = false;
+  assert.equal(
+    (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '101' })).success,
+    false
+  );
 
-  sender.running[SYMBOL] = true;
-  assert.equal((await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '0' })).success, false);
-  assert.equal((await sender.replaceManualOrder({ side: 'BUY', index: 0, price: 'abc' })).success, false);
+  sender.running = true;
+  assert.equal(
+    (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: '0' })).success,
+    false
+  );
+  assert.equal(
+    (await sender.replaceManualOrder({ side: 'BUY', index: 0, price: 'abc' })).success,
+    false
+  );
 
   assert.equal(calls.length, 0);
 });

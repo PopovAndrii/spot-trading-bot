@@ -3,7 +3,7 @@
 // backward compatibility with old behavior (NODE_ENV=development → testnet).
 // This decouples “which Binance” and “dev tools” (NODE_ENV launches browser-sync).
 
-// Regardless of whether keys are present. 
+// Regardless of whether keys are present.
 function requestedTestnet() {
   const mode = process.env.BINANCE_MODE;
   if (mode === 'test') return true;

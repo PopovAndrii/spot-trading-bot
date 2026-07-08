@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { partialFillDelta } = require('../modules/jsonTimerSender');
 
-// REQUIREMENTS.md item 20 — persist a partial fill while the status stays unchanged.
+// Persist a partial fill while the status stays unchanged.
 // PARTIALLY_FILLED is hard to reproduce on the exchange, so we check the pure
 // function with synthetic getOrder responses.
 

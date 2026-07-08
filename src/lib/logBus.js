@@ -12,7 +12,11 @@ function log(msg) {
     const entry = { id: ++seq, t: Date.now(), msg: String(msg) };
     entries.push(entry);
     if (entries.length > MAX) entries.shift();
-    clients.forEach(fn => { try { fn(entry); } catch {} });
+    clients.forEach((fn) => {
+      try {
+        fn(entry);
+      } catch {}
+    });
   } catch {}
 }
 

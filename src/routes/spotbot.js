@@ -157,9 +157,9 @@ router.post('/calculator/save', async (req, res, next) => {
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const exchangeName = 'binance';
 
-    // Server-side write lock (req 15): refuse to overwrite a live order-state
+    // Server-side write lock: refuse to overwrite a live order-state
     // file while the bot is running for this symbol. The UI already locks the
-    // Save button (req 7), but a direct POST (stale tab, reload mid-tick) would
+    // Save button, but a direct POST (stale tab, reload mid-tick) would
     // bypass it and wipe orderId/status/executedQty. Stop the cycle first.
     if (pair.isRunning(symbol)) {
       return res.status(409).json({ message: 'Cycle is running — press "Stop" before saving' });
@@ -167,7 +167,8 @@ router.post('/calculator/save', async (req, res, next) => {
 
     if (pair.needsAttention(symbol)) {
       return res.status(409).json({
-        message: 'Server was restarted with live orders — press "Start" to resume or cancel orders before saving',
+        message:
+          'Server was restarted with live orders — press "Start" to resume or cancel orders before saving',
       });
     }
 
@@ -178,7 +179,9 @@ router.post('/calculator/save', async (req, res, next) => {
       typeof msg.param !== 'object' ||
       msg.param === null
     ) {
-      return res.status(400).json({ message: 'Invalid data structure: BUY, SELL, param are required' });
+      return res
+        .status(400)
+        .json({ message: 'Invalid data structure: BUY, SELL, param are required' });
     }
 
     // JSON stringify with check
@@ -195,7 +198,8 @@ router.post('/calculator/save', async (req, res, next) => {
     const open = await API.openOrders({ symbol });
     if (!open.success) {
       return res.status(502).json({
-        message: 'Cannot verify the exchange has no live orders — try again, or stop the cycle first',
+        message:
+          'Cannot verify the exchange has no live orders — try again, or stop the cycle first',
       });
     }
     if (open.message > 0) {
@@ -250,7 +254,7 @@ router.post('/calculator/restart', async (req, res, next) => {
 
     await writeFileAtomic(filePath, data, 'utf8');
 
-    const str = newData.restart === true ? "on" : "off";
+    const str = newData.restart === true ? 'on' : 'off';
 
     res.json({ message: `Restart for: ${symbol} is <b>${str}</b>` });
   } catch (err) {
@@ -367,7 +371,9 @@ router.post('/series/delete', async (req, res) => {
     await fs.unlink(file);
   } catch (err) {
     if (err.code !== 'ENOENT') {
-      return res.status(500).json({ success: false, message: `Failed to delete series file: ${err.message}` });
+      return res
+        .status(500)
+        .json({ success: false, message: `Failed to delete series file: ${err.message}` });
     }
   }
 

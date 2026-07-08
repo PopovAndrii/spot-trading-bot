@@ -8,7 +8,7 @@ const helmet = require('helmet');
 const Dotenv = require('dotenv');
 Dotenv.config();
 
-// Fail-fast (ANALYSIS item 11): without the secret, express-session throws an
+// Fail-fast: without the secret, express-session throws an
 // opaque stack on the very first request — better to crash now with a clear message.
 if (!process.env.SESSION_SECRET) {
   console.error('❌ SESSION_SECRET is not set (src/.env) — refusing to start');
@@ -50,7 +50,7 @@ app.use(
 
 // NOTE: dev live-reload (browser-sync) lives in bin/www, where it proxies the
 // REAL server (the one with WebSocketRouter). Do NOT call app.listen() here —
-// it used to spawn a second, WS-less HTTP server and caused port confusion (req 23).
+// it used to spawn a second, WS-less HTTP server and caused port confusion.
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -59,13 +59,13 @@ app.set('view engine', 'ejs');
 app.set('trust proxy', 1); // for HTTPS secure: 'auto'
 
 // Single session middleware instance, reused for both HTTP routes and the
-// WebSocket upgrade handshake (req 24 — authorize WS, not only HTTP routes).
+// WebSocket upgrade handshake (authorize WS, not only HTTP routes).
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   rolling: true, // extend the session on activity (inactivity timeout)
-  // File store instead of MemoryStore (ANALYSIS item 11): sessions survive a
+  // File store instead of MemoryStore: sessions survive a
   // container restart (no forced logout) and don't leak memory.
   // data/ is already in .gitignore and persisted via a bind-mount.
   store: new FileStore({

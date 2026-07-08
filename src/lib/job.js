@@ -1,3 +1,4 @@
+const Decimal = require('decimal.js');
 const { rebalanceClose } = require('./rebalanceClose');
 
 const Status = Object.freeze({
@@ -29,7 +30,7 @@ function deepestFilledIndex(arr) {
   return -1;
 }
 
-// Stage 3c: quantity/price of the closing order, accounting for what was actually
+// Quantity/price of the closing order, accounting for what was actually
 // sold/bought back across partially filled and canceled closes during the cycle.
 // Returns { quantity, price } (strings, rounded by step/tick) or null — in which
 // case the caller uses the precomputed values from config.
@@ -60,12 +61,13 @@ function rebalancedClose(obj, i, strategy) {
 
   const stepSize = parseInt(obj['param']['field-stepSize'], 10) || 0;
   const tickSize = parseInt(obj['param']['field-tickSize'], 10) || 0;
-  const stepPow = 10 ** stepSize;
 
   return {
     // floor the quantity — so we don't try to close more than we actually hold
-    quantity: (Math.floor(res.quantity * stepPow) / stepPow).toFixed(stepSize),
-    price: res.price.toFixed(tickSize),
+    quantity: new Decimal(res.quantity)
+      .toDecimalPlaces(stepSize, Decimal.ROUND_DOWN)
+      .toFixed(stepSize),
+    price: new Decimal(res.price).toFixed(tickSize),
   };
 }
 
@@ -153,7 +155,7 @@ class Job {
           }
 
           if (obj['SELL'][i].status === null || obj['SELL'][i].status === state.CANCELED) {
-            // Manual pull (Item 10): user cancelled this close — do NOT re-place
+            // Manual pull: user cancelled this close — do NOT re-place
             // it; the position stays open until they re-place (their choice).
             if (obj['SELL'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
@@ -238,7 +240,7 @@ class Job {
           };
 
         default:
-          // Manual pull (Item 10): user cancelled this entry — leave it alone,
+          // Manual pull: user cancelled this entry — leave it alone,
           // do not re-place. Without the flag a null/CANCELED entry is re-placed.
           if (el.manual) {
             return { status: 'pass', method: false, side: null, id: i, data: {} };
@@ -356,7 +358,7 @@ class Job {
           }
 
           if (obj['BUY'][i].status === null || obj['BUY'][i].status === state.CANCELED) {
-            // Manual pull (Item 10): user cancelled this close — do NOT re-place
+            // Manual pull: user cancelled this close — do NOT re-place
             // it; the position stays open until they re-place (their choice).
             if (obj['BUY'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
@@ -440,7 +442,7 @@ class Job {
           };
 
         default:
-          // Manual pull (Item 10): user cancelled this entry — leave it alone,
+          // Manual pull: user cancelled this entry — leave it alone,
           // do not re-place. Without the flag a null/CANCELED entry is re-placed.
           if (el.manual) {
             return { status: 'pass', method: false, side: null, id: i, data: {} };

@@ -47,11 +47,12 @@ helper script:
   See `src/.env.example` for the full variable list.
 - `npm run prod-runtime` — `pm2-runtime` (prod).
 
-## Requirements log
+## Backlog
 
-`REQUIREMENTS.md` is the running spec/changelog. Commits and code comments
-reference items by number (e.g. "req 24", "req 22"). When you touch behavior that
-maps to a numbered requirement, read that entry first and keep its rationale.
+`docs/DEEP_ANALYSIS_PLAN.md` holds the remaining open/deferred items (money-in-float
+refactor, `running` dictionary, confirm-before-destructive, position-entry orphan).
+The rationale for shipped behavior lives in the code comments next to it, not in a
+separate log.
 
 ## Core modules (in `src/`)
 
@@ -72,12 +73,12 @@ maps to a numbered requirement, read that entry first and keep its rationale.
   calls Binance, writes results back. Supports auto-restart of a completed cycle.
 - `lib/websocketRouter.js` — WS server (browser ↔ server), subscribe/start/stop.
   The upgrade is **authenticated** in `bin/www`: the shared session middleware
-  runs on the handshake, so an un-logged-in socket gets 401 (req 24/16) — unless
+  runs on the handshake, so an un-logged-in socket gets 401 — unless
   `STATUS_LOGIN=false`.
 - `lib/UserStreamApi.js` — Singleton WS client to Binance **user data stream**
   (listenKey + keep-alive + heartbeat/backoff reconnect). For account/order events.
 - `lib/atomicWrite.js` — `writeFileAtomic`: temp-file + `fs.rename` so a crash mid-write
-  never leaves a corrupt config (the single source of truth for open orders, req 22).
+  never leaves a corrupt config (the single source of truth for open orders).
 - `lib/runMode.js` — `isTestnet()` / `requestedTestnet()`: which Binance to hit
   (see Runtime section). Used by `invokeAPI`/`checkKeys` to pick keys + baseURL.
 - `lib/checkKeys.js` — Validates an API key+secret **pair** via a signed account

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Job, Status } = require('../lib/job');
 
-// ANALYSIS.md item 8 — the order state machine (the most money-critical logic) had
+// The order state machine (the most money-critical logic) had
 // no tests. Table-driven transition tests: for each pair state (entry[i], close[i])
 // we check which API call Job decides to make and with what data.
 
@@ -146,7 +146,10 @@ test('long: close SELL PARTIALLY_FILLED → poll it (early branch)', () => {
 test('long: SELL CANCELED + higher BUY FILLED → pass (close delegated up)', () => {
   const obj = mkObj({
     buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 })],
-    sells: [mkOrder('SELL', 'CANCELED', { orderId: 101 }), mkOrder('SELL', 'NEW', { orderId: 102 })],
+    sells: [
+      mkOrder('SELL', 'CANCELED', { orderId: 101 }),
+      mkOrder('SELL', 'NEW', { orderId: 102 }),
+    ],
   });
 
   const r = job.long(obj, 0, obj.BUY[0]);
@@ -184,9 +187,7 @@ test('long: partial close happened → re-placed close uses rebalanced quantity'
   // BUY[0] filled 1.0 @ 100; the canceled SELL managed to sell 0.4.
   // Position leftover 0.6 — the new closing order must not sell 1.0.
   const obj = mkObj({
-    buys: [
-      mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 }),
-    ],
+    buys: [mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 })],
     sells: [
       mkOrder('SELL', 'CANCELED', {
         orderId: 101,
@@ -279,8 +280,18 @@ test('long: active close lagging below i-1 (gap-fill) → cancel it before placi
   // intermediate SELL[2] is null. At the deep index 3 we must pull SELL[1] (not
   // only look at SELL[2]=null), otherwise it holds the balance → -2010.
   const obj = mkObj({
-    buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 }), mkOrder('BUY', 'FILLED', { orderId: 3 }), mkOrder('BUY', 'FILLED', { orderId: 4 })],
-    sells: [mkOrder('SELL', 'CANCELED', { orderId: 101 }), mkOrder('SELL', 'NEW', { orderId: 102 }), mkOrder('SELL', null), mkOrder('SELL', null)],
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1 }),
+      mkOrder('BUY', 'FILLED', { orderId: 2 }),
+      mkOrder('BUY', 'FILLED', { orderId: 3 }),
+      mkOrder('BUY', 'FILLED', { orderId: 4 }),
+    ],
+    sells: [
+      mkOrder('SELL', 'CANCELED', { orderId: 101 }),
+      mkOrder('SELL', 'NEW', { orderId: 102 }),
+      mkOrder('SELL', null),
+      mkOrder('SELL', null),
+    ],
   });
 
   const r = job.long(obj, 3, obj.BUY[3]);
@@ -290,15 +301,23 @@ test('long: active close lagging below i-1 (gap-fill) → cancel it before placi
   assert.equal(r.data.orderId, 102);
 });
 
-// ===== orphan inventory after a "blind" window (Step 2) =====
+// ===== orphan inventory after a "blind" window =====
 // the sell slipped through between the drop and the bounce within one poll
 // interval: the lower buys filled, but the close executed at the upper index
 // before it crawled down. The cycle must not close, leaving an unsold position.
 
 test('long: close filled but a deeper BUY is filled → pass, NOT done', () => {
   const obj = mkObj({
-    buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 }), mkOrder('BUY', 'FILLED', { orderId: 3 })],
-    sells: [mkOrder('SELL', 'FILLED', { orderId: 101 }), mkOrder('SELL', null), mkOrder('SELL', null)],
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1 }),
+      mkOrder('BUY', 'FILLED', { orderId: 2 }),
+      mkOrder('BUY', 'FILLED', { orderId: 3 }),
+    ],
+    sells: [
+      mkOrder('SELL', 'FILLED', { orderId: 101 }),
+      mkOrder('SELL', null),
+      mkOrder('SELL', null),
+    ],
   });
 
   const r = job.long(obj, 0, obj.BUY[0]);
@@ -308,8 +327,16 @@ test('long: close filled but a deeper BUY is filled → pass, NOT done', () => {
 
 test('long: intermediate orphan index delegates close up → pass', () => {
   const obj = mkObj({
-    buys: [mkOrder('BUY', 'FILLED', { orderId: 1 }), mkOrder('BUY', 'FILLED', { orderId: 2 }), mkOrder('BUY', 'FILLED', { orderId: 3 })],
-    sells: [mkOrder('SELL', 'FILLED', { orderId: 101 }), mkOrder('SELL', null), mkOrder('SELL', null)],
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1 }),
+      mkOrder('BUY', 'FILLED', { orderId: 2 }),
+      mkOrder('BUY', 'FILLED', { orderId: 3 }),
+    ],
+    sells: [
+      mkOrder('SELL', 'FILLED', { orderId: 101 }),
+      mkOrder('SELL', null),
+      mkOrder('SELL', null),
+    ],
   });
 
   const r = job.long(obj, 1, obj.BUY[1]); // SELL[1] null, BUY[2] FILLED → delegate upward
@@ -364,7 +391,11 @@ test('long: orphan remainder below minQty → DONE with leftover notice', () => 
 test('short: close filled but a deeper SELL is filled → pass, NOT done', () => {
   const obj = mkObj({
     buys: [mkOrder('BUY', 'FILLED', { orderId: 101 }), mkOrder('BUY', null), mkOrder('BUY', null)],
-    sells: [mkOrder('SELL', 'FILLED', { orderId: 1 }), mkOrder('SELL', 'FILLED', { orderId: 2 }), mkOrder('SELL', 'FILLED', { orderId: 3 })],
+    sells: [
+      mkOrder('SELL', 'FILLED', { orderId: 1 }),
+      mkOrder('SELL', 'FILLED', { orderId: 2 }),
+      mkOrder('SELL', 'FILLED', { orderId: 3 }),
+    ],
   });
 
   const r = job.short(obj, 0, obj.SELL[0]);
@@ -405,7 +436,7 @@ test('test mode: both strategies always return pass (no API calls)', () => {
   assert.equal(testJob.short(obj, 0, obj.SELL[0]).status, 'pass');
 });
 
-// ===== manual pull (Item 10): engine must NOT re-place a user-cancelled order =====
+// ===== manual pull: engine must NOT re-place a user-cancelled order =====
 // A CANCELED order is normally treated as "re-place me". The `manual: true` flag
 // (set by a manual single-order cancel) makes the engine leave it alone (pass).
 

@@ -43,7 +43,7 @@ class UserStreamAPI extends EventEmitter {
       });
 
       this.ws.on('message', (data) => {
-        // a corrupt frame must not crash the process (ANALYSIS item 10)
+        // a corrupt frame must not crash the process
         let json;
         try {
           json = JSON.parse(data);
@@ -121,7 +121,7 @@ class UserStreamAPI extends EventEmitter {
   reconnect() {
     this.stop();
 
-    // Never give up (like StreamAPI, ANALYSIS item 1.4): after
+    // Never give up (like StreamAPI): after
     // maxReconnectAttempts keep going at the delay cap, signal once
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
     this.reconnectAttempts++;

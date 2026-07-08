@@ -6,7 +6,6 @@ const path = require('path');
  * (atomic within one filesystem). A crash/restart exactly at write time won't
  * leave broken JSON in the main file — it stays either fully old or fully new.
  * Protects the single source of truth about open orders.
- * See REQUIREMENTS.md item 22.
  *
  * @param {string} filePath - target path.
  * @param {string|Buffer} data - contents.
@@ -23,7 +22,11 @@ async function writeFileAtomic(filePath, data, encoding = 'utf8') {
     await fs.rename(tmp, filePath);
   } catch (err) {
     // clean up the leftover if rename didn't happen (otherwise .tmp files pile up)
-    try { await fs.unlink(tmp); } catch (_) { /* already gone — ok */ }
+    try {
+      await fs.unlink(tmp);
+    } catch (_) {
+      /* already gone — ok */
+    }
     throw err;
   }
 }

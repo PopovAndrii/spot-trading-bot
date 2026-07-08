@@ -24,18 +24,29 @@ export class SpotWS {
       }
     };
 
-    // Item 10: manual single-order cancel → tell this symbol's bot over WS.
+    // Manual single-order cancel → tell this symbol's bot over WS.
     // `expert` carries the Expert Mode gate to the server (rejected without it).
     this.loadDataCalculator.onCancelOrder = ({ side, index, orderId, expert }) => {
       if (this.#isWebSocketOpen(this.ws)) {
-        this.ws.send(JSON.stringify({ type: 'cancelOrder', symbol: base + quote, side, index, orderId, expert }));
+        this.ws.send(
+          JSON.stringify({
+            type: 'cancelOrder',
+            symbol: base + quote,
+            side,
+            index,
+            orderId,
+            expert,
+          })
+        );
       }
     };
 
-    // Item 10: manual re-place of a pulled order at a new price → tell the bot.
+    // Manual re-place of a pulled order at a new price → tell the bot.
     this.loadDataCalculator.onReplaceOrder = ({ side, index, price, expert }) => {
       if (this.#isWebSocketOpen(this.ws)) {
-        this.ws.send(JSON.stringify({ type: 'replaceOrder', symbol: base + quote, side, index, price, expert }));
+        this.ws.send(
+          JSON.stringify({ type: 'replaceOrder', symbol: base + quote, side, index, price, expert })
+        );
       }
     };
 
@@ -46,6 +57,20 @@ export class SpotWS {
     this.isRunning = false;
     this.btnClickHandler = null;
     this.btnStart();
+
+    this.#watchOnStrategy();
+  }
+
+  // Long/Short picked → ask the server to open the public price stream so the
+  // live price shows in .stream-currency before Start (same spot as when running).
+  #watchOnStrategy() {
+    const group = document.querySelector('.UIbg');
+    if (!group) return;
+
+    group.addEventListener('ui-button-group-change', () => {
+      if (!this.#isWebSocketOpen(this.ws)) return;
+      this.ws.send(JSON.stringify({ type: 'watchPrice', symbol: base + quote }));
+    });
   }
 
   #isWebSocketOpen(ws) {
@@ -104,7 +129,7 @@ export class SpotWS {
             this.#updateRestartSwitch(message.data);
             break;
           case 'cancelOrderResult':
-            // Item 10: result of a manual single-order cancel
+            // Result of a manual single-order cancel
             this.notifications.showNotification(
               message.data?.message || 'Cancel result',
               message.data?.success ? 'success' : 'warning',
@@ -117,7 +142,7 @@ export class SpotWS {
             }
             break;
           case 'replaceOrderResult':
-            // Item 10: result of a manual single-order re-place
+            // Result of a manual single-order re-place
             this.notifications.showNotification(
               message.data?.message || 'Re-place result',
               message.data?.success ? 'success' : 'warning',

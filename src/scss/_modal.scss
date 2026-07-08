@@ -1,6 +1,6 @@
 @use './var' as *;
 
-// Confirmation dialog (Item 10): centered modal over a dimmed backdrop.
+// Confirmation dialog: centered modal over a dimmed backdrop.
 .UIconfirm-overlay {
   position: fixed;
   inset: 0;

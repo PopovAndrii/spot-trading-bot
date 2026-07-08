@@ -56,6 +56,10 @@ API_SECRET='you_secret_key_form_binance_api'
 API_KEY_TEST='you_testnet_key_form_binance'
 API_SECRET_TEST='you_testnet_secret_form_binance'
 
+# Telegram trade notifications — optional. Leave empty to disable (no-op).
+TELEGRAM_BOT_TOKEN=''
+TELEGRAM_CHAT_ID=''
+
 # SSH keys / git config are NOT mounted into the container anymore.
 
 ```
@@ -120,6 +124,33 @@ npm run build-css              # build CSS once
 
 > Production launch (compose.prod.yml, pm2-runtime, certs via proxy) is covered
 > in its own section below.
+
+## Telegram trade notifications (optional)
+
+The bot can push a message to Telegram on each trade. It is **opt-in**: with no
+token/chat id set it is a silent no-op, and existing installs behave exactly as
+before. Sending is fire-and-forget — a notification outage never blocks or
+affects trading (`src/lib/telegram.js`).
+
+1. **Create the bot.** In Telegram open [@BotFather](https://t.me/BotFather),
+   send `/newbot`, follow the prompts, and copy the **token** it gives you
+   (looks like `123456789:AAE...`).
+2. **Get the chat id.** Message [@userinfobot](https://t.me/userinfobot) to get
+   your personal id, or add the bot to a group and use the group id. To receive
+   DMs, first press **Start** on your new bot so it may message you.
+3. **Configure `src/.env`** (no code changes needed):
+   ```sh
+   TELEGRAM_BOT_TOKEN='123456789:AAE...'
+   TELEGRAM_CHAT_ID='987654321'
+   ```
+4. **Restart** so the container picks up the new env:
+   ```sh
+   docker compose up -d                              # dev
+   docker compose -f compose.prod.yml up -d          # prod
+   ```
+
+Both variables must be present to enable notifications; clearing either one
+disables them again.
 
 ## Production launch (`compose.prod.yml`)
 

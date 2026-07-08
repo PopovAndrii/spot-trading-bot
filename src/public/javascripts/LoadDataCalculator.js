@@ -1,7 +1,7 @@
 import { confirmDialog } from './ui/confirmDialog.js';
 import { priceDialog } from './ui/priceDialog.js';
 
-// Item 10 safety gate: while false, the per-order cancel button only confirms
+// Safety gate: while false, the per-order cancel button only confirms
 // and toasts — it does NOT send a cancel to the exchange. Keeps a live testnet
 // cycle from being broken during UI testing. Flip to true (and wire the API)
 // once manual cancel is ready to go live.
@@ -18,7 +18,7 @@ export class LoadDataCalculator {
     this.onReplaceOrder = null; // set by SpotWS — sends a 'replaceOrder' WS message
     this._calcSeq = 0; // sequence token: drop stale async calculator() renders
 
-    // Item 10: orders whose manual cancel is in flight ("side:index"). The table
+    // Orders whose manual cancel is in flight ("side:index"). The table
     // re-renders every tick and recreates the ✕ button, so a one-off node.disabled
     // is lost; we re-render ✕ disabled while the key is here, until the order turns
     // CANCELED+manual (✕ becomes ＋) and the key is dropped.
@@ -37,7 +37,7 @@ export class LoadDataCalculator {
           3000
         );
       }
-    })
+    });
 
     // Change claculate button
     document.querySelector('#settings-calculate').addEventListener('ui-button-change', () => {
@@ -113,7 +113,7 @@ export class LoadDataCalculator {
     });
   }
 
-  // Item 10: Expert Mode gate. The per-order cancel (✕) / re-place (＋) controls
+  // Expert Mode gate. The per-order cancel (✕) / re-place (＋) controls
   // in the grid table are hidden until the Expert switch is on. The switch only
   // toggles an .expert-on class on the table; the buttons themselves are still
   // rendered every tick, so CSS — not per-render JS — does the show/hide (the
@@ -139,9 +139,11 @@ export class LoadDataCalculator {
 
   // Change button restart
   restart() {
-    document.getElementById('settings-calculate-restart').addEventListener('ui-switch-change', (e) => {
-      this.addRestartStatus(e.detail.value);
-    });
+    document
+      .getElementById('settings-calculate-restart')
+      .addEventListener('ui-switch-change', (e) => {
+        this.addRestartStatus(e.detail.value);
+      });
   }
 
   runtimeParams() {
@@ -155,9 +157,9 @@ export class LoadDataCalculator {
 
   async saveRuntimeParam(key, value) {
     const obj = {
-      'pair': base + quote,
-      'key': key,
-      'value': value,
+      pair: base + quote,
+      key: key,
+      value: value,
     };
 
     try {
@@ -180,7 +182,7 @@ export class LoadDataCalculator {
 
     const all = [
       ...document.querySelectorAll('[id^="field-"]'),
-      strategyList?.querySelector('[name="strategyList"]')
+      strategyList?.querySelector('[name="strategyList"]'),
     ].filter(Boolean); // Remove null if element is not found
 
     all.forEach((el) => {
@@ -222,7 +224,7 @@ export class LoadDataCalculator {
     return `<span class="fill-badge" title="real ${kind}">${out}</span>`;
   }
 
-  // Item 10: a live order may rest at a price different from the planned grid
+  // A live order may rest at a price different from the planned grid
   // price — a manual re-place. The column shows the plan (el.buyCurrency), so
   // surface the order's ACTUAL resting price as a badge; otherwise the table
   // lies (old price visible while the engine polls the new one). Only for live
@@ -241,7 +243,7 @@ export class LoadDataCalculator {
     return `<span class="fill-badge price-badge" title="current price (re-placed)">${actual.toFixed(dec)}</span>`;
   }
 
-  // Per-order manual action (Item 10) in the Buy/Sell currency cell:
+  // Per-order manual action in the Buy/Sell currency cell:
   //   NEW / PARTIALLY_FILLED        → hover ✕ cancel (pull the live order)
   //   CANCELED + manual (user pull) → ＋ re-place (opens a price-editor popup)
   //   FILLED / bot-CANCELED / null  → nothing
@@ -264,14 +266,20 @@ export class LoadDataCalculator {
       const tick = parseInt(obj.param?.['field-tickSize'], 10);
       const dec = Number.isFinite(tick) ? tick : 2;
       const replace = JSON.stringify({
-        action: 'replace', side: type, index,
+        action: 'replace',
+        side: type,
+        index,
         orderId: o.orderId ?? null,
-        price: o.price ?? '', grid: gridPrice ?? '', dec,
+        price: o.price ?? '',
+        grid: gridPrice ?? '',
+        dec,
       });
-      return `<span class="row-actions row-actions--edit">`
-        + `<button type="button" class="UIb xsm r-round success" data-value='${replace}' title="Re-place at a new price">`
-        + `+</button>`
-        + `</span>`;
+      return (
+        `<span class="row-actions row-actions--edit">` +
+        `<button type="button" class="UIb xsm r-round success" data-value='${replace}' title="Re-place at a new price">` +
+        `+</button>` +
+        `</span>`
+      );
     }
 
     // manual cancel in flight → hold a DISABLED ✕ until ＋ appears. Held through
@@ -280,23 +288,32 @@ export class LoadDataCalculator {
     // ✕ mid-cancel. Cleared only by the ＋ branch above, or by clearPendingCancel
     // on a failed cancel (SpotWS).
     if (this._pendingCancel.has(key)) {
-      return `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"`
-        + ` disabled title="Cancelling…">`
-        + `x</button></span>`;
+      return (
+        `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"` +
+        ` disabled title="Cancelling…">` +
+        `x</button></span>`
+      );
     }
 
     // active order → hover cancel pill
     if (o.status === 'NEW' || o.status === 'PARTIALLY_FILLED') {
-      const cancel = JSON.stringify({ action: 'cancel', side: type, index, orderId: o.orderId ?? null });
-      return `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"`
-        + ` data-value='${cancel}' title="Cancel order">`
-        + `x</button></span>`;
+      const cancel = JSON.stringify({
+        action: 'cancel',
+        side: type,
+        index,
+        orderId: o.orderId ?? null,
+      });
+      return (
+        `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"` +
+        ` data-value='${cancel}' title="Cancel order">` +
+        `x</button></span>`
+      );
     }
 
     return '';
   }
 
-  // Item 10: release a held ✕ when its manual cancel FAILED (SpotWS calls this on
+  // Release a held ✕ when its manual cancel FAILED (SpotWS calls this on
   // a cancelOrderResult with success:false) — the order is still live, so the
   // next render must show a clickable ✕ again for a retry. On success we do NOT
   // clear here: the ＋ branch clears it when CANCELED+manual renders, avoiding a
@@ -305,7 +322,7 @@ export class LoadDataCalculator {
     this._pendingCancel.delete(`${side}:${index}`);
   }
 
-  // Item 10: one delegated 'ui-button-change' listener for the per-order cancel
+  // One delegated 'ui-button-change' listener for the per-order cancel
   // buttons. The buttons are re-created on every table re-render, but the event
   // bubbles, so a single listener on the table stays valid without rebinding
   // each row. Called once at startup (spotMain).
@@ -316,7 +333,11 @@ export class LoadDataCalculator {
       if (!btn) return;
 
       let payload;
-      try { payload = JSON.parse(btn.dataset.value); } catch { return; }
+      try {
+        payload = JSON.parse(btn.dataset.value);
+      } catch {
+        return;
+      }
 
       // Expert Mode gate is server-enforced, not only CSS: emit a manual order op
       // only while the switch is on (source of truth = .expert-on on the table).
@@ -325,7 +346,9 @@ export class LoadDataCalculator {
       const expertOn = table.classList.contains('expert-on');
       if ((payload.action === 'cancel' || payload.action === 'replace') && !expertOn) {
         this.notifications.showNotification(
-          'Enable Expert Mode to manage individual orders', 'warning', 5000
+          'Enable Expert Mode to manage individual orders',
+          'warning',
+          5000
         );
         return;
       }
@@ -345,14 +368,20 @@ export class LoadDataCalculator {
         if (!ORDER_CANCEL_ENABLED) {
           this.notifications.showNotification(
             `🧪 Stub: ${payload.side} #${payload.index + 1} not cancelled (manual cancel disabled)`,
-            'warning', 6000
+            'warning',
+            6000
           );
           return;
         }
         // Real cancel: send to this symbol's bot via WS (SpotWS sets the
         // callback). The bot cancels on the exchange and marks the order
         // manual:true so the engine won't re-place it.
-        this.onCancelOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, expert: true });
+        this.onCancelOrder?.({
+          side: payload.side,
+          index: payload.index,
+          orderId: payload.orderId,
+          expert: true,
+        });
         // Hold the ✕ disabled until the order turns CANCELED+manual (✕ → ＋):
         // the key survives the per-tick re-render (node.disabled would not), and
         // the current node is disabled too for instant feedback before re-render.
@@ -381,11 +410,18 @@ export class LoadDataCalculator {
         if (!ORDER_CANCEL_ENABLED) {
           this.notifications.showNotification(
             `🧪 Stub: ${payload.side} #${payload.index + 1} not re-placed at ${price} (manual cancel disabled)`,
-            'warning', 6000
+            'warning',
+            6000
           );
           return;
         }
-        this.onReplaceOrder?.({ side: payload.side, index: payload.index, orderId: payload.orderId, price, expert: true });
+        this.onReplaceOrder?.({
+          side: payload.side,
+          index: payload.index,
+          orderId: payload.orderId,
+          price,
+          expert: true,
+        });
         return;
       }
     });
@@ -468,7 +504,7 @@ export class LoadDataCalculator {
       if (this.strategy === 'short') rows.reverse();
       document.querySelector('#settings-table tbody').innerHTML = rows.join(''); // single DOM write
 
-      // Re-bind the ui-elements buttons + SpinBoxes (Item 10 cancel/re-place)
+      // Re-bind the ui-elements buttons + SpinBoxes (manual cancel/re-place)
       // freshly rendered into the new rows. scan() skips already-bound nodes, so
       // this is cheap and idempotent on every tick.
       UiElements.getButtonManager().scan();
@@ -494,7 +530,7 @@ export class LoadDataCalculator {
       });
 
       const data = await res.json();
-      // 409 = server write lock: cycle is running (req 15). Surface as warning,
+      // 409 = server write lock: cycle is running. Surface as warning,
       // not a green "success".
       this.notifications.showNotification(data.message, res.ok ? 'success' : 'warning', 10000);
     } catch (err) {
@@ -505,9 +541,9 @@ export class LoadDataCalculator {
 
   async addRestartStatus(value) {
     const obj = {
-      "pair": base + quote,
-      "restart": value
-    }
+      pair: base + quote,
+      restart: value,
+    };
 
     try {
       const res = await fetch(`/spotbot/calculator/restart`, {

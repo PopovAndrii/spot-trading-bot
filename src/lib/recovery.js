@@ -11,7 +11,7 @@ const ARCHIVE_RE = /^\d+-/;
  * Scans the data/ directory for configs with live orders (NEW/PARTIALLY_FILLED
  * with an orderId). Such orders hang on the exchange, but after a server restart
  * the cycle doesn't walk them and the Save write-lock isn't in effect — a file
- * with live orderIds could be silently overwritten (ANALYSIS.md item 1.5).
+ * with live orderIds could be silently overwritten.
  *
  * @param {string} dataDir - absolute path to the data/ directory.
  * @returns {Promise<Array<{symbol:string, file:string, liveOrders:number}>>}
@@ -39,9 +39,7 @@ async function scanLiveCycles(dataDir) {
       if (data.status === 3 /* Status.DONE */) continue;
 
       const orders = [...(data.BUY || []), ...(data.SELL || [])];
-      const live = orders.filter(
-        (o) => o && o.orderId != null && LIVE_STATES.has(o.status)
-      );
+      const live = orders.filter((o) => o && o.orderId != null && LIVE_STATES.has(o.status));
 
       if (live.length > 0) {
         // symbol from the pair field or from the file name SYMBOL-exchange.json

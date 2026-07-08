@@ -1,3 +1,5 @@
+import { confirmDialog } from './ui/confirmDialog.js';
+
 export class DeleteCurrentSeries {
   constructor(notifications) {
     this.notifications = notifications;
@@ -5,7 +7,16 @@ export class DeleteCurrentSeries {
     new UiElements.Button();
 
     const btn = document.getElementById('delete-current-series');
-    btn?.addEventListener('ui-button-change', (e) => {
+    btn?.addEventListener('ui-button-change', async (e) => {
+      // Deleting the series file is irreversible — guard with a confirm.
+      const ok = await confirmDialog({
+        title: 'Delete current series?',
+        message: `The saved series for ${e.target.dataset.value} will be permanently removed.`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+
       this.delete(e.target.dataset.value);
     });
   }

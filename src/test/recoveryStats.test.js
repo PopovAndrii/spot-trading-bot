@@ -13,8 +13,16 @@ const param = (over = {}) => ({
   ...over,
 });
 
-const buy = (executedQty, cummulativeQuoteQty) => ({ side: 'BUY', executedQty, cummulativeQuoteQty });
-const sell = (executedQty, cummulativeQuoteQty) => ({ side: 'SELL', executedQty, cummulativeQuoteQty });
+const buy = (executedQty, cummulativeQuoteQty) => ({
+  side: 'BUY',
+  executedQty,
+  cummulativeQuoteQty,
+});
+const sell = (executedQty, cummulativeQuoteQty) => ({
+  side: 'SELL',
+  executedQty,
+  cummulativeQuoteQty,
+});
 
 test('long: leftover on hand → whole-series break-even price', () => {
   // bought 8.773 for 4962.08, sold 7.826 for 4765.98 → 0.947 stranded,

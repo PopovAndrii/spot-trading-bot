@@ -5,7 +5,7 @@ const path = require('path');
 const os = require('os');
 const { scanLiveCycles } = require('../lib/recovery');
 
-// ANALYSIS.md item 1.5 — after a server restart, configs with live orders
+// After a server restart, configs with live orders
 // (NEW/PARTIALLY_FILLED + orderId) must be found by the recovery scan.
 
 async function withTmpDir(files, fn) {
@@ -31,9 +31,7 @@ test('live NEW order with orderId → found', async () => {
 
   await withTmpDir({ 'BNBUSDT-binance.json': config }, async (dir) => {
     const found = await scanLiveCycles(dir);
-    assert.deepEqual(found, [
-      { symbol: 'BNBUSDT', file: 'BNBUSDT-binance.json', liveOrders: 1 },
-    ]);
+    assert.deepEqual(found, [{ symbol: 'BNBUSDT', file: 'BNBUSDT-binance.json', liveOrders: 1 }]);
   });
 });
 

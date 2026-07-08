@@ -64,7 +64,9 @@ export class ConsoleLog {
 
     es.onmessage = (e) => {
       this.#kickWatchdog();
-      try { this.#add(JSON.parse(e.data)); } catch { }
+      try {
+        this.#add(JSON.parse(e.data));
+      } catch {}
     };
 
     // the heartbeat shows up as a named event — it carries no data, only confirms
@@ -91,7 +93,9 @@ export class ConsoleLog {
 
   #reconnect() {
     clearTimeout(this.watchdog);
-    try { this.es?.close(); } catch { }
+    try {
+      this.es?.close();
+    } catch {}
     this.#connect();
   }
 
@@ -114,7 +118,8 @@ export class ConsoleLog {
       this.#renderFilters();
     }
 
-    const show = this.filter === null ||
+    const show =
+      this.filter === null ||
       this.filter === entry.symbol ||
       (this.filter === '__sys__' && entry.symbol === null);
 
@@ -133,13 +138,13 @@ export class ConsoleLog {
     this.content.innerHTML = '';
     let list;
     if (symbol === '__sys__') {
-      list = this.entries.filter(e => e.symbol === null);
+      list = this.entries.filter((e) => e.symbol === null);
     } else if (symbol) {
-      list = this.entries.filter(e => e.symbol === symbol);
+      list = this.entries.filter((e) => e.symbol === symbol);
     } else {
       list = this.entries;
     }
-    list.forEach(e => this.#appendEl(e));
+    list.forEach((e) => this.#appendEl(e));
   }
 
   #renderFilters() {
@@ -147,7 +152,7 @@ export class ConsoleLog {
     this.filtersEl.innerHTML = '';
     this.#addFilterBtn('ALL', null);
     this.#addFilterBtn('SYS', '__sys__');
-    this.symbols.forEach(sym => this.#addFilterBtn(sym, sym));
+    this.symbols.forEach((sym) => this.#addFilterBtn(sym, sym));
     this.#addClearBtn();
   }
 
@@ -163,9 +168,9 @@ export class ConsoleLog {
   // Deletes only entries that match the active filter; the rest are preserved.
   #clearCurrent() {
     if (this.filter === '__sys__') {
-      this.entries = this.entries.filter(e => e.symbol !== null);
+      this.entries = this.entries.filter((e) => e.symbol !== null);
     } else if (this.filter) {
-      this.entries = this.entries.filter(e => e.symbol !== this.filter);
+      this.entries = this.entries.filter((e) => e.symbol !== this.filter);
     } else {
       this.entries = []; // ALL — The current filter covers everything
     }

@@ -1,4 +1,4 @@
-// Price editor dialog (Item 10). Like confirmDialog, but hosts a ui-elements
+// Price editor dialog. Like confirmDialog, but hosts a ui-elements
 // SpinBox so the user can dial a new price with +/- and Apply. Lives OUTSIDE the
 // live orders table, so the per-tick table re-render can't reset the in-progress
 // value (the reason the inline-in-row SpinBox was abandoned). Resolves to the

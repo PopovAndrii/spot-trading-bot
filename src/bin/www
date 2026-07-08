@@ -24,7 +24,7 @@ var server = http.createServer(app);
 
 const wsRouter = new WebSocketRouter();
 
-// Recovery scan (ANALYSIS.md item 1.5): the "running" state lives in memory and
+// Recovery scan: the "running" state lives in memory and
 // doesn't survive a restart. If data/ still has configs with live orders
 // (NEW/PARTIALLY_FILLED + orderId) — they hang on the exchange, but no cycle walks
 // them and the Save write-lock isn't in effect. We mark the symbol ATTENTION: Save
@@ -43,7 +43,7 @@ scanLiveCycles(path.join(__dirname, '../data')).then((found) => {
 // run the shared session middleware on the upgrade request and require a
 // logged-in session (unless STATUS_LOGIN=false). Without this, start/stop
 // trading and the price stream were reachable by any socket, bypassing
-// ensureAuthenticated (req 24 / 16).
+// ensureAuthenticated.
 const sessionMiddleware = app.get('sessionMiddleware');
 
 server.on('upgrade', (req, socket, head) => {
@@ -71,7 +71,7 @@ server.listen(port, '0.0.0.0', () => {
   // Dev live-reload: browser-sync proxies the REAL server (this one, which has
   // the WebSocketRouter) instead of a separate WS-less listener. `ws: true`
   // forwards WebSocket upgrades to the target so trading start/stop works on the
-  // browser-sync port too. (req 23 — merged the two dev HTTP servers into one.)
+  // browser-sync port too. (merged the two dev HTTP servers into one.)
   if (process.env.NODE_ENV === 'development') {
     const browserSync = require('browser-sync').create();
     browserSync.init({
@@ -86,7 +86,7 @@ server.listen(port, '0.0.0.0', () => {
 server.on('error', onError);
 server.on('listening', onListening);
 
-// Graceful shutdown (ANALYSIS item 12): docker stop sends SIGTERM (pm2-runtime
+// Graceful shutdown: docker stop sends SIGTERM (pm2-runtime
 // forwards it). We close HTTP, stop the cycles/streams and let the current
 // iterator pass finish writing (writes are atomic), then exit.
 let shuttingDown = false;

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const JsonTimerSender = require('../modules/jsonTimerSender');
 
-// DEEP_ANALYSIS_PLAN.md Item 10 — manual single-order cancel (cancelManualOrder).
+// Manual single-order cancel (cancelManualOrder).
 // Contract: mark the pull in this.manualPulls OPTIMISTICALLY (before the exchange
 // responds) so the very next readLoop tick already sees `manual` and the engine
 // never re-places ("resurrects") an order whose cancel ACK lagged. A failed/invalid
@@ -12,7 +12,7 @@ const JsonTimerSender = require('../modules/jsonTimerSender');
 function setup() {
   const sender = new JsonTimerSender({}, 'long');
   sender.symbol = 'TESTUSDT';
-  sender.running[sender.symbol] = true;
+  sender.running = true;
 
   const calls = [];
   sender.API = {
@@ -37,7 +37,7 @@ test('cancelManualOrder: cancels on exchange, then records the pull', async () =
 
 test('cancelManualOrder: cycle not running → fail, no API call, no mark', async () => {
   const { sender, calls } = setup();
-  sender.running[sender.symbol] = false;
+  sender.running = false;
 
   const r = await sender.cancelManualOrder({ side: 'BUY', index: 0, orderId: 1 });
 
@@ -49,9 +49,18 @@ test('cancelManualOrder: cycle not running → fail, no API call, no mark', asyn
 test('cancelManualOrder: invalid side / index / orderId → fail, no API call', async () => {
   const { sender, calls } = setup();
 
-  assert.equal((await sender.cancelManualOrder({ side: 'XXX', index: 0, orderId: 1 })).success, false);
-  assert.equal((await sender.cancelManualOrder({ side: 'BUY', index: 1.5, orderId: 1 })).success, false);
-  assert.equal((await sender.cancelManualOrder({ side: 'BUY', index: 0, orderId: null })).success, false);
+  assert.equal(
+    (await sender.cancelManualOrder({ side: 'XXX', index: 0, orderId: 1 })).success,
+    false
+  );
+  assert.equal(
+    (await sender.cancelManualOrder({ side: 'BUY', index: 1.5, orderId: 1 })).success,
+    false
+  );
+  assert.equal(
+    (await sender.cancelManualOrder({ side: 'BUY', index: 0, orderId: null })).success,
+    false
+  );
   assert.equal(calls.length, 0);
   assert.equal(sender.manualPulls.BUY.size, 0);
 });

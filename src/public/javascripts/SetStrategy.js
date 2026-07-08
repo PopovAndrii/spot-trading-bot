@@ -77,7 +77,7 @@ export class SetStrategy {
       'field-orderSize': data['minNotional'], // 0.028, // >= 10$
       'info-minQuoteAsset': '(min: ' + data['minQuoteAsset'] + ' ' + data['quoteAsset'] + ')',
       'field-profit': 0.4, // %
-      'field-commission': 0.20, // %
+      'field-commission': 0.2, // %
       'field-fibonachiStep': 0.6,
       'field-martingail': 68, // %
       'field-indent': 0.1, // %

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { decimalCount, roundToStep } = require('../lib/format');
 
-// Extracted from two copies in routes/spotbot.js (ANALYSIS item 14).
+// Extracted from two copies in routes/spotbot.js.
 
 test('decimalCount: exchange filter values', () => {
   assert.equal(decimalCount('0.001'), 3);

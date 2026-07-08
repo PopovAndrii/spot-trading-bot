@@ -54,7 +54,10 @@ export class CancelAllOrders {
       const data = await res.json();
 
       if (data.success) {
-        this.notifications.showNotification(`${data.message} active orders cancelled per pair ${currency}`, 'success');
+        this.notifications.showNotification(
+          `${data.message} active orders cancelled per pair ${currency}`,
+          'success'
+        );
         this.deleteCurrentSeries?.enable();
       } else {
         this.notifications.showNotification(data.message, 'danger');

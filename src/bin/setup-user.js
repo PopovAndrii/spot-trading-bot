@@ -21,7 +21,12 @@ const MIN_PASSWORD_LENGTH = 8;
 
 function question(query) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => rl.question(query, (a) => { rl.close(); resolve(a); }));
+  return new Promise((resolve) =>
+    rl.question(query, (a) => {
+      rl.close();
+      resolve(a);
+    })
+  );
 }
 
 // Hidden input: show a hint, mask characters with asterisks.
@@ -64,17 +69,23 @@ const quote = (v) => `'${v}'`;
 // Asks for a key+secret pair. required=true — keeps asking until entered;
 // otherwise, an empty key = skip (returns null).
 async function askKeyPair(title, { required = false } = {}) {
-  for (; ;) {
+  for (;;) {
     console.log(`\n${title}${required ? ' (required)' : ' (Enter — skip)'}:`);
     const key = (await question('  API key: ')).trim();
     if (!key) {
-      if (required) { console.log('  🔴 Keys are required for this mode'); continue; }
+      if (required) {
+        console.log('  🔴 Keys are required for this mode');
+        continue;
+      }
       console.log('  ⏭  omitted');
       return null;
     }
     const secret = (await hiddenQuestion('  API secret: ')).trim();
     if (!secret) {
-      if (required) { console.log('  🔴 secret is required'); continue; }
+      if (required) {
+        console.log('  🔴 secret is required');
+        continue;
+      }
       console.log('  🔴 secret is empty — pair skipped');
       return null;
     }
@@ -110,7 +121,11 @@ async function askKeyPair(title, { required = false } = {}) {
   }
 
   content = upsertEnv(content, 'ADMIN_LOGIN', login);
-  content = upsertEnv(content, 'ADMIN_PASSWORD_HASH', quote(bcrypt.hashSync(password, SALT_ROUNDS)));
+  content = upsertEnv(
+    content,
+    'ADMIN_PASSWORD_HASH',
+    quote(bcrypt.hashSync(password, SALT_ROUNDS))
+  );
 
   // We generate SESSION_SECRET only if it is empty/missing, to avoid logging out.
   if (!getEnvValue(content, 'SESSION_SECRET')) {
@@ -119,15 +134,20 @@ async function askKeyPair(title, { required = false } = {}) {
   }
 
   // --- operating mode ---
-  const modeAns = (await question('\nMode — [t]est / [r]eal (default test): ')).trim().toLowerCase();
+  const modeAns = (await question('\nMode — [t]est / [r]eal (default test): '))
+    .trim()
+    .toLowerCase();
   const mode = modeAns.startsWith('r') ? 'real' : 'test';
   content = upsertEnv(content, 'BINANCE_MODE', mode);
   console.log(`   BINANCE_MODE=${mode}`);
 
   // --- runtime ---
   // NODE_ENV: production for defaul (development up browser-sync).
-  const envAns = (await question('\nNODE_ENV — [p]roduction / [d]evelopment (default production): '))
-    .trim().toLowerCase();
+  const envAns = (
+    await question('\nNODE_ENV — [p]roduction / [d]evelopment (default production): ')
+  )
+    .trim()
+    .toLowerCase();
   const nodeEnv = envAns.startsWith('d') ? 'development' : 'production';
   content = upsertEnv(content, 'NODE_ENV', nodeEnv);
   console.log(`   NODE_ENV=${nodeEnv}`);
@@ -135,11 +155,13 @@ async function askKeyPair(title, { required = false } = {}) {
   // --- HTTP request logging level ---
   // off — no request logs; app — app routes only (hides the static asset flood); all — everything.
   const logAns = (await question('\nHTTP_LOG — [o]ff / [a]pp / a[l]l (default app): '))
-    .trim().toLowerCase();
-  const httpLog =
-    logAns.startsWith('o') ? 'off'
-      : (logAns === 'all' || logAns.startsWith('l')) ? 'all'
-        : 'app';
+    .trim()
+    .toLowerCase();
+  const httpLog = logAns.startsWith('o')
+    ? 'off'
+    : logAns === 'all' || logAns.startsWith('l')
+      ? 'all'
+      : 'app';
   content = upsertEnv(content, 'HTTP_LOG', httpLog);
   console.log(`   HTTP_LOG=${httpLog}`);
 
@@ -164,7 +186,9 @@ async function askKeyPair(title, { required = false } = {}) {
   fs.writeFileSync(ENV_PATH, content, 'utf8');
   try {
     fs.chmodSync(ENV_PATH, 0o600); // secrets — for the owner only
-  } catch { /* in some containers, chmod may be prohibited */ }
+  } catch {
+    /* in some containers, chmod may be prohibited */
+  }
 
   console.log(`\n✅ Saved in ${ENV_PATH}`);
   console.log(`   ADMIN_LOGIN=${login}`);
@@ -173,7 +197,9 @@ async function askKeyPair(title, { required = false } = {}) {
   // No more crashes: if no real keys are present, the application automatically switches to testnet.
   const hasReal = getEnvValue(content, 'API_KEY') && getEnvValue(content, 'API_SECRET');
   if (mode === 'real' && !hasReal) {
-    console.log('⚠️  Real mode is selected, but there are no real keys — the application will run on the testnet (fallback).');
+    console.log(
+      '⚠️  Real mode is selected, but there are no real keys — the application will run on the testnet (fallback).'
+    );
   }
   console.log('ℹ️  Restart the application so it re-reads file settings.');
   process.exit(0);

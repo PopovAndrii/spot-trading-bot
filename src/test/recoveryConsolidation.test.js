@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { needsRecoveryConsolidation } = require('../modules/jsonTimerSender');
 
-// Step 3 — detector for "entry grid exhausted + overlapping closes". Pure function,
+// Detector for "entry grid exhausted + overlapping closes". Pure function,
 // testable without the exchange. true only when ALL entries are FILLED and there
 // are ≥2 live NEW closes (the typical result of a burst fill on a testnet wick).
 
@@ -24,7 +24,7 @@ test('long: all BUY filled but only ONE live close → false (healthy, let it ri
   assert.equal(needsRecoveryConsolidation(obj, 'long'), false);
 });
 
-test('long: not all BUY filled → false (mid-grid is Step 2 territory)', () => {
+test('long: not all BUY filled → false (mid-grid territory)', () => {
   const obj = {
     BUY: [o('FILLED'), o('FILLED'), o('NEW', { orderId: 9 })],
     SELL: [o('NEW', { orderId: 1 }), o('NEW', { orderId: 2 }), o(null)],

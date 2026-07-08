@@ -8,10 +8,11 @@ const { StreamAPI } = require('../lib/streamAPI');
 const { Calculator } = require('../lib/calculator');
 const { writeFileAtomic } = require('../lib/atomicWrite');
 const { recoveryStats } = require('../lib/recoveryStats');
+const telegram = require('../lib/telegram');
 
 /**
  * Decides whether the growth of an order's partial fill should be persisted.
- * Pure function — testable without the exchange (REQUIREMENTS.md item 20).
+ * Pure function — testable without the exchange.
  *
  * @param {Object} stored - the order stored in config (obj[side][id]).
  * @param {Object} message - the API response (getOrder) for this order.
@@ -62,6 +63,24 @@ function manualStuckSlots(obj, pending = { BUY: new Map(), SELL: new Map() }) {
   return out;
 }
 
+// Realized quote flow of a finished cycle from the ACTUAL fills: Σ(SELL quote) −
+// Σ(BUY quote) over FILLED orders. For both long and short this equals the cycle
+// profit in the quote asset (long: buy low / sell high; short: sell high / buy
+// back low — the sign works out either way). Read-only — used only for the
+// Telegram completion notice. Pure/testable.
+function cycleProfit(obj) {
+  const sumFilledQuote = (arr) =>
+    (arr || []).reduce((acc, o) => {
+      if (!o || o.status !== 'FILLED') return acc;
+      const quote =
+        o.cummulativeQuoteQty !== undefined && o.cummulativeQuoteQty !== null
+          ? parseFloat(o.cummulativeQuoteQty)
+          : (parseFloat(o.price) || 0) * (parseFloat(o.executedQty ?? o.quantity) || 0);
+      return acc + (Number.isFinite(quote) ? quote : 0);
+    }, 0);
+  return sumFilledQuote(obj?.SELL) - sumFilledQuote(obj?.BUY);
+}
+
 function partialFillDelta(stored, message) {
   if (!message || message.status !== 'PARTIALLY_FILLED') return null;
   if (message.executedQty === undefined) return null;
@@ -82,7 +101,8 @@ class JsonTimerSender extends EventEmitter {
     this.symbol = null;
     this.strategy = strategy;
     this.autoRestart = false;
-    this.running = {};
+    this.running = false;
+    this.watching = false;
     this.exchangeName = 'binance';
 
     this.busy = false;
@@ -92,6 +112,7 @@ class JsonTimerSender extends EventEmitter {
 
     this.baseAsset = '';
     this.quoteAsset = '';
+    this.tickDecimals = 2; // price decimals for notifications; refreshed from the grid on start
 
     this.API = InvokeApi.getInstance();
     this.job = new Job(process.env.STATUS_APP ? false : true); // Test === true
@@ -106,17 +127,17 @@ class JsonTimerSender extends EventEmitter {
   }
 
   getSpotStatus(symbol) {
-    return this.running[symbol];
+    return this.symbol === symbol ? this.running : false;
   }
 
   /**
-   * Out-of-band readLoop tick — a reaction to executionReport (ANALYSIS item 10).
+   * Out-of-band readLoop tick — a reaction to executionReport.
    * 50 ms is a debounce in case of a burst of reports (a series of partial fills).
    * If a pass is already running (busy) — do nothing: it'll pick up the fresh
    * statuses via getOrder, and the next tick schedules readLoop as usual.
    */
   #kickTick() {
-    if (!this.running[this.symbol]) return;
+    if (!this.running) return;
     if (this.busy) return;
 
     clearTimeout(this.timer);
@@ -213,7 +234,7 @@ class JsonTimerSender extends EventEmitter {
    * Mixes fresh live edits from the file into obj before the iterator writes.
    * A #jobIterator pass is long (a sleep per order) and writes the WHOLE obj: without
    * the merge, a param edit (/calculator/param) or restart (/calculator/restart) made
-   * during the pass would be silently lost — a lost update (ANALYSIS.md item 1.3).
+   * during the pass would be silently lost — a lost update.
    * We don't touch orders (BUY/SELL): their only writer during a cycle is the
    * iterator itself (Save is held by a write-lock while the pair is running).
    */
@@ -226,7 +247,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async cancelManualOrder({ side, index, orderId } = {}) {
-    if (!this.running[this.symbol]) {
+    if (!this.running) {
       return { success: false, message: 'cycle is not running' };
     }
     if ((side !== 'BUY' && side !== 'SELL') || !Number.isInteger(index) || orderId == null) {
@@ -264,7 +285,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async replaceManualOrder({ side, index, price } = {}) {
-    if (!this.running[this.symbol]) {
+    if (!this.running) {
       return { success: false, message: 'cycle is not running' };
     }
     const priceNum = Number(price);
@@ -337,7 +358,7 @@ class JsonTimerSender extends EventEmitter {
       if (fresh.param) obj.param = fresh.param;
       if ('restart' in fresh) obj.restart = fresh.restart;
 
-      // Manual-pull marker (Item 10): a manual single-order cancel writes
+      // Manual-pull marker: a manual single-order cancel writes
       // { status: CANCELED, manual: true } straight to the grid file. The robot
       // owns the file and rewrites it every tick, so without this merge its
       // write would clobber that flag. Carry a manual pull (with its canceled
@@ -366,7 +387,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   /**
-   * Step 3: the entry grid is exhausted (all entries FILLED) and the closes
+   * The entry grid is exhausted (all entries FILLED) and the closes
    * overlapped (≥2 live NEW — a burst fill on a wick). There's nothing left to
    * average into, while several closes hang on pieces of one position. Action:
    * pull the overlapping closes on the exchange, write ONE close at the deepest
@@ -409,6 +430,41 @@ class JsonTimerSender extends EventEmitter {
     return true;
   }
 
+  // Trade-event notices over Telegram, driven by the POLL loop — the user stream
+  // is a latency optimization and must not be a prerequisite for notifications
+  // (on testnet it was silently down for weeks). Called once per persisted slot
+  // transition: placement, cancel, and the NEW→FILLED / PARTIAL→FILLED edge.
+  #notifyOrderEvent(currentOrder, message, slot) {
+    const num = currentOrder.id + 1;
+    const side = message.side || currentOrder.side || '';
+
+    // One-line-per-event notices batched under the pair header by #jobIterator
+    // (telegram.open/flush). The symbol lives in the batch header, so lines omit it.
+    if (currentOrder.method === 'cancelOrder') {
+      telegram.push(this.symbol, `canceled ${side} #${num}`);
+      return;
+    }
+
+    if (currentOrder.method === 'newOrder') {
+      telegram.push(
+        this.symbol,
+        `placed ${side} #${num} ${currentOrder.data?.quantity} @ ${currentOrder.data?.price}`
+      );
+      if (message.status !== 'FILLED') return; // instant taker fill → also report below
+    }
+
+    if (message.status === 'FILLED') {
+      const qty = parseFloat(message.executedQty) || 0;
+      const quote = parseFloat(message.cummulativeQuoteQty) || 0;
+      const avg = qty > 0 ? quote / qty : parseFloat(slot?.price) || 0;
+      telegram.push(
+        this.symbol,
+        `filled ${side} #${num} ${qty} @ ${avg.toFixed(this.tickDecimals)}` +
+          ` ≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
+      );
+    }
+  }
+
   /**
    * Iterates through the entire table of placed orders.
    * @param {Object} obj - Configuration of order data from file or database.
@@ -418,15 +474,17 @@ class JsonTimerSender extends EventEmitter {
     const strategy = this.#strategy();
 
     if (obj.status == Status.READY && strategy != null) {
-
       if (await this.#maybePrepareRecoveryClose(obj, strategy)) return;
+
+      // Batch this pass's per-order notices into one Telegram message; flushed in
+      // readLoop's finally (and before the Done finale below). See telegram.js.
+      telegram.open(this.symbol);
 
       let i = 0;
 
       // never started 0
       for (const [key, val] of obj[strategy.side].entries()) {
-
-        if (!this.running[this.symbol]) return;
+        if (!this.running) return;
 
         const cellStatus = obj[strategy.side][key]['status'];
         if (
@@ -453,8 +511,8 @@ class JsonTimerSender extends EventEmitter {
             const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
             logBus.log(
               `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
-              `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
-              `Funds are on the exchange; decide manually (swap or keep).`
+                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+                `Funds are on the exchange; decide manually (swap or keep).`
             );
           }
 
@@ -466,6 +524,19 @@ class JsonTimerSender extends EventEmitter {
           await this.#mergeLiveEdits(obj);
 
           this.autoRestart = obj.restart == true ? true : false;
+
+          // Flush any batched order lines from this pass before the standalone
+          // finale, so the chat reads batch → Done → Restart, not Done mixed in.
+          telegram.flush(this.symbol);
+
+          // Telegram: cycle finished — realized profit in the quote asset from the
+          // actual fills (read-only, does not touch trading).
+          const profit = cycleProfit(obj);
+          telegram.send(
+            `🏁 <b>Done</b> ${this.symbol}\n` +
+              `Profit: <b>${profit >= 0 ? '+' : ''}${profit.toFixed(this.tickDecimals)}</b> ${this.quoteAsset || ''}\n` +
+              `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+          );
 
           await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
 
@@ -488,7 +559,6 @@ class JsonTimerSender extends EventEmitter {
             this.stop();
             return;
           }
-
         }
 
         if (currentOrder.status === 'pass') {
@@ -504,12 +574,11 @@ class JsonTimerSender extends EventEmitter {
         }
 
         if (result.message.status === currentOrder.status) {
-
           const stored = obj[result.message.side]?.[currentOrder['id']];
           const delta = partialFillDelta(stored, result.message);
 
           if (delta) {
-            if (!this.running[this.symbol]) return;
+            if (!this.running) return;
             Object.assign(stored, delta);
             await this.#mergeLiveEdits(obj);
             await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
@@ -529,11 +598,17 @@ class JsonTimerSender extends EventEmitter {
           toObj.cummulativeQuoteQty = parseFloat(result.message.cummulativeQuoteQty) || 0;
         }
 
-        if (!this.running[this.symbol]) return;
+        if (!this.running) return;
 
         // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
         Object.assign(obj[result.message.side][currentOrder['id']], toObj);
+
+        this.#notifyOrderEvent(
+          currentOrder,
+          result.message,
+          obj[result.message.side][currentOrder['id']]
+        );
 
         await this.#mergeLiveEdits(obj);
         await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
@@ -544,7 +619,7 @@ class JsonTimerSender extends EventEmitter {
   }
 
   async readLoop() {
-    if (!this.running[this.symbol]) return;
+    if (!this.running) return;
 
     try {
       const content = await fs.readFile(this.#filePath(), 'utf8');
@@ -566,7 +641,12 @@ class JsonTimerSender extends EventEmitter {
 
         this.#jobIterator(data)
           .catch((err) => console.error('jobIterator:', err))
-          .finally(() => { this.busy = false; });
+          .finally(() => {
+            // Send this pass's batched order notices as one framed message. No-op
+            // when nothing was queued (the common quiet tick) or already flushed.
+            telegram.flush(this.symbol);
+            this.busy = false;
+          });
       }
 
       this.#remindManualStuck(data);
@@ -581,7 +661,7 @@ class JsonTimerSender extends EventEmitter {
       console.error(this.#filePath(), 'Error reading file:', err);
     }
 
-    if (!this.running[this.symbol]) return;
+    if (!this.running) return;
 
     this.timer = setTimeout(() => this.readLoop(), this.interval || 5000);
   }
@@ -603,9 +683,29 @@ class JsonTimerSender extends EventEmitter {
     }
   }
 
-  async start(symbol, strategy, options = {}) {
+  // Open ONLY the public price stream and forward ticks (emit 'price') without
+  // starting the trading loop — lets the UI show a live price the moment the
+  // user picks Long/Short, before Start. Touches no orders, no user stream and
+  // no cycle state; start() supersedes it (its removeAllListeners('message')
+  // drops this handler and re-adds its own). Idempotent; a no-op while running.
+  watchPrice(symbol) {
+    if (this.running || this.watching) return;
 
-    if (!this.running[symbol]) {
+    this.symbol = symbol;
+    this.watching = true;
+
+    const api = InvokeApi.getInstance();
+    const streamAPI = api.getPublicStream(symbol);
+
+    streamAPI.removeAllListeners('message');
+    streamAPI.start();
+    streamAPI.on('message', (data) => {
+      this.emit('price', data);
+    });
+  }
+
+  async start(symbol, strategy, options = {}) {
+    if (!this.running) {
       // this.strategy = (this.strategy == null) ? strategy : this.strategy;
       this.strategy = strategy == 'short' ? 'short' : 'long';
 
@@ -628,6 +728,10 @@ class JsonTimerSender extends EventEmitter {
         this.onExecReport = (report) => {
           if (report.s !== symbol) return;
           logBus.log(`⚡ ${symbol} executionReport: ${report.S} ${report.X} (order ${report.i})`);
+
+          // No Telegram here: fill notices are sent by the poll loop
+          // (#notifyOrderEvent), which works even when this stream is down —
+          // the push only shortens the reaction time.
           this.#kickTick();
         };
 
@@ -656,7 +760,7 @@ class JsonTimerSender extends EventEmitter {
         this.emit('streamState', { symbol, up: true, message: msg });
       });
 
-      this.running[symbol] = true;
+      this.running = true;
 
       this.symbol = symbol;
 
@@ -665,6 +769,23 @@ class JsonTimerSender extends EventEmitter {
       const startMsg = `🟢 Start: ${this.symbol} | ${this.strategy} | restart: ${this.autoRestart}`;
       console.log(startMsg);
       logBus.log(startMsg);
+
+      // Telegram: cycle start — price (grid base), strategy, auto-restart status.
+      let startPrice = '';
+      try {
+        const obj = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
+        startPrice = obj?.param?.['field-currency'] || '';
+        const td = parseInt(obj?.param?.['field-tickSize'], 10);
+        if (Number.isInteger(td) && td >= 0) this.tickDecimals = td;
+      } catch {
+        // grid file unreadable — send without a price rather than skip the notice
+      }
+      telegram.send(
+        `🟢 <b>Start</b> ${this.symbol}\n` +
+          `Strategy: <b>${this.strategy}</b>\n` +
+          (startPrice ? `Price: <b>${startPrice}</b> ${this.quoteAsset || ''}\n` : '') +
+          `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+      );
     }
   }
 
@@ -683,7 +804,8 @@ class JsonTimerSender extends EventEmitter {
     StreamAPI.removeInstance(this.symbol);
 
     this.timer = null;
-    this.running[this.symbol] = false;
+    this.running = false;
+    this.watching = false; // stream destroyed above → allow watchPrice() to re-arm
 
     const stopMsg = `🛑 Stop: ${this.symbol}`;
     console.log(stopMsg);
@@ -703,6 +825,9 @@ class JsonTimerSender extends EventEmitter {
       console.log(line);
       logBus.log(line);
       this.emit('recovery', { symbol: this.symbol, text: rec.text });
+      // Same leftover notice over Telegram: the cycle stopped with unsold
+      // inventory on hand and the person decides what to do with it.
+      telegram.send(`💰 <b>Leftover</b> ${this.symbol}\n${rec.text}`);
     } catch (err) {
       console.warn('🟡 recoveryStats failed:', err.message);
     }
@@ -717,14 +842,14 @@ class JsonTimerSender extends EventEmitter {
       // Get current price (and param ??)
       const data = await this.API.bookTicker({ symbol: this.symbol });
 
-      const price = (this.strategy === "long") ? data.message.askPrice : data.message.bidPrice;
+      const price = this.strategy === 'long' ? data.message.askPrice : data.message.bidPrice;
 
       // recalculete
       const settings = {
         ...obj['param'],
         'field-currency': `${price}`,
-        'field-indent': "0",
-      }
+        'field-indent': '0',
+      };
 
       const calc = Calculator.build(settings, this.strategy);
 
@@ -736,8 +861,14 @@ class JsonTimerSender extends EventEmitter {
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
       await writeFileAtomic(filePath, JSON.stringify(tmp, null, 2), 'utf8');
 
-      this.emit('restarted', { symbol: this.symbol, price });
+      // Telegram: the cycle looped — new grid built around the fresh price.
+      telegram.send(
+        `🔄 <b>Restart</b> ${this.symbol}\n` +
+          `Strategy: <b>${this.strategy}</b>\n` +
+          `Price: <b>${price}</b> ${this.quoteAsset || ''}`
+      );
 
+      this.emit('restarted', { symbol: this.symbol, price });
     } catch (err) {
       console.error('❌ Failed to restart cycle:', err);
       this.emit('stopped', this.symbol);
@@ -778,7 +909,7 @@ class JsonTimerSender extends EventEmitter {
         timeInForce: 'GTC',
         orderId: null,
       };
-    })
+    });
 
     return config;
   }
@@ -793,3 +924,4 @@ module.exports.partialFillDelta = partialFillDelta;
 module.exports.markOpenAsCanceled = markOpenAsCanceled;
 module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
 module.exports.manualStuckSlots = manualStuckSlots;
+module.exports.cycleProfit = cycleProfit;

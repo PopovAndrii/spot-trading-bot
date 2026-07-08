@@ -23,7 +23,7 @@ document.getElementById('selectCurrency')?.addEventListener('ui-select-change', 
 });
 
 btn?.addEventListener('ui-button-change', () => {
-  console.log('test')
+  console.log('test');
   if (navigateUrl) window.location.href = navigateUrl;
 });
 
