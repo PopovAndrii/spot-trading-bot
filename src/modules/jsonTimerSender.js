@@ -1,13 +1,7 @@
 const EventEmitter = require('events');
 const fs = require('fs/promises');
 const path = require('path');
-const {
-  Job,
-  Status,
-  rebalancedClose,
-  deepestFilledIndex,
-  bankGridLeg,
-} = require('../lib/job');
+const { Job, Status, rebalancedClose, deepestFilledIndex, bankGridLeg } = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
@@ -742,6 +736,13 @@ class JsonTimerSender extends EventEmitter {
     try {
       const content = await fs.readFile(this.#filePath(), 'utf8');
       const data = JSON.parse(content);
+
+      // Let the API layer format log prices/quantities to this pair's precision
+      // (field-tickSize/field-stepSize hold decimal counts, not raw filter values).
+      this.API.setLogDecimals?.(this.symbol, {
+        price: parseInt(data?.param?.['field-tickSize'], 10),
+        qty: parseInt(data?.param?.['field-stepSize'], 10),
+      });
 
       this.#applyManualPulls(data);
 

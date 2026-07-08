@@ -69,10 +69,7 @@ function scalpObj(over = {}) {
         price: '90.00',
       }),
     ],
-    sells: [
-      mkOrder('SELL', null),
-      mkOrder('SELL', null, { quantity: '2.000', price: '95.38' }),
-    ],
+    sells: [mkOrder('SELL', null), mkOrder('SELL', null, { quantity: '2.000', price: '95.38' })],
     param: { 'field-gridLevel': '2', 'field-profit': '0.2', 'field-commission': '0.2' },
     ...over,
   });
@@ -238,10 +235,7 @@ test('yield: scalp off + resting full close → classic keeps polling it', () =>
 
 test('yield: manual-pulled close in the scalp zone → pass (user decision wins)', () => {
   const obj = scalpObj({
-    sells: [
-      mkOrder('SELL', null),
-      mkOrder('SELL', 'CANCELED', { orderId: 304, manual: true }),
-    ],
+    sells: [mkOrder('SELL', null), mkOrder('SELL', 'CANCELED', { orderId: 304, manual: true })],
   });
   const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.status, 'pass');
@@ -314,10 +308,7 @@ test('canceled predecessor already closed the whole rung → REARM (banked de-fa
 //   micro      = 110 × (1 − 0.003)  = 109.67  (> split → cap ok)
 function scalpShortObj(over = {}) {
   return mkObj({
-    buys: [
-      mkOrder('BUY', null),
-      mkOrder('BUY', null, { quantity: '2.000', price: '104.58' }),
-    ],
+    buys: [mkOrder('BUY', null), mkOrder('BUY', null, { quantity: '2.000', price: '104.58' })],
     sells: [
       mkOrder('SELL', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 }),
       mkOrder('SELL', 'FILLED', {

@@ -7,6 +7,10 @@ const logBus = require('./logBus');
 class InvokeApi {
   static #instance = null;
 
+  // symbol → { price, qty } decimal counts (from field-tickSize/field-stepSize),
+  // registered by the running cycle; used only to format log output.
+  #logDecimals = new Map();
+
   // Single entry point for the client: a singleton without the "constructor
   // returns a different instance" antipattern. Previously `new InvokeApi()`
   // returned an already-existing object — instanceof survived it, but the
@@ -97,6 +101,24 @@ class InvokeApi {
     return this.client;
   }
 
+  setLogDecimals(symbol, { price, qty } = {}) {
+    this.#logDecimals.set(symbol, {
+      price: Number.isInteger(price) && price >= 0 ? price : null,
+      qty: Number.isInteger(qty) && qty >= 0 ? qty : null,
+    });
+  }
+
+  // "553.58000000" -> "553.58" using the pair's decimals ("1.00000000" -> "1.00"
+  // when tickSize is 2); falls back to trailing-zero trim when decimals are unknown.
+  #fmtNum(symbol, value, kind) {
+    const dec = this.#logDecimals.get(symbol)?.[kind];
+    const n = Number(value);
+    if (dec != null && Number.isFinite(n)) return n.toFixed(dec);
+    return String(value)
+      .replace(/(\.\d*?)0+$/, '$1')
+      .replace(/\.$/, '');
+  }
+
   async newOrder(data) {
     try {
       const res = await this.#withRateLimitRetry(() =>
@@ -111,8 +133,8 @@ class InvokeApi {
         res.data.symbol,
         res.data.status,
         res.data.side,
-        res.data.price,
-        res.data.origQty,
+        this.#fmtNum(res.data.symbol, res.data.price, 'price'),
+        this.#fmtNum(res.data.symbol, res.data.origQty, 'qty'),
       ];
 
       this.getConsoleMsg(`newOrder(${data.id}) ${msg.join(' | ')}`);
@@ -137,8 +159,8 @@ class InvokeApi {
         res.data.symbol,
         res.data.status,
         res.data.side,
-        res.data.price,
-        res.data.origQty,
+        this.#fmtNum(res.data.symbol, res.data.price, 'price'),
+        this.#fmtNum(res.data.symbol, res.data.origQty, 'qty'),
       ];
 
       this.getConsoleMsg(`getOrder(${data.id}) ${msg.join(' | ')}`);
@@ -164,8 +186,8 @@ class InvokeApi {
         res.data.symbol,
         res.data.status,
         res.data.side,
-        res.data.price,
-        res.data.origQty,
+        this.#fmtNum(res.data.symbol, res.data.price, 'price'),
+        this.#fmtNum(res.data.symbol, res.data.origQty, 'qty'),
       ];
 
       this.getConsoleMsg(`cancelOrder() ${msg.join(' | ')}`);

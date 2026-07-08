@@ -590,8 +590,7 @@ class Job {
 
   hybridLong = (obj, i, el) => this.#pauseScalp(obj, i, el, 'long', 'BUY', 'SELL', this.long);
 
-  hybridShort = (obj, i, el) =>
-    this.#pauseScalp(obj, i, el, 'short', 'SELL', 'BUY', this.short);
+  hybridShort = (obj, i, el) => this.#pauseScalp(obj, i, el, 'short', 'SELL', 'BUY', this.short);
 
   // The whole-position close over the REAL fills: everything held across filled
   // entries 0..D minus everything already sold/bought back by partial or micro
@@ -616,8 +615,7 @@ class Job {
     const closes = (obj[closeSide] || []).filter((c) => (Number(c?.executedQty) || 0) > 0);
 
     const p = obj.param || {};
-    const fees =
-      (parseFloat(p['field-profit']) || 0) + (parseFloat(p['field-commission']) || 0);
+    const fees = (parseFloat(p['field-profit']) || 0) + (parseFloat(p['field-commission']) || 0);
 
     const res = rebalanceClose(entries, closes, strategy, fees);
     if (!res) return null; // position already fully closed
@@ -816,7 +814,6 @@ class Job {
       .toFixed(step);
     return { quantity, price };
   }
-
 }
 
 module.exports = {
