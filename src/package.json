@@ -12,6 +12,8 @@
     "prod-runtime": "pm2-runtime start ./bin/www --name my-app",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
+    "lint:css": "stylelint \"scss/**/*.scss\"",
+    "lint:css:fix": "stylelint \"scss/**/*.scss\" --fix",
     "watch-css": "sass --style=compressed --no-source-map --watch scss/:public/stylesheets/"
   },
   "dependencies": {
@@ -42,6 +44,10 @@
     "nodemon": "^3.1.14",
     "prettier": "^3.8.4",
     "qrcode": "^1.5.4",
-    "sass": "^1.101.0"
+    "sass": "^1.101.0",
+    "stylelint": "^17.14.0",
+    "stylelint-config-standard-scss": "^17.0.0",
+    "@stylistic/stylelint-config": "^5.0.0",
+    "@stylistic/stylelint-plugin": "^5.2.1"
   }
 }
