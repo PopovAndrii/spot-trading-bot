@@ -460,7 +460,7 @@ class JsonTimerSender extends EventEmitter {
       telegram.push(
         this.symbol,
         `filled ${side} #${num} ${qty} @ ${avg.toFixed(this.tickDecimals)}` +
-          ` ≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
+        ` ≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
       );
     }
   }
@@ -511,8 +511,8 @@ class JsonTimerSender extends EventEmitter {
             const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
             logBus.log(
               `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
-                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
-                `Funds are on the exchange; decide manually (swap or keep).`
+              `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+              'Funds are on the exchange; decide manually (swap or keep).'
             );
           }
 
@@ -534,8 +534,8 @@ class JsonTimerSender extends EventEmitter {
           const profit = cycleProfit(obj);
           telegram.send(
             `🏁 <b>Done</b> ${this.symbol}\n` +
-              `Profit: <b>${profit >= 0 ? '+' : ''}${profit.toFixed(this.tickDecimals)}</b> ${this.quoteAsset || ''}\n` +
-              `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+            `Profit: <b>${profit >= 0 ? '+' : ''}${profit.toFixed(this.tickDecimals)}</b> ${this.quoteAsset || ''}\n` +
+            `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
           );
 
           await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
@@ -782,9 +782,9 @@ class JsonTimerSender extends EventEmitter {
       }
       telegram.send(
         `🟢 <b>Start</b> ${this.symbol}\n` +
-          `Strategy: <b>${this.strategy}</b>\n` +
-          (startPrice ? `Price: <b>${startPrice}</b> ${this.quoteAsset || ''}\n` : '') +
-          `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+        `Strategy: <b>${this.strategy}</b>\n` +
+        (startPrice ? `Price: <b>${startPrice}</b> ${this.quoteAsset || ''}\n` : '') +
+        `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
       );
     }
   }
@@ -864,8 +864,8 @@ class JsonTimerSender extends EventEmitter {
       // Telegram: the cycle looped — new grid built around the fresh price.
       telegram.send(
         `🔄 <b>Restart</b> ${this.symbol}\n` +
-          `Strategy: <b>${this.strategy}</b>\n` +
-          `Price: <b>${price}</b> ${this.quoteAsset || ''}`
+        `Strategy: <b>${this.strategy}</b>\n` +
+        `Price: <b>${price}</b> ${this.quoteAsset || ''}`
       );
 
       this.emit('restarted', { symbol: this.symbol, price });

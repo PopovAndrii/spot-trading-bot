@@ -7,7 +7,7 @@ export class LoadInfo {
 
   async loadPersonalInfo() {
     try {
-      const res = await fetch(`/info/account-info`, {
+      const res = await fetch('/info/account-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

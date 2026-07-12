@@ -45,7 +45,7 @@ export class CancelAllOrders {
 
   async cancel(currency) {
     try {
-      const res = await fetch(`/spotbot/cancel/allorders`, {
+      const res = await fetch('/spotbot/cancel/allorders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: currency }),

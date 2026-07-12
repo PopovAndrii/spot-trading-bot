@@ -40,7 +40,7 @@ test('long: leftover on hand → whole-series break-even price', () => {
   assert.equal(
     r.text,
     'If you want to stop the session, to break even you need to sell 0.947 BNB at no less than 207.49. ' +
-      "This is a one-time sell — you don't need to buy it back afterwards."
+    "This is a one-time sell — you don't need to buy it back afterwards."
   );
 });
 
