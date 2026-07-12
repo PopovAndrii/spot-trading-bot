@@ -497,7 +497,7 @@ class JsonTimerSender extends EventEmitter {
     console.log(line);
     logBus.log(line);
 
-    this.stop();
+    this.stop().catch((err) => console.error('stop():', err));
     return true;
   }
 
@@ -730,7 +730,7 @@ class JsonTimerSender extends EventEmitter {
             }
 
             await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
-            this.stop();
+            this.stop().catch((err) => console.error('stop():', err));
             return;
           }
         }
@@ -981,18 +981,31 @@ class JsonTimerSender extends EventEmitter {
     // (cleanup, shutdown sweep) — those must not notify.
     const wasRunning = this.running;
 
+    // STATE FIRST, teardown second, and nothing between them may throw.
+    //
+    // stop() is called fire-and-forget from the DONE branch (`this.stop()`, no await,
+    // no catch), so anything that throws before `running = false` leaves the engine
+    // reporting itself alive forever: getSpotStatus keeps saying "running", the
+    // 'stopped' event never fires, and the UI stays locked on a finished cycle with
+    // no way back short of a server restart. The stream teardown below is exactly
+    // that kind of code — getUserStream() can be null when the socket dropped and is
+    // mid-reconnect, which is precisely what happens during a burst of fills.
     clearTimeout(this.timer);
-
-    if (this.onExecReport) {
-      this.API.getUserStream().removeListener('executionReport', this.onExecReport);
-      this.onExecReport = null;
-    }
-
-    StreamAPI.removeInstance(this.symbol);
-
     this.timer = null;
     this.running = false;
-    this.watching = false; // stream destroyed above → allow watchPrice() to re-arm
+    this.watching = false; // stream destroyed below → allow watchPrice() to re-arm
+
+    try {
+      if (this.onExecReport) {
+        this.API?.getUserStream()?.removeListener('executionReport', this.onExecReport);
+        this.onExecReport = null;
+      }
+      StreamAPI.removeInstance(this.symbol);
+    } catch (err) {
+      // A leaked listener or a stream instance is a leak, not a reason to keep a
+      // finished cycle "running" — the transition has already happened above.
+      console.warn('🟡 stop(): stream teardown failed:', err.message);
+    }
 
     const stopMsg = `🛑 Stop: ${this.symbol}`;
     console.log(stopMsg);
