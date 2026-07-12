@@ -33,50 +33,36 @@
           </div>
           <div id="group-spinbox">
             <div class="line">
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-deposit' , label:'Available balance' , min: 0 , max: 0 , step: formatInfo.tickSize || 0, hint:'Retrieving your available balance from the exchange. Click the Long/Short button. You can also reduce your balance. The order grid is calculated based on the balance shown in this field. Do not increase your balance in this field if it is insufficient!' }); %>
-              </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-orderSize' , label:'Order Size' , min: 0 , max: 0 , step: formatInfo.stepSize || 0, hint:'Size of the first order. It must not be less than the amount specified for the exchange. It is usually set at +5% higher.' }); %>
-              </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-profit' , label:'Profit 0.1 - 0.4' , min: 0.1 , step: 1, max: 0, hint:'Profit is usually up to 1%. The optimal range is 0.2–0.5%.' }); %>
-              </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-commission' , label:'Exchange commission' , min: 0.2 , step: 2, max: 2, hint:'Generally, the commission on Binance is 0.25%. However, you may be eligible for a bonus commission of 0.1%. Please keep this in mind.' }); %>
-              </div>
+              <%- include('../views/ui/SpinBox', { id:'field-deposit' , label:'Available balance' , min: 0 , max: 0 , step: formatInfo.tickSize || 0, hint:'Retrieving your available balance from the exchange. Click the Long/Short button. You can also reduce your balance. The order grid is calculated based on the balance shown in this field. Do not increase your balance in this field if it is insufficient!' }); %>
+              <%- include('../views/ui/SpinBox', { id:'field-orderSize' , label:'Order Size' , min: 0 , max: 0 , step: formatInfo.stepSize || 0, hint:'Size of the first order. It must not be less than the amount specified for the exchange. It is usually set at +5% higher.' }); %>
+              <%- include('../views/ui/SpinBox', { id:'field-profit' , label:'Profit 0.1 - 0.4' , min: 0.1 , step: 1, max: 0, hint:'Profit is usually up to 1%. The optimal range is 0.2–0.5%.' }); %>
+              <%- include('../views/ui/SpinBox', { id:'field-commission' , label:'Exchange commission' , min: 0.2 , step: 2, max: 2, hint:'Generally, the commission on Binance is 0.25%. However, you may be eligible for a bonus commission of 0.1%. Please keep this in mind.' }); %>
             </div>
 
             <div class="line">
-              <div class="">Progression strategy
-                <span class="UIql UIql--click" tabindex="0"><span class="UIql__text">Increase in order size across the grid: with the progressive method, each step is scaled by a fixed multiplier; with the Fibonacci method, the Fibonacci sequence is used. This determines how quickly the deposit is used up as the grid progresses. The Fibonacci method is the most effective.</span></span>
-                <div class="UIselect lg" id="strategyList" tabindex="0" role="listbox" aria-haspopup="listbox">
-                  <span class="UIselect-selected">Select</span>
-                  <span class="UIselect-arrow">
-                    <svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M7 12 1.4 5.6c-.7-.8-.1-2 1-2h11.5a1.2 1.2 0 0 1 .9 2L9 12.2q-.9.8-1.8 0" />
-                    </svg>
-                  </span>
-                  <input type="hidden" name="strategyList">
-                  <ul class="UIselect-options" hidden>
-                    <li class="UIselect-options__items" aria-hidden="true">
-                      <ul role="group">
-                        <li role="option" data-value=' progressive'>Progressive</li>
-                        <li role="option" data-value='fibonacci'>Fibonacci</li>
-                      </ul>
-                    </li>
-                  </ul>
-                </div>
+              <div class="UIselect lg expand" id="strategyList" tabindex="0" role="listbox" aria-haspopup="listbox" aria-labelledby="strategyList-caption">
+                <span class="UIlabel" id="strategyList-caption">Progression strategy
+                  <span class="UIql UIql--click" tabindex="0"><span class="UIql__text">Increase in order size across the grid: with the progressive method, each step is scaled by a fixed multiplier; with the Fibonacci method, the Fibonacci sequence is used. This determines how quickly the deposit is used up as the grid progresses. The Fibonacci method is the most effective.</span></span>
+                </span>
+                <span class="UIselect-selected">Select</span>
+                <span class="UIselect-arrow">
+                  <svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M7 12 1.4 5.6c-.7-.8-.1-2 1-2h11.5a1.2 1.2 0 0 1 .9 2L9 12.2q-.9.8-1.8 0" />
+                  </svg>
+                </span>
+                <input type="hidden" name="strategyList">
+                <ul class="UIselect-options" hidden>
+                  <li class="UIselect-options__items" aria-hidden="true">
+                    <ul role="group">
+                      <li role="option" data-value=' progressive'>Progressive</li>
+                      <li role="option" data-value='fibonacci'>Fibonacci</li>
+                    </ul>
+                  </li>
+                </ul>
               </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 20 , max: 150 , step: 0, hint:'The Martingale factor affects the size of the gap in the closing order (final sale). The higher the Martingale factor, the more effectively and frequently the end of the series is triggered. However, this causes the balance to be depleted very quickly. With a low Martingale factor, the order grid is very wide and provides good overlap in percentage terms. However, the final order in the series is located slightly further away than desired. Range: minimum 25-35; optimal 35-80; excellent 80-100+.' }); %>
-              </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0.01 , max: 2 , step: 2, hint:'Progressive Step—allows you to control the percentage of overlap between price drops (Long) and rises (Short). The greater the overlap (>20%), the lower the risk-which is good. At the same time, orders are triggered less frequently-which is bad. You need to find the optimal balance depending on the amount of currency in your exchange account.'}); %>
-              </div>
-              <div class="">
-                <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
-              </div>
+              <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 20 , max: 150 , step: 0, hint:'The Martingale factor affects the size of the gap in the closing order (final sale). The higher the Martingale factor, the more effectively and frequently the end of the series is triggered. However, this causes the balance to be depleted very quickly. With a low Martingale factor, the order grid is very wide and provides good overlap in percentage terms. However, the final order in the series is located slightly further away than desired. Range: minimum 25-35; optimal 35-80; excellent 80-100+.' }); %>
+              <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0.01 , max: 2 , step: 2, hint:'Progressive Step—allows you to control the percentage of overlap between price drops (Long) and rises (Short). The greater the overlap (>20%), the lower the risk-which is good. At the same time, orders are triggered less frequently-which is bad. You need to find the optimal balance depending on the amount of currency in your exchange account.'}); %>
+              <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
             </div>
           </div>
 
