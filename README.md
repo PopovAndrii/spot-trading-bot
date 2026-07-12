@@ -386,33 +386,90 @@ The footer shows which Binance environment is actually used:
 | `REAL`                     | real mode with real keys                                                   |
 | `REAL → TESTNET (no keys)` | `real` selected, but real keys are missing → running on testnet (fallback) |
 
-## Formating ESLint (inside Docker)
+## Formatting — settled, do not renegotiate
 
-- ESlint and Pretier work automatically. (spaces and tabs are formatted only by VScode) But if necessary, you can run it manually.
-- Check and fix one file
+**Formatting is the linters' job. There is no Prettier in this project.**
+
+Prettier was dropped because it cannot be told to leave things alone: it forced
+spaces around combinators (`&>ul` -> `& > ul`) and reflowed whole files on save.
+`@stylistic` does the same job rule by rule, and every rule can be turned off.
+This is the same scheme as `andriipopov.ua`.
+
+| Files | Formatted by | Config |
+|-------|--------------|--------|
+| `.js` | ESLint + `@stylistic/eslint-plugin`, `--fix` on save | `src/eslint.config.cjs` |
+| `.css` / `.scss` | Stylelint + `@stylistic/stylelint-plugin`, `--fix` on save | `src/.stylelintrc.json` |
+| `.ejs` | js-beautify, on save (no linter can parse EJS) | the `emeraldwalk.runonsave` block below |
+| everything else | nobody | — |
+
+Two rules keep diffs clean:
+
+1. **Every file is kept at its formatter's fixpoint.** Re-running the formatter
+   over the repo must change nothing. If it does, the file drifted and the next
+   save will reflow it whole, burying real changes under whitespace churn.
+2. **Never hand-indent against the formatter.** Match the indentation already in
+   the file.
+
+`src/eslint.config.cjs` deliberately overrides two `@stylistic` defaults so that
+dropping Prettier did not rewrite live trading code for cosmetics: `&&` / `||`
+stay at the end of the line, and `"'self'"` keeps its double quotes instead of
+becoming `'\'self\''`.
+
+All three tools are `devDependencies` in `src/package.json` — **nothing is
+installed globally on the host.** `git clone` + `npm i` is enough.
+
+Manual runs (inside Docker, from `/var/www/src`):
 
 ```sh
-npx eslint /var/www/src/lib/job.js
-npx eslint /var/www/src/lib/job.js --fix
+npm run lint:fix        # eslint . --fix
+npm run lint:css:fix    # stylelint "scss/**/*.scss" --fix
+npx js-beautify --type html --templating auto --indent-size 2 --end-with-newline \
+  --brace-style=collapse,preserve-inline -r views/*.ejs views/ui/*.ejs
 ```
 
-## Config .vscode/settings.json in root dirrectory
+## Config `.vscode/settings.json`
 
-VScode must have the ESlint plugin from Microsoft installed.
+`.vscode/` is gitignored, so this is the only copy — recreate the file from
+here on a new machine. Required extensions: **ESLint** (Microsoft),
+**Stylelint**, **Run on Save** (emeraldwalk). Do **not** install Prettier.
 
 ```json
 {
-  "editor.formatOnSave": true,
-  "editor.insertSpaces": true,
   "editor.tabSize": 2,
+  "editor.insertSpaces": true,
   "editor.detectIndentation": false,
+
+  "editor.formatOnSave": false,
+
   "editor.codeActionsOnSave": {
-    "source.fixAll": true,
-    "source.fixAll.eslint": true
+    "source.fixAll.eslint": "explicit",
+    "source.fixAll.stylelint": "explicit"
   },
-  "eslint.validate": ["javascript"]
+
+  "eslint.validate": ["javascript"],
+  "stylelint.validate": ["css", "scss"],
+  "css.validate": false,
+  "scss.validate": false,
+
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.ejs$",
+        "cmd": "\"${workspaceFolder}/src/node_modules/.bin/js-beautify\" --type html --templating auto --indent-size 2 --end-with-newline --brace-style=collapse,preserve-inline -r \"${file}\""
+      }
+    ]
+  }
 }
 ```
+
+Two things about the `.ejs` hook:
+
+- it calls the **local** binary from `src/node_modules/.bin/`, never a global
+  install. The hook runs in VS Code on the host, so the host needs a Node
+  runtime for the shebang — but no globally installed packages.
+- `--brace-style=collapse,preserve-inline` is not optional: without it
+  js-beautify explodes `import { X } from '...'` inside `<script>` into three
+  lines every time `head.ejs` is saved.
 
 ## Experimental files (not in the flow)
 
