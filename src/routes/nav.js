@@ -105,7 +105,7 @@ router.get('/logs', (req, res) => {
   const heartbeat = setInterval(() => {
     if (res.writableEnded) return;
     try {
-      res.write(`event: ping\ndata: {}\n\n`);
+      res.write('event: ping\ndata: {}\n\n');
     } catch {}
   }, 15000);
 

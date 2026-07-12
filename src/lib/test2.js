@@ -270,16 +270,16 @@ DM.addExecutedOrder(next.priceBuy);
 
 const targets = DM.calculateTakeProfit();
 
-console.log(`   -------------------------------------`);
+console.log('   -------------------------------------');
 console.log(`📈 ${JSON.stringify(targets)}`);
 
-console.log(`\n|======================================|`);
+console.log('\n|======================================|');
 console.log(`|= Balance: ${targets.balance} ====================|`);
 console.log(`|= Balance envolved: ${targets.bidAmount} ==========|`);
 console.log(`|= Balance free: ${targets.free} =================|`);
 console.log(`|= Profit: ${targets.profit} =======================|`);
 console.log(`|= Last Bid (q-ty:${targets.quantity} price:${targets.price}) ===|`);
-console.log(`|=================end==================|`);
+console.log('|=================end==================|');
 
 const MI = new MomentumIndicator(60, {
   price: 0.8,

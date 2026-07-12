@@ -163,7 +163,7 @@ export class LoadDataCalculator {
     };
 
     try {
-      const res = await fetch(`/spotbot/calculator/param`, {
+      const res = await fetch('/spotbot/calculator/param', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: obj }),
@@ -322,10 +322,10 @@ export class LoadDataCalculator {
         dec,
       });
       return (
-        `<span class="row-actions row-actions--edit">` +
+        '<span class="row-actions row-actions--edit">' +
         `<button type="button" class="UIb xsm r-round success" data-value='${replace}' title="Re-place at a new price">` +
-        `+</button>` +
-        `</span>`
+        '+</button>' +
+        '</span>'
       );
     }
 
@@ -336,9 +336,9 @@ export class LoadDataCalculator {
     // on a failed cancel (SpotWS).
     if (this._pendingCancel.has(key)) {
       return (
-        `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"` +
-        ` disabled title="Cancelling…">` +
-        `x</button></span>`
+        '<span class="row-actions"><button type="button" class="UIb xsm r-round danger"' +
+        ' disabled title="Cancelling…">' +
+        'x</button></span>'
       );
     }
 
@@ -351,9 +351,9 @@ export class LoadDataCalculator {
         orderId: o.orderId ?? null,
       });
       return (
-        `<span class="row-actions"><button type="button" class="UIb xsm r-round danger"` +
+        '<span class="row-actions"><button type="button" class="UIb xsm r-round danger"' +
         ` data-value='${cancel}' title="Cancel order">` +
-        `x</button></span>`
+        'x</button></span>'
       );
     }
 
@@ -480,7 +480,7 @@ export class LoadDataCalculator {
     // duplicated/“double” table from overlapping rapid recalcs).
     const seq = ++this._calcSeq;
     try {
-      const res = await fetch(`/spotbot/calculator/result`, {
+      const res = await fetch('/spotbot/calculator/result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: this.strategy, settings: this.defaultData }),
@@ -579,7 +579,7 @@ export class LoadDataCalculator {
     orders.restart = Boolean(restartInput?.checked);
 
     try {
-      const res = await fetch(`/spotbot/calculator/save`, {
+      const res = await fetch('/spotbot/calculator/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: orders }),
@@ -602,7 +602,7 @@ export class LoadDataCalculator {
     };
 
     try {
-      const res = await fetch(`/spotbot/calculator/restart`, {
+      const res = await fetch('/spotbot/calculator/restart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: obj }),

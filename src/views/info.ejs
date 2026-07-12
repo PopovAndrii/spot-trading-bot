@@ -2,36 +2,36 @@
 <html>
 <%- include('../views/head'); %>
 
-  <body>
-    <%- include('../views/navbar'); %>
-      <div class="container-adaptive content">
-        <h3 id="info-time">
-          <%= title %>
-        </h3>
+<body>
+  <%- include('../views/navbar'); %>
+  <div class="container-adaptive content">
+    <h3 id="info-time">
+      <%= title %>
+    </h3>
 
-        <div class="line">
-          <table id="info-currency" class="t t-border t-striped t-hover">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Asset</th>
-                <th>Free</th>
-                <th>Locked</th>
-              </tr>
-            </thead>
-            <tbody>
-            </tbody>
-          </table>
-        </div>
+    <div class="line">
+      <table id="info-currency" class="t t-border t-striped t-hover">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Asset</th>
+            <th>Free</th>
+            <th>Locked</th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+    </div>
 
-        <div class="line">
-          <table id="info-commission" class="t t-border t-striped t-hover">
-            <tbody>
-            <tbody>
-          </table>
-        </div>
-      <%- include('../views/footer'); %>
-  </body>
-  <script type="module" src="/javascripts/infoMain.js"></script>
+    <div class="line">
+      <table id="info-commission" class="t t-border t-striped t-hover">
+        <tbody>
+        <tbody>
+      </table>
+    </div>
+    <%- include('../views/footer'); %>
+</body>
+<script type="module" src="/javascripts/infoMain.js"></script>
 
 </html>

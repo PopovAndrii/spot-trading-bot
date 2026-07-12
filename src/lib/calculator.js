@@ -46,7 +46,7 @@ class Calculator {
 
     // BTCUSDT
     const defaultData = {
-      'field-currency': 0.10794235, //368.5,
+      'field-currency': 0.10794235, // 368.5,
       'field-deposit': 560, // 1.074 430$
       'field-orderSize': 125, // 0.028
       'field-profit': 0.1,

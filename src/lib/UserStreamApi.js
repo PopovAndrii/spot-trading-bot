@@ -9,7 +9,7 @@ class UserStreamAPI extends EventEmitter {
 
     this.client = client;
     this.ws = null;
-    this.wssURL = wssURL ? wssURL : `wss://stream.binance.com:9443/ws/`;
+    this.wssURL = wssURL ? wssURL : 'wss://stream.binance.com:9443/ws/';
     this.listenKey = null;
     this.keepAliveTimer = null;
     this.heartbeatTimer = null;

@@ -2,138 +2,138 @@
 <html data-theme="">
 <%- include('../views/head'); %>
 
-  <body>
-    <div class="wrapper">
-      <header class="">
-        <%- include('../views/navbar'); %>
-      </header>
-      <main class="container-adaptive content">
+<body>
+  <div class="wrapper">
+    <header class="">
+      <%- include('../views/navbar'); %>
+    </header>
+    <main class="container-adaptive content">
 
-        <section class="index-massege">
-          <div class="index-massege__warning index-massege__item" data-msg="uk-warning">
-            Citizens and residents of the UK and the United States are neither permitted nor technically able to carry out any transactions on the Binance exchange.<br>
-            This software does not allow you to bypass Binance’s restrictions in the UK and the USA.<br>
-            In simple terms: For citizens of the UK and the United States of America, only the Binance testnet is available.
-            <button data-value="uk-warning" class="UIb sm index-massege__ack">yes</button>
-          </div>
-
-          <div class="index-massege__info index-massege__item" data-msg="no-profit">
-            This programme does not guarantee any profit.<br>
-            All the trading strategies included here operate solely under your control.<br>
-            Always rely on your own calculations and common sense.<br>
-            This programme does not store your private keys and does not transmit them to third-party servers.<br>
-            <button data-value="no-profit" class="UIb sm index-massege__ack">yes</button>
-          </div>
-
-          <div class="index-massege__info index-massege__item" data-msg="strategies-untested">
-            Not all strategies have been tested, nor have they been tested on all currency pairs.<br>
-            Use the test network to check the robot`s performance and fine-tune the settings.<br>
-            <button data-value="strategies-untested" class="UIb sm index-massege__ack">yes</button>
-          </div>
-        </section>
-
-        <section class="donate" aria-labelledby="donate-title">
-          <h2 class="donate__title" id="donate-title">Support development</h2>
-          <p class="donate__lead">
-            This bot is free and open. If it helps you, a crypto tip keeps it maintained.
-            Send any amount to the addresses below — no third-party service involved.
-          </p>
-
-          <div class="donate__grid">
-            <% donations.forEach((d)=> { %>
-              <article class="donate-card" data-id="<%= d.id %>">
-                <header class="donate-card__head">
-                  <span class="donate-card__coin">
-                    <%= d.coin %>
-                  </span>
-                  <span class="donate-card__network">
-                    <%= d.network %>
-                  </span>
-                </header>
-
-                <a class="donate-card__qr" href="<%= d.uri || ('#' + d.id) %>" <%=d.uri ? '' : 'aria-disabled="true"' %> title="Open in wallet">
-                  <img src="<%= d.qr %>" width="220" height="220" alt="QR for <%= d.coin %> address" loading="lazy">
-                </a>
-
-                <div class="donate-card__addr">
-                  <code class="donate-card__address" title="<%= d.address %>"><%= d.address %></code>
-                  <button type="button" class="UIb g-1 donate-card__copy" data-value="<%= d.address %>" data-copy="<%= d.address %>" aria-label="Copy <%= d.coin %> address">
-                    <span class="btn-label">Copy</span>
-                  </button>
-                </div>
-              </article>
-              <% }); %>
-          </div>
-        </section>
-
-
-        <section class="-line -justify-start -align-end">
-          <h1 class="index-h1">Start trading</h1>
-
-          <div class="start-trading -self-stretch">
-            <div class="UIselect lg expand info" id="selectCurrency" tabindex="0" role="listbox" aria-haspopup="listbox">
-              <span class="UIselect-selected">Select Symbol</span>
-              <span class="UIselect-arrow">
-                <svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M7 12 1.4 5.6c-.7-.8-.1-2 1-2h11.5a1.2 1.2 0 0 1 .9 2L9 12.2q-.9.8-1.8 0" />
-                </svg>
-              </span>
-              <input type="hidden" name="myId2">
-              <ul class="UIselect-options" hidden>
-                <li class="UIselect-options__search" role="search">
-                  <input type="text" value="" aria-label="Search Symbol">
-                </li>
-                <li class="UIselect-options__items" aria-hidden="true">
-                  <ul role="group">
-                    <% info.symbols.forEach((name, index)=> { %>
-                      <li role="option" data-value='<%= name.symbol %>'>
-                        <%= name.symbol %>
-                      </li>
-                      <% }); %>
-                  </ul>
-                </li>
-              </ul>
-            </div>
-
-            <a id="sendCurrency" data-value="" class="UIb lg g-1 info" aria-disabled="true">
-              <span class="btn-label">Select currency!</span>
-            </a>
-          </div>
-        </section>
-
-        <section class="server-address">
-          Server address: <span>
-            <%= serverIp || 'unavailable' %>
-          </span>
-        </section>
-
-        <div class="api-keys">
-          <% [['real', 'Real' ], ['test', 'Test' ]].forEach(([env, label])=> { const k = keys[env]; %>
-            <div class="api-keys__group" data-env="<%= env %>">
-              <div>
-                <%= label %> keys in .env file:
-                  <strong>
-                    <%= k.present ? 'present' : 'missing' %>
-                  </strong>
-              </div>
-              <div>key: <code><%= k.key ? k.key + '…' : '—' %></code></div>
-              <div>secret: <code><%= k.secret ? k.secret + '…' : '—' %></code></div>
-              <span>
-                <button type="button" class="UIb sm expand" data-value="<%= env %>" data-check="<%= env %>" <%=k.present ? '' : 'disabled' %>>
-                  Check <%= label %>
-                </button>
-              </span>
-              <span class="api-keys__status" aria-live="polite"></span>
-            </div>
-            <% }) %>
-              <span>
-                Get test keys <a href="https://testnet.binance.vision/" target="_blank">Binance Test keys</a>
-              </span>
+      <section class="index-massege">
+        <div class="index-massege__warning index-massege__item" data-msg="uk-warning">
+          Citizens and residents of the UK and the United States are neither permitted nor technically able to carry out any transactions on the Binance exchange.<br>
+          This software does not allow you to bypass Binance’s restrictions in the UK and the USA.<br>
+          In simple terms: For citizens of the UK and the United States of America, only the Binance testnet is available.
+          <button data-value="uk-warning" class="UIb sm index-massege__ack">yes</button>
         </div>
-      </main>
-      <%- include('../views/footer'); %>
-    </div>
-  </body>
-  <script type="module" src="/javascripts/indexMain.js"></script>
+
+        <div class="index-massege__info index-massege__item" data-msg="no-profit">
+          This programme does not guarantee any profit.<br>
+          All the trading strategies included here operate solely under your control.<br>
+          Always rely on your own calculations and common sense.<br>
+          This programme does not store your private keys and does not transmit them to third-party servers.<br>
+          <button data-value="no-profit" class="UIb sm index-massege__ack">yes</button>
+        </div>
+
+        <div class="index-massege__info index-massege__item" data-msg="strategies-untested">
+          Not all strategies have been tested, nor have they been tested on all currency pairs.<br>
+          Use the test network to check the robot`s performance and fine-tune the settings.<br>
+          <button data-value="strategies-untested" class="UIb sm index-massege__ack">yes</button>
+        </div>
+      </section>
+
+      <section class="donate" aria-labelledby="donate-title">
+        <h2 class="donate__title" id="donate-title">Support development</h2>
+        <p class="donate__lead">
+          This bot is free and open. If it helps you, a crypto tip keeps it maintained.
+          Send any amount to the addresses below — no third-party service involved.
+        </p>
+
+        <div class="donate__grid">
+          <% donations.forEach((d)=> { %>
+          <article class="donate-card" data-id="<%= d.id %>">
+            <header class="donate-card__head">
+              <span class="donate-card__coin">
+                <%= d.coin %>
+              </span>
+              <span class="donate-card__network">
+                <%= d.network %>
+              </span>
+            </header>
+
+            <a class="donate-card__qr" href="<%= d.uri || ('#' + d.id) %>" <%=d.uri ? '' : 'aria-disabled="true"' %> title="Open in wallet">
+              <img src="<%= d.qr %>" width="220" height="220" alt="QR for <%= d.coin %> address" loading="lazy">
+            </a>
+
+            <div class="donate-card__addr">
+              <code class="donate-card__address" title="<%= d.address %>"><%= d.address %></code>
+              <button type="button" class="UIb g-1 donate-card__copy" data-value="<%= d.address %>" data-copy="<%= d.address %>" aria-label="Copy <%= d.coin %> address">
+                <span class="btn-label">Copy</span>
+              </button>
+            </div>
+          </article>
+          <% }); %>
+        </div>
+      </section>
+
+
+      <section class="-line -justify-start -align-end">
+        <h1 class="index-h1">Start trading</h1>
+
+        <div class="start-trading -self-stretch">
+          <div class="UIselect lg expand info" id="selectCurrency" tabindex="0" role="listbox" aria-haspopup="listbox">
+            <span class="UIselect-selected">Select Symbol</span>
+            <span class="UIselect-arrow">
+              <svg width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M7 12 1.4 5.6c-.7-.8-.1-2 1-2h11.5a1.2 1.2 0 0 1 .9 2L9 12.2q-.9.8-1.8 0" />
+              </svg>
+            </span>
+            <input type="hidden" name="myId2">
+            <ul class="UIselect-options" hidden>
+              <li class="UIselect-options__search" role="search">
+                <input type="text" value="" aria-label="Search Symbol">
+              </li>
+              <li class="UIselect-options__items" aria-hidden="true">
+                <ul role="group">
+                  <% info.symbols.forEach((name, index)=> { %>
+                  <li role="option" data-value='<%= name.symbol %>'>
+                    <%= name.symbol %>
+                  </li>
+                  <% }); %>
+                </ul>
+              </li>
+            </ul>
+          </div>
+
+          <a id="sendCurrency" data-value="" class="UIb lg g-1 info" aria-disabled="true">
+            <span class="btn-label">Select currency!</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="server-address">
+        Server address: <span>
+          <%= serverIp || 'unavailable' %>
+        </span>
+      </section>
+
+      <div class="api-keys">
+        <% [['real', 'Real' ], ['test', 'Test' ]].forEach(([env, label])=> { const k = keys[env]; %>
+        <div class="api-keys__group" data-env="<%= env %>">
+          <div>
+            <%= label %> keys in .env file:
+            <strong>
+              <%= k.present ? 'present' : 'missing' %>
+            </strong>
+          </div>
+          <div>key: <code><%= k.key ? k.key + '…' : '—' %></code></div>
+          <div>secret: <code><%= k.secret ? k.secret + '…' : '—' %></code></div>
+          <span>
+            <button type="button" class="UIb sm expand" data-value="<%= env %>" data-check="<%= env %>" <%=k.present ? '' : 'disabled' %>>
+              Check <%= label %>
+            </button>
+          </span>
+          <span class="api-keys__status" aria-live="polite"></span>
+        </div>
+        <% }) %>
+        <span>
+          Get test keys <a href="https://testnet.binance.vision/" target="_blank">Binance Test keys</a>
+        </span>
+      </div>
+    </main>
+    <%- include('../views/footer'); %>
+  </div>
+</body>
+<script type="module" src="/javascripts/indexMain.js"></script>
 
 </html>
