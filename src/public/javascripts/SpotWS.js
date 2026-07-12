@@ -295,11 +295,13 @@ export class SpotWS {
     if (status) {
       startBtn.classList.add('danger');
       startBtn.classList.remove('success');
-      startBtn.innerHTML = `Stop <svg class="icon active"><use href="/sprite.svg#stop"></use></svg>`;
+      startBtn.innerHTML = `<span class="UIb__label">Stop</span> <svg class="icon active"><use href="/sprite.svg#stop"></use></svg>`;
+      startBtn.setAttribute('aria-label', 'Stop');
     } else {
       startBtn.classList.add('success');
       startBtn.classList.remove('danger');
-      startBtn.innerHTML = `Start <svg class="icon"><use href="/sprite.svg#play"></use></svg>`;
+      startBtn.innerHTML = `<span class="UIb__label">Start</span> <svg class="icon"><use href="/sprite.svg#play"></use></svg>`;
+      startBtn.setAttribute('aria-label', 'Start');
     }
   }
 }
