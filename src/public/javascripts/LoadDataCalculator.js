@@ -449,9 +449,14 @@ export class LoadDataCalculator {
   // lies (old price visible while the engine polls the new one). Only for live
   // orders (NEW/PARTIALLY_FILLED), compared at tick precision so an unchanged
   // order shows no badge.
+  //
+  // A resting micro always differs from the plan (that IS the scalp), and its own
+  // badge already carries the price and the volume — this one would just repeat the
+  // number and read as a manual re-place, which it is not.
   #currentPriceBadge(obj, type, index, gridPrice) {
     const o = obj?.[type]?.[index];
     if (!o || o.price == null) return '';
+    if (o.role === 'micro') return '';
     if (o.status !== 'NEW' && o.status !== 'PARTIALLY_FILLED') return '';
     const tick = parseInt(obj.param?.['field-tickSize'], 10);
     const dec = Number.isFinite(tick) ? tick : 2;
