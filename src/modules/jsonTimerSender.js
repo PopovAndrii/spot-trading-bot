@@ -676,6 +676,21 @@ class JsonTimerSender extends EventEmitter {
         }
 
         if (currentOrder.status === Status.DONE) {
+          // A DONE that came from the scalp carries one last oscillation to bank: the
+          // micro that sold the final volume the cycle held. It has to land BEFORE
+          // the books close — bankGridLeg re-arms the leg, which clears the fills the
+          // profit is computed from, so anything reading them afterwards (the Telegram
+          // finale, the archive) would silently lose it.
+          if (currentOrder.bank != null) {
+            const banked = bankGridLeg(obj, currentOrder.bank, this.strategy);
+            const line =
+              `♻️ ${this.symbol}: grid leg #${currentOrder.bank + 1} banked ` +
+              `${banked >= 0 ? '+' : ''}${banked.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}` +
+              ' — it closed the last of the position, so the cycle ends here';
+            console.log(line);
+            logBus.log(line);
+          }
+
           const result = await this.#runToApi(currentOrder); // cancelOpenOrders
 
           if (currentOrder.leftover) {

@@ -695,6 +695,33 @@ class Job {
     };
   }
 
+  // Is the cycle holding anything at all? Everything the filled entries bought,
+  // minus everything the closes have already sold back — the micro that just fired
+  // included, since its fills are still on the slot when this is asked.
+  //
+  // Missing fill data (a config from before executedQty was persisted) reads as NOT
+  // flat: "cannot tell" must never be allowed to mean "closed", or an old cycle ends
+  // itself on the first micro. Rounded down to stepSize — dust below the exchange's
+  // own resolution is not a position.
+  #positionFlat(obj, D, strategy) {
+    const entrySide = strategy === 'short' ? 'SELL' : 'BUY';
+    const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
+
+    let held = new Decimal(0);
+    for (let k = 0; k <= D; k++) {
+      const e = obj[entrySide]?.[k];
+      if (!e || e.status !== state.FILLED) continue;
+      if (e.executedQty === undefined) return false;
+      held = held.plus(e.executedQty);
+    }
+    for (const c of obj[closeSide] || []) {
+      held = held.minus(Number(c?.executedQty) || 0);
+    }
+
+    const step = parseInt(obj.param?.['field-stepSize'], 10) || 0;
+    return held.toDecimalPlaces(step, Decimal.ROUND_DOWN).lte(0);
+  }
+
   // The split line inside the pause gap: interpolate between the deepest rung's
   // REAL entry fill price and the whole-position close price recomputed from the
   // fills (#fullClose; slot-plan fallback only for old configs without fill
@@ -746,6 +773,24 @@ class Job {
       close.status === state.FILLED &&
       close.role === 'micro'
     ) {
+      // …unless that micro sold the LAST volume the cycle was holding. Re-arming
+      // there would re-open a position the cycle had already fully exited — the rung
+      // has nothing left to oscillate against, and the ladder below it is still
+      // armed, so the next dip is entered as if the cycle never ended. Seen live: the
+      // micro and the whole-position close filled on the same rise, the books were
+      // square and in profit, and the re-arm bought straight back into a crash.
+      // The oscillation is still banked (the money is real) — `bank` says so — and
+      // then the cycle closes on the spot.
+      if (this.#positionFlat(obj, D, strategy)) {
+        return {
+          status: Status.DONE,
+          method: 'cancelOpenOrders',
+          side: null,
+          id: i,
+          bank: i,
+          data: { id: i, symbol },
+        };
+      }
       return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
     }
 
