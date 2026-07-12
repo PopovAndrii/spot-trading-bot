@@ -59,11 +59,18 @@
             <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
           </div>
 
-          <div class="line" id="group-hybrid">
-            <%- include('../views/ui/SpinBox', { id:'field-gridLevel' , label:'Grid from order' , min:1, max:50 , step: 0, hint:'From which order number (down the ladder) the deepest filled order may run the pause-scalp. Orders above it never scalp — pure DCA. Only used when Hybrid grid is on.' }); %>
-            <%- include('../views/ui/SpinBox', { id:'field-microProfit' , label:'Micro profit %' , min:0.01, max:2 , step: 2, hint:'Net take-profit of each grid micro-order, on top of commission. Smaller = banks bounces more often. Default 0.1.' }); %>
-            <%- include('../views/ui/SpinBox', { id:'field-gridExit' , label:'Grid exit %' , min:0, max:100 , step: 0, hint:'Split of the pause gap between the deepest filled order and the whole-position close (live stream price). Below the split the micro-scalp trades the deepest order&#39;s own volume; above it the normal full close rests. 0 = at the deepest fill (no scalp), 100 = at the close, default 50 = midway. The micro never crosses this line.' }); %>
-          </div>
+        </div>
+
+        <!-- Hybrid params live OUTSIDE #group-spinbox on purpose: none of them build
+               the ladder (the calculator never reads gridLevel or gridExit, and reads
+               microProfit only for the displayed micro column). They are decisions the
+               Job re-reads every tick, so they must stay adjustable while the robot
+               runs — the scalp is armed and re-aimed by watching the live price, which
+               is exactly when the settings block is locked. -->
+        <div class="line" id="group-hybrid">
+          <%- include('../views/ui/SpinBox', { id:'field-gridLevel' , label:'Grid from order' , min:1, max:50, step:0, hint:'From which order number (down the ladder) the deepest filled order may run the pause-scalp. Orders above it never scalp — pure DCA. Changeable while the bot is running: switching Hybrid on aims it at the order the price is currently stuck on, and you can retype it — e.g. raise it to make the scalp ignore this order and wait for a deeper one.' }); %>
+          <%- include('../views/ui/SpinBox', { id:'field-microProfit' , label:'Micro profit %' , min:0.01, max:2 , step: 2, hint:'Net take-profit of each grid micro-order, on top of commission. Smaller = banks bounces more often, and fits into a narrower pause gap. Default 0.1. Changeable while the bot is running.' }); %>
+          <%- include('../views/ui/SpinBox', { id:'field-gridExit' , label:'Grid exit %' , min:0, max:100 , step: 0, hint:'Split of the pause gap between the deepest filled order and the whole-position close (live stream price). Below the split the micro-scalp trades the deepest order&#39;s own volume; above it the normal full close rests. 0 = at the deepest fill (no scalp), 100 = at the close, default 50 = midway. The micro never crosses this line — so if micro profit + commission needs more room than this split leaves, no scalp is placed at all: raise this. Changeable while the bot is running.' }); %>
         </div>
 
         <!-- These params stay available while the robot is running: Active orders /

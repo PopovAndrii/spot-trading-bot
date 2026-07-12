@@ -118,6 +118,55 @@ function rearmGridLeg(obj, i) {
 // keeps it (it only wipes the fill/status fields), so the count accumulates
 // across re-arms. Must run while the fills are still on the slots. Returns the
 // banked amount. Mutates obj. Pure/testable.
+// Does the scalp still own something the classic machine cannot read? A live micro
+// close (NEW/PARTIALLY_FILLED), a filled one waiting to be banked (REARM), or a
+// canceled one whose marker still stands on the slot. The classic machine knows
+// nothing about the role — it would poll a resting micro as if it were the
+// whole-position close and call the cycle DONE on a rung-sized fill. So while a
+// cycle is dirty the hybrid keeps the wheel EVEN WITH THE SWITCH OFF: its own
+// out-of-zone branch cancels the micro and hands the position back, re-priced off
+// the real fills. The marker is dropped as the classic close is placed
+// (applyOrderResult), so the cycle drains to clean within a tick or two. Pure.
+function hybridDirty(obj, strategy) {
+  const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
+  const closes = obj?.[closeSide];
+  if (!Array.isArray(closes)) return false;
+  return closes.some((c) => c?.role === 'micro');
+}
+
+// The live hybrid switch, as a pure param patch. ON aims the scalp at the rung the
+// price is stuck on — the deepest held entry — by writing field-gridArm, the live
+// floor the UI then shows in "Grid from order". You can retype it right after: a
+// hand edit lands on the same key and wins outright, which is how you say "not
+// here, wait for rung 5". Only this AUTOMATIC aim is held to the configured
+// field-gridLevel — the robot never arms shallower than you asked for, though you
+// may. With nothing held there is nothing to aim at and the config stands alone.
+// OFF drops the switch and the live floor together, so the next ON re-aims fresh.
+// field-gridLevel itself is never touched: it is the saved config and it must
+// outlive the cycle. Returns a NEW param object. Pure/testable.
+function hybridSwitch(param, entries, on) {
+  const next = { ...param };
+
+  if (!on) {
+    next['field-hybrid'] = 'off';
+    delete next['field-gridArm'];
+    return next;
+  }
+
+  next['field-hybrid'] = 'on';
+
+  const D = deepestFilledIndex(entries);
+  if (D < 0) {
+    delete next['field-gridArm'];
+    return next;
+  }
+
+  const cfg = parseInt(next['field-gridLevel'], 10);
+  const floor = Number.isInteger(cfg) && cfg >= 1 ? cfg : 1;
+  next['field-gridArm'] = String(Math.max(D + 1, floor));
+  return next;
+}
+
 function bankGridLeg(obj, i, strategy) {
   const banked = gridLegProfit(obj['BUY'][i], obj['SELL'][i]);
   obj.gridRealized = (Number(obj.gridRealized) || 0) + banked;
@@ -140,6 +189,11 @@ class Job {
     // the engine (ticker stream, bookTicker fallback). null = unknown → the
     // scalp stays off and the machine behaves exactly like classic DCA.
     this.price = null;
+    // Live hybrid switch, driven per tick from param['field-hybrid']. false = no
+    // NEW scalp is armed, but the machine still runs its own cleanup: a resting
+    // micro is canceled and the whole-position close returns. Default true so a
+    // direct hybridLong/hybridShort call scalps.
+    this.hybridEnabled = true;
   }
 
   // Is the leftover below exchange limits (LOT_SIZE.minQty / NOTIONAL.minNotional)?
@@ -580,9 +634,19 @@ class Job {
   // The micro close itself must never cross the split line; if it would, the
   // scalp is skipped entirely. Unknown price / missing data → classic DCA.
 
-  // 0-based index of the first GRID (scalp-capable) rung. Invalid/missing level
-  // → Infinity, i.e. every rung stays DCA and hybrid degrades to classic.
+  // 0-based index of the first GRID (scalp-capable) rung. One number decides it,
+  // and the UI shows exactly that number:
+  //   field-gridArm   — the LIVE floor, when a cycle carries one. Written by the
+  //     switch (snapshot of the rung the price is stuck on) and re-writable by hand
+  //     while the robot runs. It wins outright: what the field says is what the
+  //     engine does.
+  //   field-gridLevel — the saved config, used when no live floor is set. Survives
+  //     the toggle untouched, so the next cycle starts from the user's own value.
+  // Invalid/missing → Infinity, i.e. every rung stays DCA and hybrid degrades to
+  // classic.
   #gridStartIndex(obj) {
+    const arm = parseInt(obj?.param?.['field-gridArm'], 10);
+    if (Number.isInteger(arm) && arm >= 1) return arm - 1;
     const n = parseInt(obj?.param?.['field-gridLevel'], 10);
     if (!Number.isInteger(n) || n < 1) return Infinity;
     return n - 1;
@@ -650,7 +714,10 @@ class Job {
   // side of the split (long: P < split, short: P > split), and the micro's own
   // close price must stay strictly inside that zone too — the micro must NEVER
   // cross the split line. Unknown price / missing data → false (classic DCA).
+  // The live switch is checked first: off = no new scalp, and the caller's
+  // out-of-zone branch pulls whatever the scalp left resting.
   #scalpMode(obj, D, strategy, microPrice) {
+    if (this.hybridEnabled !== true) return false;
     const P = parseFloat(this.price);
     if (!Number.isFinite(P) || P <= 0) return false;
     const split = this.#splitPrice(obj, D, strategy);
@@ -825,4 +892,6 @@ module.exports = {
   gridLegProfit,
   rearmGridLeg,
   bankGridLeg,
+  hybridDirty,
+  hybridSwitch,
 };

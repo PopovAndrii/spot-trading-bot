@@ -103,6 +103,15 @@ export class LoadDataFromFileCalculator {
       el.value = value;
     });
 
+    // "Grid from order" must show the LIVE scalp floor, not the saved config: while
+    // a cycle runs the switch (or a hand edit) aims it via field-gridArm, and that
+    // is what #gridStartIndex obeys. Showing field-gridLevel here would make the
+    // field lie about what the robot is actually doing. Direct .value, same reason
+    // as the loop above.
+    const arm = obj.param['field-gridArm'];
+    const level = document.getElementById('field-gridLevel');
+    if (level && arm) level.value = String(arm);
+
     // We do NOT build the table here: it's authoritatively rendered by
     // loadDataCalculator.calculate() (called right after in getStateCalculator) with
     // a single `tbody.innerHTML = html` — with status colors and real-fill badges.

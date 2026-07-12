@@ -1,7 +1,14 @@
 const EventEmitter = require('events');
 const fs = require('fs/promises');
 const path = require('path');
-const { Job, Status, rebalancedClose, deepestFilledIndex, bankGridLeg } = require('../lib/job');
+const {
+  Job,
+  Status,
+  rebalancedClose,
+  deepestFilledIndex,
+  bankGridLeg,
+  hybridDirty,
+} = require('../lib/job');
 const { InvokeApi } = require('../lib/invokeAPI');
 const logBus = require('../lib/logBus');
 const { StreamAPI } = require('../lib/streamAPI');
@@ -139,6 +146,19 @@ function orderResultPatch(currentOrder, message) {
   }
 
   return patch;
+}
+
+// Persist an API result into its slot. Beyond orderResultPatch's fields this owns
+// the one thing Object.assign cannot express — a deletion. A fresh newOrder that
+// carries no role REPLACES whatever the scalp left on the slot, so a stale 'micro'
+// marker must go with it: kept, it would let the next tick read the FILLED
+// whole-position close as a banked micro (entry FILLED + close FILLED + role
+// 'micro' = REARM), bank the entire close into gridRealized and re-arm a rung on a
+// position that is already closed. Classic slots never carry a role, so this is a
+// no-op for them. Mutates and returns the slot. Pure/testable.
+function applyOrderResult(slot, currentOrder, message) {
+  if (currentOrder.method === 'newOrder' && !currentOrder.role) delete slot.role;
+  return Object.assign(slot, orderResultPatch(currentOrder, message));
 }
 
 class JsonTimerSender extends EventEmitter {
@@ -551,15 +571,33 @@ class JsonTimerSender extends EventEmitter {
       // pause-scalp micro on the deepest held rung. The averaged-recovery
       // consolidation stops the bot on a fully-filled grid; skip it in hybrid,
       // where a fully-filled grid is exactly where the scalp keeps working.
-      const hybrid = obj?.param?.['field-hybrid'] === 'on' || obj?.param?.['field-hybrid'] === true;
+      //
+      // The switch is LIVE (#mergeLiveEdits re-reads param every tick), and the
+      // two questions it raises are separate:
+      //   enabled — may a NEW scalp be armed? Straight from the flag.
+      //   routing — who drives this tick? The hybrid keeps the wheel while it
+      //     still has a micro on the table (hybridDirty), even after the switch
+      //     goes off: handing a resting micro to the classic machine, which has
+      //     no concept of the role, would have it poll a rung-sized order as the
+      //     whole-position close and call the cycle DONE on its fill. Disabled +
+      //     dirty = the hybrid's own out-of-zone branch cancels the micro and
+      //     puts the real close back; the cycle drains to clean in a tick or two
+      //     and routing falls back to classic on its own.
+      const enabled =
+        obj?.param?.['field-hybrid'] === 'on' || obj?.param?.['field-hybrid'] === true;
+      const hybrid = enabled || hybridDirty(obj, strategy.method);
       const method = hybrid
         ? strategy.method === 'short'
           ? 'hybridShort'
           : 'hybridLong'
         : strategy.method;
 
-      // classic runs never pay for the price plumbing (no request, price unused)
-      if (hybrid) await this.#refreshJobPrice();
+      this.job.hybridEnabled = enabled;
+
+      // classic runs never pay for the price plumbing (no request, price unused);
+      // neither does a disabled hybrid draining its micro — the scalp gate is shut
+      // by the switch before it ever reads the price.
+      if (enabled) await this.#refreshJobPrice();
 
       if (!hybrid && (await this.#maybePrepareRecoveryClose(obj, strategy))) return;
 
@@ -708,13 +746,11 @@ class JsonTimerSender extends EventEmitter {
           continue;
         }
 
-        const toObj = orderResultPatch(currentOrder, result.message);
-
         if (!this.running) return;
 
         // result.message.side == "SELL" or "BUY"
         // currentOrder['id'] !== [key] !!!
-        Object.assign(obj[result.message.side][currentOrder['id']], toObj);
+        applyOrderResult(obj[result.message.side][currentOrder['id']], currentOrder, result.message);
 
         this.#notifyOrderEvent(
           currentOrder,
@@ -998,6 +1034,12 @@ class JsonTimerSender extends EventEmitter {
         'field-indent': '0',
       };
 
+      // field-gridArm is the LIVE scalp floor of the cycle that just ENDED — it was
+      // aimed at a rung that was filled back then. The new ladder starts empty, so it
+      // must not inherit it: the fresh cycle obeys the saved field-gridLevel config
+      // again, and the switch re-aims when there is something to aim at.
+      delete settings['field-gridArm'];
+
       const calc = Calculator.build(settings, this.strategy);
 
       const tmp = this.#config(calc);
@@ -1074,3 +1116,4 @@ module.exports.manualStuckSlots = manualStuckSlots;
 module.exports.cycleProfit = cycleProfit;
 module.exports.freshPrice = freshPrice;
 module.exports.orderResultPatch = orderResultPatch;
+module.exports.applyOrderResult = applyOrderResult;

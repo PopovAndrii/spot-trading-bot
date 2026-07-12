@@ -39,6 +39,18 @@ export class LoadDataCalculator {
       }
     });
 
+    // The hybrid params sit outside #group-spinbox (they are runtime decisions, not
+    // build inputs — see the view), so the recompute above does not see them. While
+    // the robot is IDLE they still have to redraw the table: Micro profit % moves the
+    // displayed micro column. While it RUNS they are written straight to the live
+    // cycle by runtimeParams(), and the table is owned by the robot's own tick.
+    document.querySelector('#group-hybrid')?.addEventListener('ui-spinbox-change', () => {
+      if (!this.getListenerStatus()) return;
+      this.getSettings();
+      this.strategy = document.getElementById('field-strategy').value;
+      this.calculator();
+    });
+
     // Change claculate button
     document.querySelector('#settings-calculate').addEventListener('ui-button-change', () => {
       if (this.getListenerStatus()) {
@@ -146,12 +158,29 @@ export class LoadDataCalculator {
       });
   }
 
+  // Params the robot re-reads every tick, so an edit lands on the LIVE cycle. Written
+  // ALWAYS, running or not: the robot picks the value up on its next tick, or off the
+  // file on Start. (Guarding a write on "running" is what made "Grid from order" look
+  // dead — the value went nowhere while the robot was stopped.)
+  //
+  // "Grid from order" is special only in WHERE it lands: an edit re-aims the live
+  // scalp floor (field-gridArm) — that is how you say "not this order, wait for a
+  // deeper one" — and leaves the saved field-gridLevel config alone, so the next
+  // cycle starts from your own value again. A fresh Save rebuilds param from the
+  // form, which has no field-gridArm, so a new ladder always obeys the config.
   runtimeParams() {
-    const keys = ['field-activeOrders', 'field-requestFrequency'];
+    const keys = {
+      'field-activeOrders': 'field-activeOrders',
+      'field-requestFrequency': 'field-requestFrequency',
+      'field-microProfit': 'field-microProfit',
+      'field-gridExit': 'field-gridExit',
+      'field-gridLevel': 'field-gridArm',
+    };
+
     document.addEventListener('ui-spinbox-change', (e) => {
-      const key = e.detail?.id;
-      if (!keys.includes(key)) return;
-      this.saveRuntimeParam(key, e.detail.value);
+      const target = keys[e.detail?.id];
+      if (!target) return;
+      this.saveRuntimeParam(target, e.detail.value);
     });
   }
 
@@ -197,26 +226,55 @@ export class LoadDataCalculator {
     this.defaultData['field-hybrid'] = document.getElementById('hybrid')?.checked ? 'on' : 'off';
   }
 
-  // Wire the Hybrid-grid switch: toggling it recomputes the grid (the micro
-  // take-profit column depends on it), like a settings SpinBox change. Locked
-  // while a cycle runs, same guard as the other build params.
+  // Wire the Hybrid-grid switch. It means two different things depending on the
+  // cycle:
+  //   idle — a build param: toggling recomputes the grid (the micro take-profit
+  //     column depends on it), like a settings SpinBox change.
+  //   running — a LIVE switch: the ladder must not be rebuilt, so the flip goes
+  //     straight to the running cycle (switchHybrid). This is the point of it —
+  //     you arm the scalp when you SEE the price oscillating on a deep order, and
+  //     disarm it when you don't; the engine picks the change up on the next tick.
   hybrid() {
     const sw = document.getElementById('settings-hybrid');
     this.toggleHybridFields();
-    sw?.addEventListener('ui-switch-change', () => {
+    sw?.addEventListener('ui-switch-change', (e) => {
       this.toggleHybridFields();
-      if (this.getListenerStatus()) {
-        this.getSettings();
-        this.strategy = document.getElementById('field-strategy').value;
-        this.calculator();
-      } else {
-        this.notifications.showNotification(
-          'Calculator is locked. <br>Press the "Stop" button.',
-          'warning',
-          3000
-        );
+
+      if (!this.getListenerStatus()) {
+        this.switchHybrid(Boolean(e.detail?.value));
+        return;
       }
+
+      this.getSettings();
+      this.strategy = document.getElementById('field-strategy').value;
+      this.calculator();
     });
+  }
+
+  // Flip the hybrid on the RUNNING cycle: param only, no rebuild. Arming aims the
+  // scalp at the order the price is stuck on and returns that level — show it in
+  // "Grid from order" so the user can see where it landed and retype it.
+  async switchHybrid(on) {
+    try {
+      const res = await fetch('/spotbot/calculator/hybrid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: { pair: base + quote, on } }),
+      });
+
+      const data = await res.json();
+
+      // Direct .value, never spinBox.setValue: the package clamps to data-min/max
+      // and does not emit ui-spinbox-change — which is what we want, the level is
+      // already saved and echoing it back would re-post it.
+      const level = document.getElementById('field-gridLevel');
+      if (level && data.level) level.value = String(data.level);
+
+      this.notifications.showNotification(data.message, res.ok ? 'success' : 'warning', 6000);
+    } catch (err) {
+      console.error('❌ switchHybrid():', err);
+      return null;
+    }
   }
 
   // The hybrid-only params (Grid from order / Micro profit % / Grid exit %)
