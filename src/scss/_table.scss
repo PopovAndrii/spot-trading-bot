@@ -124,6 +124,23 @@
   color: $c-d-900;
 }
 
+// The fit forecast on a rung that has not filled yet: will the scalp be allowed
+// here at all? Quiet by design — it sits on every rung of the zone, so it must not
+// shout the way the live micro does.
+.fit-badge {
+  padding-inline: 0.3rem;
+  background: transparent;
+  font-weight: bold;
+}
+
+.fit-yes {
+  color: $c-s-700;
+}
+
+.fit-no {
+  color: $c-d-700;
+}
+
 // One-line scalp readout above the table: state, live price, the split it is
 // measured against, the micro, the real close, and the banked total.
 .hybrid-bar {

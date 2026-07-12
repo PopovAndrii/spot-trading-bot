@@ -32,6 +32,21 @@ function gridExitThreshold(sPrev, sF, pct) {
   return prev.plus(new Decimal(sF).minus(prev).times(share)).toNumber();
 }
 
+// Will the scalp even be ALLOWED on this rung, once it fills? The engine refuses a
+// micro that would cross the split (job's #scalpMode) and it refuses SILENTLY: the
+// cycle then runs as plain DCA and nothing in the table says why. Answered here off
+// the PLANNED ladder, because both ends of the pause are already on the row — the
+// rung's own entry, and the whole-position close through it — so the question can be
+// settled before a single order fills, which is when the knob actually gets set.
+//
+// A forecast, not a promise: the real fills land a tick or two off the plan, and the
+// live answer comes from Job.view. Same two functions either way, so they agree.
+function microFit(entry, close, micro, pct, strategy) {
+  const split = gridExitThreshold(entry, close, pct);
+  const m = parseFloat(micro);
+  return { split, fits: strategy === 'short' ? m > split : m < split };
+}
+
 class Calculator {
   // The grid is built by a factory, not the constructor: `new Calculator()` now
   // returns a normal instance (instanceof works); the entry point is the static
@@ -180,6 +195,16 @@ class Calculator {
         // microProfit + commission. The DCA path ignores it; job's hybrid path uses
         // it for rungs at/below the activation level, so each leg banks its own bounce.
         row.microSellCurrency = microClosePrice(entryPrice, microProfit, commission, tick, 'long');
+
+        const fit = microFit(
+          entryPrice,
+          row.sellCurrency,
+          row.microSellCurrency,
+          this.data['field-gridExit'],
+          'long'
+        );
+        row.microSplit = new Decimal(fit.split).toFixed(tick);
+        row.microFits = fit.fits;
       }
 
       mainObj.push(row);
@@ -282,6 +307,18 @@ class Calculator {
         // Mirror of long: grid micro take-profit is a BUY-back at THIS rung's own
         // sell entry price marked down by microProfit + commission.
         row.microBuyCurrency = microClosePrice(entryPrice, microProfit, commission, tick, 'short');
+
+        // Mirrored too: the pause runs from the rung's own SELL entry down to the
+        // whole-position buy-back, and the micro must stay ABOVE the split.
+        const fit = microFit(
+          entryPrice,
+          row.buyCurrency,
+          row.microBuyCurrency,
+          this.data['field-gridExit'],
+          'short'
+        );
+        row.microSplit = new Decimal(fit.split).toFixed(tick);
+        row.microFits = fit.fits;
       }
 
       mainObj.push(row);

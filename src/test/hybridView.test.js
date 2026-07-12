@@ -223,3 +223,77 @@ test('view: short mirrors long — the micro is a buy-back BELOW the deepest sel
   assert.equal(v.inZone, true);
   assert.equal(v.armed, true);
 });
+
+// The FORECAST half: Calculator.microFits answers "will the scalp be allowed on this
+// rung once it fills?" off the planned ladder, before a single order is placed. It is
+// the same split the engine draws (gridExitThreshold) — so the ✓/✗ in the table and
+// the engine's silence can never disagree.
+const { Calculator } = require('../lib/calculator');
+
+const plan = (over = {}) =>
+  Calculator.build(
+    {
+      'field-currency': '579.20',
+      'field-strategy': 'long',
+      'field-tickSize': 2,
+      'field-stepSize': 3,
+      'field-deposit': '8890.95',
+      'field-orderSize': '0.018',
+      'field-profit': 0.2,
+      'field-commission': 0.2,
+      'field-martingail': 68,
+      'field-fibonachiStep': 0.04,
+      'field-indent': 0.05,
+      'field-activeOrders': 12,
+      'strategyList': 'fibonacci',
+      'field-hybrid': 'on',
+      'field-microProfit': 0.1,
+      'field-gridExit': 50,
+      ...over,
+    },
+    'long'
+  );
+
+test('forecast: Grid exit 50 is too tight for the shallow rungs of a narrow ladder', () => {
+  const rows = plan();
+
+  // BNBUSDT rungs sit tenths of a percent apart, and the micro needs 0.3% (micro
+  // profit + commission). Aiming the scalp at #3 with Grid exit 50 buys nothing:
+  // the engine will place no micro at all and the cycle runs as plain DCA.
+  assert.equal(rows[2].microFits, false);
+  assert.equal(rows[3].microFits, false);
+  assert.equal(rows[4].microFits, false);
+  assert.equal(rows[5].microFits, true); // the ladder is wide enough only by #6
+});
+
+test('forecast: Grid exit 68 opens the rung the scalp is actually aimed at', () => {
+  const rows = plan({ 'field-gridExit': 68 });
+
+  assert.equal(rows[2].microFits, true);
+  assert.equal(rows[3].microFits, true);
+});
+
+test('forecast: a smaller Micro profit is the other way in — same 50% split', () => {
+  const rows = plan({ 'field-microProfit': 0.02 });
+
+  assert.equal(rows[2].microFits, true); // the micro drops under the split instead
+});
+
+test('forecast: the split is the one the engine draws, at tick precision', () => {
+  const rows = plan();
+  const r = rows[2];
+
+  // split = entry + (whole-position close − entry) × 50%
+  const expected = (
+    parseFloat(r.buyCurrency) +
+    (parseFloat(r.sellCurrency) - parseFloat(r.buyCurrency)) * 0.5
+  ).toFixed(2);
+  assert.equal(r.microSplit, expected);
+});
+
+test('forecast: classic cycles carry no forecast at all', () => {
+  const rows = plan({ 'field-hybrid': 'off' });
+
+  assert.equal(rows[2].microFits, undefined); // → the table draws no ✓/✗
+  assert.equal(rows[2].microSplit, undefined);
+});

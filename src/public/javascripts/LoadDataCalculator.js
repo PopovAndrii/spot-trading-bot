@@ -332,9 +332,28 @@ export class LoadDataCalculator {
   // The scalp zone: orders from "Grid from order" down may run the pause-scalp,
   // everything above them is pure DCA and always will be. Tinting the rows is the
   // only way to SEE where the two strategies part — the numbers look identical.
-  #zoneClass(view, index) {
-    if (!view?.enabled || !view.arm) return '';
-    return index >= view.arm - 1 ? 'grid-zone' : '';
+  #zoneClass(arm, index) {
+    if (!arm) return '';
+    return index >= arm - 1 ? 'grid-zone' : '';
+  }
+
+  // The forecast, on every rung of the zone that is not already carrying a live
+  // micro: WOULD the scalp be allowed here, once this rung fills? The engine refuses
+  // a micro that crosses the split and refuses in silence, so without this you only
+  // find out by running the cycle down to the rung and watching nothing happen —
+  // which is exactly how a whole cycle got spent on a Grid exit % that was too tight.
+  // The numbers are the calculator's (microFits / microSplit), off the planned ladder.
+  #fitBadge(el, arm, index) {
+    if (!arm || index < arm - 1) return ''; // above the arm: pure DCA, nothing to forecast
+    if (el.microFits === undefined) return ''; // hybrid off → the calculator emits nothing
+
+    const micro = this.strategy === 'short' ? el.microBuyCurrency : el.microSellCurrency;
+    const side = this.strategy === 'short' ? 'above' : 'below';
+
+    if (el.microFits) {
+      return `<span class="fill-badge fit-badge fit-yes" title="the scalp fits here: the micro at ${micro} stays ${side} the split at ${el.microSplit}">✓</span>`;
+    }
+    return `<span class="fill-badge fit-badge fit-no" title="no scalp here: the micro at ${micro} crosses the split at ${el.microSplit} — raise Grid exit % or lower Micro profit %">✗</span>`;
   }
 
   // The micro on the rung that actually carries it (the deepest held one). It is
@@ -671,6 +690,13 @@ export class LoadDataCalculator {
       const view = obj?.hybridView || null;
       this.#hybridBar(view, parseInt(obj?.param?.['field-tickSize'], 10) || 2);
 
+      // The scalp zone is drawn from the LIVE floor when a cycle carries one, and
+      // from the form otherwise — so the zone and the fit forecast are on screen
+      // while you are still setting the numbers, with no cycle to read them from.
+      // The calculator only emits microFits with hybrid on, which is the signal.
+      const hybridOn = data['calculator'].some((r) => r.microFits !== undefined);
+      const arm = hybridOn ? Number(view?.arm ?? this.defaultData['field-gridLevel']) || 0 : 0;
+
       const rows = [];
       data['calculator'].forEach((el, index) => {
         const buyAct = this.#rowAction(obj, 'BUY', index, el.buyCurrency);
@@ -682,9 +708,12 @@ export class LoadDataCalculator {
         // The close side is the one that scalps, so the micro badge goes in ITS
         // currency cell — SELL on long, BUY on short.
         const closeSide = this.strategy === 'short' ? 'BUY' : 'SELL';
-        const buyMicro = closeSide === 'BUY' ? this.#microBadge(view, index) : '';
-        const sellMicro = closeSide === 'SELL' ? this.#microBadge(view, index) : '';
-        rows[index] = `<tr class="${this.#zoneClass(view, index)}">
+        // The rung that CARRIES the micro shows the real thing; every other rung in
+        // the zone shows the forecast. Never both — the live order wins its own row.
+        const mark = this.#microBadge(view, index) || this.#fitBadge(el, arm, index);
+        const buyMicro = closeSide === 'BUY' ? mark : '';
+        const sellMicro = closeSide === 'SELL' ? mark : '';
+        rows[index] = `<tr class="${this.#zoneClass(arm, index)}">
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
               <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${buyRecycle}${buyMicro}${this.#currentPriceBadge(obj, 'BUY', index, el.buyCurrency)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
