@@ -17,16 +17,10 @@
               <input type="radio" class="UIbg-input" name="strategy" value="long" id="long">
               <label class="UIbg-btn" for="long">Long</label>
             </div>
-
-            <div class="symbol-bar">
-              <div class="symbol-bar__text">
-                <%= base + quote %>
-              </div>
-              <input type="" id="field-currency" disabled readonly>
-            </div>
           </div>
 
           <div>
+            <input type="hidden" id="field-currency">
             <input type="hidden" id="field-strategy">
             <input type="hidden" id="field-tickSize">
             <input type="hidden" id="field-stepSize">
