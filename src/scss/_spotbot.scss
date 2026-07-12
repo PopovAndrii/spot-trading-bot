@@ -1,3 +1,17 @@
+// Parameter rows: 4 columns on wide screens, 2 on tablets, 1 on phones.
+#group-spinbox>.line {
+  grid-template-columns: repeat(4, 1fr);
+  justify-items: stretch;
+
+  @media (width <= 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (width <= 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
 .spotbot {
   &-danger-zone {
     display: grid;
