@@ -881,6 +881,78 @@ class Job {
       .toFixed(step);
     return { quantity, price };
   }
+
+  // Read-only mirror of the scalp decision, for the table. Every number here comes
+  // out of the SAME private helpers the engine trades on (#gridStartIndex,
+  // #fullClose, #splitPrice, #gridClose), so the UI cannot disagree with the robot
+  // and the client computes nothing. Places and pulls nothing.
+  //
+  // The gate is reported as its two independent halves, because they fail for
+  // different reasons and are fixed with different knobs:
+  //   fits   — is there ROOM under the split for the micro? A settings question:
+  //            no room → raise Grid exit % or lower Micro profit %. Silent
+  //            otherwise: the engine simply never places a scalp and the table
+  //            looks like plain DCA, which is exactly what confused everyone.
+  //   inZone — is the LIVE PRICE on the entry side of the split? A market question:
+  //            out of zone → nothing is wrong, the scalp just waits (or yields).
+  // armed = enabled AND both → this is the tick the micro rests on the book.
+  // Prices/quantities are strings at the pair's tick/step precision, ready to print.
+  view(obj, strategy) {
+    const p = obj?.param || {};
+    const entrySide = strategy === 'short' ? 'SELL' : 'BUY';
+    const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
+    if (!Array.isArray(obj?.[entrySide]) || !Array.isArray(obj?.[closeSide])) return null;
+
+    const g = this.#gridStartIndex(obj);
+    const D = deepestFilledIndex(obj[entrySide]);
+    const P = parseFloat(this.price);
+
+    const out = {
+      enabled: p['field-hybrid'] === 'on' || p['field-hybrid'] === true,
+      arm: Number.isFinite(g) ? g + 1 : null, // 1-based — the order number the UI shows
+      deepest: D >= 0 ? D + 1 : null,
+      price: Number.isFinite(P) ? String(this.price) : null,
+      banked: Number(obj.gridRealized) || 0,
+      close: null,
+      micro: null,
+      split: null,
+      fits: false,
+      inZone: false,
+      armed: false,
+      resting: false,
+    };
+
+    if (D < 0) return out; // nothing held → no pause, no scalp
+
+    out.close = this.#fullClose(obj, D, strategy);
+
+    // Above the arm the pause belongs to plain DCA: there is no micro to describe.
+    if (D < g) return out;
+
+    const close = obj[closeSide][D] || {};
+    const micro = this.#gridClose(obj, obj[entrySide][D], close, closeSide);
+    const split = this.#splitPrice(obj, D, strategy);
+    const tick = parseInt(p['field-tickSize'], 10) || 0;
+    const below = (x) => (strategy === 'short' ? x > split : x < split);
+
+    out.resting =
+      close.role === 'micro' &&
+      (close.status === state.NEW || close.status === state.PARTIALLY_FILLED);
+
+    // Nothing left on the rung (a close already took its volume, or the cycle is
+    // over) → there is no micro to describe, and a "× 0.000" badge would be a lie.
+    if (parseFloat(micro.quantity) <= 0) return out;
+
+    out.micro = micro;
+
+    if (split == null) return out; // unknown price or fill data → the engine stays classic
+
+    out.split = new Decimal(split).toFixed(tick);
+    out.fits = below(parseFloat(micro.price));
+    out.inZone = Number.isFinite(P) && below(P);
+    out.armed = out.enabled && out.fits && out.inZone;
+    return out;
+  }
 }
 
 module.exports = {

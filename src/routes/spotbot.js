@@ -9,7 +9,7 @@ const { writeFileAtomic } = require('../lib/atomicWrite');
 const { pair, statusPair } = require('../lib/pair');
 const { archiveIfActive } = require('../lib/cycleArchive');
 const { decimalCount, roundToStep } = require('../lib/format');
-const { hybridSwitch } = require('../lib/job');
+const { Job, hybridSwitch } = require('../lib/job');
 const logBus = require('../lib/logBus');
 const telegram = require('../lib/telegram');
 
@@ -55,6 +55,24 @@ router.get('/:currency', async function (req, res, next) {
 });
 
 // get calc table data
+// The table's scalp block for a cycle the ENGINE is not driving — a page load, a
+// stopped bot. Same Job.view the live tick emits, minus the price it has no source
+// for here, and that costs almost nothing: the split, the micro and whether it FITS
+// under the split are properties of the fills and the params. So the question that
+// actually gets asked — "will this even scalp, or is Grid exit % too tight?" — is
+// answerable with the robot stopped, which is exactly when you set the number.
+// Only the live half (inZone/armed) waits for the engine. Never throws.
+function hybridView(obj) {
+  try {
+    const job = new Job(false);
+    job.price = null;
+    return job.view(obj, obj?.param?.['field-strategy'] === 'short' ? 'short' : 'long');
+  } catch (err) {
+    console.error('hybridView:', err);
+    return null;
+  }
+}
+
 router.post('/table/:symbol', async (req, res, next) => {
   try {
     const rawSymbol = req.body.message;
@@ -77,7 +95,7 @@ router.post('/table/:symbol', async (req, res, next) => {
       return res.status(500).json({ data: {}, message: 'Invalid JSON in file' });
     }
 
-    res.json({ data: jsonData });
+    res.json({ data: { ...jsonData, hybridView: hybridView(jsonData) } });
   } catch (err) {
     if (err.code === 'ENOENT') {
       const msg = '🟡 File not found.';

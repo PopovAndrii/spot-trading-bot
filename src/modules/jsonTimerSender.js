@@ -491,7 +491,7 @@ class JsonTimerSender extends EventEmitter {
     obj.date_modified = new Date().toISOString();
     await this.#mergeLiveEdits(obj);
     await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
-    this.emit('tableData', obj); // refresh the UI table immediately
+    this.emit('tableData', this.#withView(obj)); // refresh the UI table immediately
 
     const line = `🧰 ${this.symbol}: grid fully filled — consolidated to one ${closeSide} of ${reb.quantity} ${this.baseAsset || ''} @ ${reb.price}. Stopped: press Start to place it, or sell manually.`;
     console.log(line);
@@ -556,6 +556,22 @@ class JsonTimerSender extends EventEmitter {
       }
     }
     this.job.price = p;
+  }
+
+  // Attach the engine's own scalp numbers (Job.view) to a table payload. Shallow
+  // copy on purpose: `obj` is the very object #jobIterator persists, and the cycle
+  // file must not grow a UI-only key. Never throws — a broken view must not take
+  // the table down with it.
+  #withView(obj) {
+    try {
+      const strategy = this.#strategy();
+      if (!strategy) return obj;
+      const hybridView = this.job.view(obj, strategy.method);
+      return hybridView ? { ...obj, hybridView } : obj;
+    } catch (err) {
+      console.error('hybridView:', err);
+      return obj;
+    }
   }
 
   /**
@@ -811,7 +827,7 @@ class JsonTimerSender extends EventEmitter {
         Number(data['BUY'].length * data['param']['field-requestFrequency']) || 5000
       );
 
-      this.emit('tableData', data);
+      this.emit('tableData', this.#withView(data));
     } catch (err) {
       console.error(this.#filePath(), 'Error reading file:', err);
     }

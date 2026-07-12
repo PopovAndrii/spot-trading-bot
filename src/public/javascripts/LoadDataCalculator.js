@@ -329,6 +329,94 @@ export class LoadDataCalculator {
     return `<span class="fill-badge" title="micro fires — banked oscillations">×${n}</span>`;
   }
 
+  // The scalp zone: orders from "Grid from order" down may run the pause-scalp,
+  // everything above them is pure DCA and always will be. Tinting the rows is the
+  // only way to SEE where the two strategies part — the numbers look identical.
+  #zoneClass(view, index) {
+    if (!view?.enabled || !view.arm) return '';
+    return index >= view.arm - 1 ? 'grid-zone' : '';
+  }
+
+  // The micro on the rung that actually carries it (the deepest held one). It is
+  // invisible in the plan columns — they show the whole-position close — so without
+  // this badge the scalp is a black box: you cannot tell a resting micro from one
+  // that was never placed, and least of all WHY.
+  //   live    — it is on the book right now, at this price and this volume.
+  //   waiting — it fits, but the price left the zone; the full close rests instead.
+  //   blocked — it does NOT fit under the split, so the engine places no scalp at
+  //             all and the cycle silently runs as plain DCA. This is the state
+  //             that needs a knob turned, and the title says which one.
+  #microBadge(view, index) {
+    if (!view?.enabled || !view.micro || view.deepest == null) return '';
+    if (index !== view.deepest - 1) return '';
+
+    const { price, quantity } = view.micro;
+    const side = this.strategy === 'short' ? 'above' : 'below';
+
+    if (view.resting) {
+      return `<span class="fill-badge micro-badge micro-live" title="micro resting on the book: ${quantity} @ ${price}">micro ${price} × ${quantity}</span>`;
+    }
+    if (!view.fits) {
+      return `<span class="fill-badge micro-badge micro-blocked" title="no scalp: the micro at ${price} must stay ${side} the split at ${view.split} — raise Grid exit % or lower Micro profit %">micro ${price} ✕</span>`;
+    }
+    if (!view.inZone) {
+      return `<span class="fill-badge micro-badge micro-wait" title="the price is out of the scalp zone (past the split at ${view.split}) — the whole-position close rests instead">micro ${price} …</span>`;
+    }
+    return `<span class="fill-badge micro-badge micro-live" title="micro arming: ${quantity} @ ${price}">micro ${price} × ${quantity}</span>`;
+  }
+
+  // The scalp in one line above the table: the live price against the split it is
+  // measured on, the micro, the REAL whole-position close (recomputed from the
+  // fills — it drifts away from the plan column as the cycle runs), and everything
+  // the grid has banked so far. Hidden entirely on a classic cycle.
+  #hybridBar(view, dec = 2) {
+    const bar = document.getElementById('hybrid-bar');
+    if (!bar) return;
+
+    if (!view?.enabled) {
+      bar.innerHTML = '';
+      bar.hidden = true;
+      return;
+    }
+
+    const cell = (label, value, cls = '') =>
+      `<span class="hybrid-bar__cell ${cls}">${label ? `<em>${label}</em>` : ''}${value}</span>`;
+
+    const banked = (Number(view.banked) || 0).toFixed(dec);
+    const out = [];
+
+    let state = 'idle';
+    let text = 'nothing held — waiting for the first fill';
+    if (view.deepest == null) {
+      // keep the idle line
+    } else if (view.arm && view.deepest < view.arm) {
+      state = 'idle';
+      text = `order #${view.deepest} held — DCA until #${view.arm}`;
+    } else if (view.resting) {
+      state = 'live';
+      text = `scalping order #${view.deepest}`;
+    } else if (!view.fits) {
+      state = 'blocked';
+      text = `no room for the micro on #${view.deepest} — raise Grid exit %`;
+    } else if (!view.inZone) {
+      state = 'wait';
+      text = 'price out of the zone — full close rests';
+    } else {
+      state = 'live';
+      text = `arming the micro on #${view.deepest}`;
+    }
+
+    out.push(cell('', text, `hybrid-bar__state is-${state}`));
+    if (view.price) out.push(cell('price', view.price));
+    if (view.split) out.push(cell('split', view.split));
+    if (view.micro) out.push(cell('micro', `${view.micro.price} × ${view.micro.quantity}`));
+    if (view.close) out.push(cell('close', `${view.close.price} × ${view.close.quantity}`));
+    out.push(cell('banked', banked, Number(view.banked) > 0 ? 'is-live' : ''));
+
+    bar.innerHTML = out.join('');
+    bar.hidden = false;
+  }
+
   // A live order may rest at a price different from the planned grid
   // price — a manual re-place. The column shows the plan (el.buyCurrency), so
   // surface the order's ACTUAL resting price as a badge; otherwise the table
@@ -567,11 +655,15 @@ export class LoadDataCalculator {
       // first order sits at the bottom and safety sells climb upward. Data binding stays
       // keyed by `index` (order number, badges, status backlight, cancel/replace
       // side:index), so only the DOM order changes — numbering keeps index+1 (№1 bottom).
-      // Hybrid v3 shows the PURE DCA plan — no column swap. The pause-scalp micro
-      // is a runtime detail of the deepest rung: when it rests, its actual
-      // price/qty surface through the current-price badge (resting price ≠ plan)
-      // and the ×N micro-fire counter. The plan columns never lie about the real
-      // exit: the whole-position averaged close stays the displayed close.
+      // Hybrid v3 shows the PURE DCA plan — no column swap. The plan columns never
+      // lie about the real exit: the whole-position averaged close stays the
+      // displayed close. The scalp is a runtime detail on top of it, and it is
+      // rendered from obj.hybridView — the engine's own numbers (Job.view), never
+      // recomputed here. Absent (classic cycle, page just loaded from file) → the
+      // table is exactly what it always was.
+      const view = obj?.hybridView || null;
+      this.#hybridBar(view, parseInt(obj?.param?.['field-tickSize'], 10) || 2);
+
       const rows = [];
       data['calculator'].forEach((el, index) => {
         const buyAct = this.#rowAction(obj, 'BUY', index, el.buyCurrency);
@@ -580,13 +672,18 @@ export class LoadDataCalculator {
         // long closes with SELL, short with BUY.
         const buyRecycle = this.strategy === 'short' ? this.#recycleBadge(obj, 'BUY', index) : '';
         const sellRecycle = this.strategy === 'long' ? this.#recycleBadge(obj, 'SELL', index) : '';
-        rows[index] = `<tr>
+        // The close side is the one that scalps, so the micro badge goes in ITS
+        // currency cell — SELL on long, BUY on short.
+        const closeSide = this.strategy === 'short' ? 'BUY' : 'SELL';
+        const buyMicro = closeSide === 'BUY' ? this.#microBadge(view, index) : '';
+        const sellMicro = closeSide === 'SELL' ? this.#microBadge(view, index) : '';
+        rows[index] = `<tr class="${this.#zoneClass(view, index)}">
               <th class="center">${index + 1}</th>
               <td>${el.overlapRange}</td>
-              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${buyRecycle}${this.#currentPriceBadge(obj, 'BUY', index, el.buyCurrency)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
+              <td class="${buyAct ? 'act-cell' : ''}"><span class="fill-cell">${el.buyCurrency}${buyRecycle}${buyMicro}${this.#currentPriceBadge(obj, 'BUY', index, el.buyCurrency)}${this.#fillBadge(obj, 'BUY', index, 'price')}</span>${buyAct}</td>
               <td class="${this.#backlight(obj, 'BUY', index)}"><span class="fill-cell">${el.buy}${this.#fillBadge(obj, 'BUY', index, 'qty')}</span></td>
               <td class="${this.#backlight(obj, 'SELL', index)}"><span class="fill-cell">${el.totalSell}${this.#fillBadge(obj, 'SELL', index, 'qty')}</span></td>
-              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${el.sellCurrency}${sellRecycle}${this.#currentPriceBadge(obj, 'SELL', index, el.sellCurrency)}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
+              <td class="${sellAct ? 'act-cell' : ''}"><span class="fill-cell">${el.sellCurrency}${sellRecycle}${sellMicro}${this.#currentPriceBadge(obj, 'SELL', index, el.sellCurrency)}${this.#fillBadge(obj, 'SELL', index, 'price')}</span>${sellAct}</td>
               <td>${el.didBuy}</td>
               <td>${el.calcBalance}</td>
           </tr>`;
