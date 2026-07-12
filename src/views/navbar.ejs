@@ -1,66 +1,125 @@
-<div class="nav warning">
-  <div class="nav-container">
-    <div class="logo">
-      <a class="" href="/">
-        <svg fill="currentColor" viewBox="0 0 16 16">
-          <path
-            d="M5.5 13v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.5v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.084c1.992 0 3.416-1.033 3.416-2.82 0-1.502-1.007-2.323-2.186-2.44v-.088c.97-.242 1.683-.974 1.683-2.19C11.997 3.93 10.847 3 9.092 3H9V1.75a.25.25 0 0 0-.25-.25h-1a.25.25 0 0 0-.25.25V3h-.573V1.75a.25.25 0 0 0-.25-.25H5.75a.25.25 0 0 0-.25.25V3l-1.998.011a.25.25 0 0 0-.25.25v.989c0 .137.11.25.248.25l.755-.005a.75.75 0 0 1 .745.75v5.505a.75.75 0 0 1-.75.75l-.748.011a.25.25 0 0 0-.25.25v1c0 .138.112.25.25.25zm1.427-8.513h1.719c.906 0 1.438.498 1.438 1.312 0 .871-.575 1.362-1.877 1.362h-1.28zm0 4.051h1.84c1.137 0 1.756.58 1.756 1.524 0 .953-.626 1.45-2.158 1.45H6.927z" />
-        </svg></a>
-    </div>
+<nav class="UInav UInav--sticky warning" aria-label="Main">
+  <a class="UInav__logo" href="/">
+    <svg fill="currentColor" viewBox="0 0 16 16">
+      <path d="M5.5 13v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.5v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.084c1.992 0 3.416-1.033 3.416-2.82 0-1.502-1.007-2.323-2.186-2.44v-.088c.97-.242 1.683-.974 1.683-2.19C11.997 3.93 10.847 3 9.092 3H9V1.75a.25.25 0 0 0-.25-.25h-1a.25.25 0 0 0-.25.25V3h-.573V1.75a.25.25 0 0 0-.25-.25H5.75a.25.25 0 0 0-.25.25V3l-1.998.011a.25.25 0 0 0-.25.25v.989c0 .137.11.25.248.25l.755-.005a.75.75 0 0 1 .745.75v5.505a.75.75 0 0 1-.75.75l-.748.011a.25.25 0 0 0-.25.25v1c0 .138.112.25.25.25zm1.427-8.513h1.719c.906 0 1.438.498 1.438 1.312 0 .871-.575 1.362-1.877 1.362h-1.28zm0 4.051h1.84c1.137 0 1.756.58 1.756 1.524 0 .953-.626 1.45-2.158 1.45H6.927z" />
+    </svg>
+  </a>
 
-    <ul id="main-menu">
-      <li class="-active"><a href="/info">My Balance</a></li>
-      <li class="ddown">
-        <button>In progress<span class="arrow"></span></button>
-        <div class="ddown-menu">
+  <div class="UInav__panel">
+    <ul class="UInav__start">
+      <li><a class="UInav__link" href="/info">My Balance</a></li>
+      <li>
+        <div class="UIselect sm nav-pairs" id="pairsMenu" tabindex="0" role="listbox" aria-haspopup="listbox">
+          <span class="UIselect-selected">In progress</span>
+          <span class="UIselect-arrow">&#9662;</span>
+          <input type="hidden" name="pairsMenu" />
+          <ul class="UIselect-options" hidden>
+            <li class="UIselect-options__search" role="search">
+              <input type="text" aria-label="Search pairs" />
+            </li>
+            <li class="UIselect-options__items" role="presentation">
+              <ul role="group"></ul>
+            </li>
+          </ul>
         </div>
       </li>
     </ul>
 
-    <a href="/login/logout" data-value="logout" class="nav-container__logout UIb sm r-round">
-      Logout
-    </a>
+    <div class="UInav__end">
+      <a href="/login/logout" data-value="logout" class="nav-logout UIb sm">Logout</a>
+    </div>
+  </div>
 
+  <div class="UInav__pinned">
     <label class="switch">
       <svg class="icon switch-icon" id="themeIcon">
         <use href="/sprite.svg#sun"></use>
       </svg>
-      <input type="checkbox" id="themeToggle">
+      <input type="checkbox" id="themeToggle" />
     </label>
-
   </div>
-</div>
+
+  <button class="UInav__toggle" type="button"><span class="UInav__burger"></span></button>
+</nav>
 
 <script>
-  async function fetchActiveSymbols() {
-    const res = await fetch('/api/symbols');
-    const symbols = await res.json();
+  (function() {
+    const navEl = document.querySelector('.UInav');
+    const selectEl = document.getElementById('pairsMenu');
+    const options = selectEl.querySelector('.UIselect-options__items ul');
 
-    const ddown = document.querySelector('#main-menu .ddown-menu');
-    ddown.replaceChildren(); // clear before filling: otherwise a repeated call (after a cancel) doubles it
+    new UiElements.Nav();
 
-    for (const [key, value] of symbols.entries()) {
-      const a = document.createElement('a');
+    // Scoped to the bar — not to the select, which would bind nothing: scan() looks for
+    // `.UIselect` *inside* the root, and an element is not its own descendant.
+    //
+    // Constructed here on purpose, too. This classic script runs during parse, i.e.
+    // before the page's deferred `type="module"` entry runs its own document-wide
+    // `new UiElements.Select()`. That order matters: whichever manager scans first marks
+    // the control bound and the other one skips it. Were the page manager to reach it
+    // first, it would bind the toggle listeners and this manager would add a second set
+    // on top — every click would open and close the list in the same tick. The root also
+    // keeps destroy() below off the page's own selects.
+    const pairs = new UiElements.Select({}, false, {
+      root: navEl,
+    });
 
-      var status = '';
+    // An option's payload is its data-value, not an href, so the listbox navigates
+    // only because we say so here.
+    selectEl.addEventListener('ui-select-change', (e) => {
+      const symbol = e.detail.value;
+      if (symbol) window.location.href = `/spotbot/${symbol}`;
+    });
 
-      if (value.status != 0) {
-        status = value.status == 1 ? 'running' : 'pause';
+    async function fetchActiveSymbols() {
+      const res = await fetch('/api/symbols');
+      const symbols = await res.json();
+
+      // The pair being viewed, so the closed control shows it instead of the placeholder.
+      const current = decodeURIComponent(window.location.pathname).match(
+        /^\/spotbot\/([^/]+)/
+      )?.[1];
+
+      options.replaceChildren(); // clear before filling: otherwise a repeated call (after a cancel) doubles it
+
+      for (const [, value] of symbols.entries()) {
+        const li = document.createElement('li');
+
+        var status = '';
+
+        if (value.status != 0) {
+          status = value.status == 1 ? 'running' : 'pause';
+        }
+
+        // base/quote in the link aren't needed: GET /spotbot/:currency derives them
+        // from exchangeInfo. And symbols flagged by the recovery scan at startup have
+        // no base/quote in pair — the link came out ?base=undefined&quote=undefined.
+        li.setAttribute('role', 'option');
+        li.dataset.value = value.symbol;
+        li.textContent = `${value.symbol} ${status}`;
+
+        // scan() reads this to fill the closed control's caption and hidden input.
+        // Doing it here rather than through setValue() leaves ui-select-change unfired
+        // — that event navigates, so emitting it on load would be a redirect loop.
+        if (value.symbol === current) li.setAttribute('aria-selected', 'true');
+
+        options.appendChild(li);
       }
 
-      // base/quote in the query aren't needed: GET /spotbot/:currency derives them
-      // from exchangeInfo. And symbols flagged by the recovery scan at startup have
-      // no base/quote in pair — the link came out ?base=undefined&quote=undefined.
-      a.href = `/spotbot/${value.symbol}`;
-      a.textContent = `${value.symbol} ${status}`;
-
-      ddown.appendChild(a);
+      // Select binds a click listener per <li>, and scan() skips a control it has
+      // already bound — so options swapped in under a live Select stay dead until it
+      // is torn down and rebound. This is what keeps a pair added or deleted at
+      // runtime clickable.
+      pairs.destroy();
+      pairs.scan();
     }
-  }
 
-  fetchActiveSymbols();
+    window.fetchActiveSymbols = fetchActiveSymbols;
+    fetchActiveSymbols();
 
-  document.querySelector('.nav-container__logout')?.addEventListener('ui-button-change', () => {
-    window.location.href = '/login/logout';
-  });
+    document.querySelector('.nav-logout')?.addEventListener('ui-button-change', () => {
+      window.location.href = '/login/logout';
+    });
+  })();
+
 </script>

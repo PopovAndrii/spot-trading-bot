@@ -37,20 +37,13 @@ export class Theme {
 
   menuHighlight() {
     const currentPath = window.location.pathname;
-    const links = document.querySelectorAll('.nav ul>li>a');
-    const drops = document.querySelectorAll('.nav ul>li.ddown a');
 
-    drops.forEach((link) => {
-      const linkPath = new URL(link.href, window.location.origin).pathname;
-
-      if (linkPath == currentPath) {
-        link.classList.add('active');
-      }
-    });
-
-    links.forEach((link) => {
+    // Only the bar's own links are marked here. The active pair is no longer a link —
+    // it is the pairs Select's aria-selected option, set as the list is built in
+    // navbar.ejs, which is also the only place that knows the pair has changed.
+    document.querySelectorAll('.UInav__link').forEach((link) => {
       if (link.getAttribute('href') === currentPath) {
-        link.closest('li').classList.add('active');
+        link.setAttribute('aria-current', 'page');
       }
     });
   }
