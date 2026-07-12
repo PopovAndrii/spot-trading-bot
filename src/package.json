@@ -10,8 +10,8 @@
     "setup-user": "node ./bin/setup-user.js",
     "test": "node --test",
     "prod-runtime": "pm2-runtime start ./bin/www --name my-app",
-    "lint": "eslint . --ext .js,.ts",
-    "lint:fix": "eslint . --ext .js,.ts --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "lint:css": "stylelint \"scss/**/*.scss\"",
     "lint:css:fix": "stylelint \"scss/**/*.scss\" --fix",
     "watch-css": "sass --style=compressed --no-source-map --watch scss/:public/stylesheets/"
@@ -36,15 +36,14 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@stylistic/stylelint-config": "^5.0.0",
     "@stylistic/stylelint-plugin": "^5.2.1",
     "browser-sync": "^3.0.4",
     "concurrently": "^10.0.3",
     "eslint": "^10.5.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.6",
+    "js-beautify": "^2.0.3",
     "nodemon": "^3.1.14",
-    "prettier": "^3.8.4",
     "qrcode": "^1.5.4",
     "sass": "^1.101.0",
     "stylelint": "^17.14.0",
