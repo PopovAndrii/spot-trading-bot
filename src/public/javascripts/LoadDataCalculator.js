@@ -385,13 +385,20 @@ export class LoadDataCalculator {
     const banked = (Number(view.banked) || 0).toFixed(dec);
     const out = [];
 
+    // Order matters: "blocked" is a real complaint and must not be printed at a
+    // cycle that simply has nothing to scalp — a finished or empty position has no
+    // micro for want of VOLUME, not for want of room, and telling the user to raise
+    // Grid exit % there would send them chasing a number that changes nothing.
     let state = 'idle';
     let text = 'nothing held — waiting for the first fill';
     if (view.deepest == null) {
       // keep the idle line
+    } else if (!view.close) {
+      text = 'position closed — nothing left to scalp';
     } else if (view.arm && view.deepest < view.arm) {
-      state = 'idle';
       text = `order #${view.deepest} held — DCA until #${view.arm}`;
+    } else if (!view.micro) {
+      text = `order #${view.deepest} is already closed out — nothing left to scalp`;
     } else if (view.resting) {
       state = 'live';
       text = `scalping order #${view.deepest}`;
