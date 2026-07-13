@@ -143,7 +143,7 @@ test('view: a resting micro is reported as resting, with its real price and volu
   assert.equal(v.micro.quantity, '0.085');
 });
 
-test('view: banked oscillations surface — they are invisible in the ladder', () => {
+test('view: banked oscillations surface — and each one pulls the close down', () => {
   const obj = cycle();
   obj.gridRealized = 0.2464;
   obj.SELL[3] = order('SELL', null, '583.23', '0.183', { hybrid: 3 });
@@ -151,7 +151,10 @@ test('view: banked oscillations surface — they are invisible in the ladder', (
   const v = job().view(obj, 'long');
 
   assert.equal(v.banked, 0.2464);
-  assert.equal(v.close.price, '583.22'); // the bank does NOT move the close — today
+  // The bank is realized money of this cycle: the close no longer has to recover
+  // it. (106.30484 − 0.2464) / 0.183 × 1.004 = 581.87 — down from 583.22. The
+  // scalp's profit now does the work of the martingale volume the re-arm took back.
+  assert.equal(v.close.price, '581.87');
 });
 
 test('view: rungs above the arm are pure DCA — no micro is described at all', () => {

@@ -46,6 +46,25 @@ function markOpenAsCanceled(obj) {
   return obj;
 }
 
+/**
+ * Close orders whose price went stale the moment a micro banked: every live
+ * whole-position close was priced before this oscillation's profit existed, so
+ * it no longer matches what rebalancedClose would place (the bank lowers a long
+ * exit / raises a short one). Returns their indices; the REARM handler cancels
+ * them and lets the next pass re-place each at the recomputed price. A resting
+ * micro is never stale (it IS the scalp) and a manual pull stays the user's.
+ * Pure function — testable without the exchange.
+ */
+function staleCloseIndices(obj, strategy) {
+  const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
+  const out = [];
+  (obj?.[closeSide] || []).forEach((c, i) => {
+    if (!c || c.role === 'micro' || c.manual || c.orderId == null) return;
+    if (c.status === 'NEW' || c.status === 'PARTIALLY_FILLED') out.push(i);
+  });
+  return out;
+}
+
 function needsRecoveryConsolidation(obj, strategy) {
   const entrySide = strategy === 'short' ? 'SELL' : 'BUY';
   const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
@@ -513,7 +532,7 @@ class JsonTimerSender extends EventEmitter {
   #notifyOrderEvent(currentOrder, message, slot) {
     const num = currentOrder.id + 1;
     const side = message.side || currentOrder.side || '';
-    const role = slot?.role === 'micro' ? ' micro' : '';
+    const role = slot?.role === 'micro' ? ' micro' : slot?.role === 'tail' ? ' tail' : '';
 
     // One-line-per-event notices batched under the pair header by #jobIterator
     // (telegram.open/flush). The symbol lives in the batch header, so lines omit it.
@@ -673,6 +692,30 @@ class JsonTimerSender extends EventEmitter {
             `${banked >= 0 ? '+' : ''}${banked.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}` +
             ` (grid: ${(Number(obj.gridRealized) || 0).toFixed(this.tickDecimals)})`
           );
+
+          // The bank just moved the exit: every resting whole-position close is
+          // now priced off pre-bank math. Pull them — the next pass re-places
+          // each through rebalancedClose, which folds the bank in ("current
+          // order + profit trim = recalculation → re-entry"). Best-effort:
+          // a failed cancel stays live and is retried on the next bank, or swept
+          // by the classic machine when it needs the balance anyway.
+          let repriced = false;
+          for (const j of staleCloseIndices(obj, this.strategy)) {
+            const c = obj[closeSide][j];
+            const res = await this.#runToApi({
+              method: 'cancelOrder',
+              data: { id: j, symbol: this.symbol, orderId: c.orderId },
+            });
+            if (res && res.success !== false) {
+              c.status = 'CANCELED';
+              repriced = true;
+              logBus.log(
+                `🔁 ${this.symbol}: ${closeSide} #${j + 1} @ ${c.price} pulled — ` +
+                'the bank changed the exit, re-placing at the recomputed price'
+              );
+            }
+          }
+          if (repriced) this.#kickTick();
 
           await this.#mergeLiveEdits(obj);
           await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
@@ -1175,6 +1218,7 @@ module.exports = JsonTimerSender;
 module.exports.partialFillDelta = partialFillDelta;
 module.exports.markOpenAsCanceled = markOpenAsCanceled;
 module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
+module.exports.staleCloseIndices = staleCloseIndices;
 module.exports.manualStuckSlots = manualStuckSlots;
 module.exports.cycleProfit = cycleProfit;
 module.exports.freshPrice = freshPrice;

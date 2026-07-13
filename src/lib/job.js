@@ -57,7 +57,10 @@ function rebalancedClose(obj, i, strategy) {
   const profit = parseFloat(obj['param']['field-profit']) || 0;
   const commission = parseFloat(obj['param']['field-commission']) || 0;
 
-  const res = rebalanceClose(entries, closes, strategy, profit + commission);
+  // The hybrid scalp bank is realized money of THIS cycle — the close no longer
+  // has to recover it (see rebalanceClose). Zero on non-hybrid cycles.
+  const res = rebalanceClose(entries, closes, strategy, profit + commission,
+    Number(obj.gridRealized) || 0);
   if (!res) return null; // position already fully closed
 
   const stepSize = parseInt(obj['param']['field-stepSize'], 10) || 0;
@@ -131,7 +134,9 @@ function hybridDirty(obj, strategy) {
   const closeSide = strategy === 'short' ? 'BUY' : 'SELL';
   const closes = obj?.[closeSide];
   if (!Array.isArray(closes)) return false;
-  return closes.some((c) => c?.role === 'micro');
+  // 'tail' counts too: a filled tail read by the classic machine is entry+close
+  // FILLED = "cycle DONE" — with the carrying rung still held.
+  return closes.some((c) => c?.role === 'micro' || c?.role === 'tail');
 }
 
 // The live hybrid switch, as a pure param patch. ON aims the scalp at the rung the
@@ -681,7 +686,10 @@ class Job {
     const p = obj.param || {};
     const fees = (parseFloat(p['field-profit']) || 0) + (parseFloat(p['field-commission']) || 0);
 
-    const res = rebalanceClose(entries, closes, strategy, fees);
+    // Fold the scalp bank into the exit: each banked oscillation lowers the
+    // whole-position close (long; raises it for short), doing the work of the
+    // martingale volume the re-arm took back. See rebalanceClose.
+    const res = rebalanceClose(entries, closes, strategy, fees, Number(obj.gridRealized) || 0);
     if (!res) return null; // position already fully closed
 
     const stepSize = parseInt(p['field-stepSize'], 10) || 0;
@@ -784,11 +792,16 @@ class Job {
     const close = obj[closeSide][i] || {};
     const symbol = el.symbol;
 
-    // A filled micro is a banked oscillation — bookkeep it (REARM) regardless of
-    // the current price, BEFORE the classic machine reads entry+close FILLED at
-    // the deepest index as "cycle DONE".
+    // A micro is ALWAYS the hybrid's to finish — the aim knob (field-gridArm)
+    // gates NEW scalps only, never the care of an existing one. Seen live: with
+    // a micro resting on rung #3 the arm was raised to #4, the rung fell out of
+    // the scalp gate and the classic machine adopted the micro as if it were the
+    // whole-position close — polling a rung-sized order whose fill would have
+    // ended the cycle with most of the position still held. So the role is
+    // checked BEFORE any arm/deepest routing:
+    //   FILLED micro → bank the oscillation (REARM) wherever the arm points now,
+    //   before the classic machine reads entry+close FILLED as "cycle DONE";
     if (
-      i >= g &&
       el.status === state.FILLED &&
       close.status === state.FILLED &&
       close.role === 'micro'
@@ -814,8 +827,120 @@ class Job {
       return { status: 'REARM', method: false, side: null, id: i, data: { id: i, symbol } };
     }
 
-    // Everything except the deepest held scalp-capable rung = pure DCA.
-    if (i !== D || D < g) return classic(obj, i, el);
+    //   live micro on a rung that is no longer the scalp-capable deepest (the
+    //   arm was raised past it, or a deeper rung filled) → pull it and hand the
+    //   rung back; swap gets the classic close placed the same tick.
+    if (
+      close.role === 'micro' &&
+      close.orderId != null &&
+      (close.status === state.NEW || close.status === state.PARTIALLY_FILLED) &&
+      (i !== D || D < g)
+    ) {
+      return {
+        status: null,
+        method: 'cancelOrder',
+        swap: true,
+        side: closeSide,
+        id: i,
+        data: { id: i, symbol, orderId: close.orderId },
+      };
+    }
+
+    // The TAIL — the rest of the position resting NEXT TO the micro, so the
+    // closes on the book always add up to the whole position: a burst spike
+    // fills both and the cycle closes on the exchange, not in the engine's
+    // reaction time. It lives on the rung right above the carrying one, priced
+    // like the whole-position close of rungs 0..D-1 with the bank folded in;
+    // after every banked micro the REARM handler pulls it (staleCloseIndices)
+    // and it is re-placed here at the recomputed price.
+    if (close.role === 'tail') {
+      if (el.status === state.FILLED && close.status === state.FILLED) {
+        // The tail closed rungs 0..D-1 on its own. With nothing else held the
+        // cycle is over; otherwise it goes on holding just the carrying rung —
+        // never a classic DONE, which would end it with that rung still held.
+        if (this.#positionFlat(obj, D, strategy)) {
+          return {
+            status: Status.DONE,
+            method: 'cancelOpenOrders',
+            side: null,
+            id: i,
+            data: { id: i, symbol },
+          };
+        }
+        return { status: 'pass', method: false, side: null, id: i, data: {} };
+      }
+      // the ladder moved — a live tail off its slot covers the wrong remainder
+      if (
+        close.orderId != null &&
+        (close.status === state.NEW || close.status === state.PARTIALLY_FILLED) &&
+        i !== D - 1
+      ) {
+        return {
+          status: null,
+          method: 'cancelOrder',
+          swap: true,
+          side: closeSide,
+          id: i,
+          data: { id: i, symbol, orderId: close.orderId },
+        };
+      }
+    }
+
+    // Everything except the deepest held scalp-capable rung = pure DCA — with
+    // one insertion: the slot right above a live micro carries the tail.
+    if (i !== D || D < g) {
+      const md = obj[closeSide]?.[D];
+      const microLive =
+        md?.role === 'micro' &&
+        md.orderId != null &&
+        (md.status === state.NEW || md.status === state.PARTIALLY_FILLED);
+
+      // While the scalp holds the head, a live close anywhere but the tail's
+      // slot covers the wrong remainder (left from before the ladder deepened).
+      // Pull it — the tail takes its place bigger and lower, exactly the way
+      // the classic close has always moved on every new fill. A close sitting
+      // ON the tail's slot is the tail de facto and is left alone.
+      if (
+        microLive &&
+        i !== D - 1 &&
+        close.role !== 'micro' &&
+        !close.manual &&
+        close.orderId != null &&
+        (close.status === state.NEW || close.status === state.PARTIALLY_FILLED)
+      ) {
+        return {
+          status: null,
+          method: 'cancelOrder',
+          swap: true,
+          side: closeSide,
+          id: i,
+          data: { id: i, symbol, orderId: close.orderId },
+        };
+      }
+
+      if (i === D - 1 && el.status === state.FILLED) {
+        const t = this.#tailClose(obj, i, D, strategy, closeSide);
+        if (t) {
+          return {
+            status: null,
+            method: 'newOrder',
+            side: closeSide,
+            id: i,
+            role: 'tail',
+            data: {
+              id: i,
+              symbol,
+              side: closeSide,
+              type: 'LIMIT',
+              timeInForce: 'GTC',
+              quantity: t.quantity,
+              price: t.price,
+            },
+          };
+        }
+      }
+      return classic(obj, i, el);
+    }
 
     // A FILLED close without the micro role is the classic whole-position close
     // → DONE path belongs to the classic machine, never to the scalp.
@@ -949,6 +1074,71 @@ class Job {
     const quantity = Decimal.max(execQty.minus(already), 0)
       .toDecimalPlaces(step, Decimal.ROUND_DOWN)
       .toFixed(step);
+    return { quantity, price };
+  }
+
+  // Quantity/price of the TAIL, or null when it must not be placed. The tail is
+  // the whole-position close of rungs 0..D-1 — the carrying rung is excluded,
+  // its volume is the micro's. Priced exactly like the real exit (rebalanceClose
+  // over the ACTUAL fills, bank folded in), so micro + tail always cover the
+  // position at the prices the cycle actually needs. Refuses when: no live micro
+  // on D (the tail accompanies the scalp, alone the classic close does the job),
+  // the slot is busy or the user's (manual), ANOTHER live non-micro close still
+  // rests (placing on top of it would oversell the position), fill data is
+  // missing (old config), or the remainder is below exchange minimums.
+  #tailClose(obj, i, D, strategy, closeSide) {
+    const entrySide = strategy === 'long' ? 'BUY' : 'SELL';
+
+    const md = obj[closeSide]?.[D];
+    const microLive =
+      md?.role === 'micro' &&
+      md.orderId != null &&
+      (md.status === state.NEW || md.status === state.PARTIALLY_FILLED);
+    if (!microLive) return null;
+
+    const slot = obj[closeSide]?.[i];
+    if (!slot || slot.manual) return null;
+    if (slot.status !== null && slot.status !== state.CANCELED) return null;
+
+    const otherLive = (obj[closeSide] || []).some(
+      (c, k) =>
+        k !== D &&
+        c &&
+        c.orderId != null &&
+        c.role !== 'micro' &&
+        !c.manual &&
+        (c.status === state.NEW || c.status === state.PARTIALLY_FILLED)
+    );
+    if (otherLive) return null;
+
+    const entries = [];
+    for (let k = 0; k < D; k++) {
+      const e = obj[entrySide][k];
+      if (!e || e.status !== state.FILLED) continue;
+      if (e.executedQty === undefined || e.cummulativeQuoteQty === undefined) return null;
+      entries.push(e);
+    }
+    if (entries.length === 0) return null;
+
+    // What the non-micro closes already sold reduces the tail; the micro's own
+    // fills belong to the carrying rung's slice, not to this remainder.
+    const closes = (obj[closeSide] || []).filter(
+      (c) => c && c.role !== 'micro' && (Number(c?.executedQty) || 0) > 0
+    );
+
+    const p = obj.param || {};
+    const fees = (parseFloat(p['field-profit']) || 0) + (parseFloat(p['field-commission']) || 0);
+    const res = rebalanceClose(entries, closes, strategy, fees, Number(obj.gridRealized) || 0);
+    if (!res) return null;
+
+    const stepSize = parseInt(p['field-stepSize'], 10) || 0;
+    const tickSize = parseInt(p['field-tickSize'], 10) || 0;
+    const quantity = new Decimal(res.quantity)
+      .toDecimalPlaces(stepSize, Decimal.ROUND_DOWN)
+      .toFixed(stepSize);
+    const price = new Decimal(res.price).toFixed(tickSize);
+    if (parseFloat(quantity) <= 0 || this.#belowMin(quantity, price)) return null;
+
     return { quantity, price };
   }
 

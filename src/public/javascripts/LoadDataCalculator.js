@@ -241,7 +241,9 @@ export class LoadDataCalculator {
       this.toggleHybridFields();
 
       if (!this.getListenerStatus()) {
-        this.switchHybrid(Boolean(e.detail?.value));
+        // detail.value is the STRING "true"/"false" (see expertMode) —
+        // Boolean("false") is true, which turned every OFF into an ON.
+        this.switchHybrid(String(e.detail?.value) === 'true');
         return;
       }
 

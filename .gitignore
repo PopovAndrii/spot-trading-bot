@@ -22,5 +22,5 @@
 /.vscode
 /.env
 *ash_history
-/graphify-out
+graphify-out
 /.claude

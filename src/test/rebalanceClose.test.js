@@ -52,3 +52,31 @@ test('short: close price below average (factor 1 − fees%)', () => {
   near(r.avgEntryPrice, 100);
   near(r.price, 99); // short → avg × (1 − 1%)
 });
+
+test('long: banked scalp profit lowers the exit, avgEntryPrice untouched', () => {
+  const entries = [{ executedQty: 0.051, cummulativeQuoteQty: 29.05735 }];
+  const r = rebalanceClose(entries, [], 'long', 0.4, 0.23055);
+  near(r.quantity, 0.051);
+  near(r.avgEntryPrice, 29.05735 / 0.051); // true average of the remaining fills
+  near(r.price, ((29.05735 - 0.23055) / 0.051) * 1.004); // bank pulls the exit down
+});
+
+test('short: banked scalp profit raises the buyback exit', () => {
+  const r = rebalanceClose([{ executedQty: 2, cummulativeQuoteQty: 200 }], [], 'short', 0.4, 1);
+  near(r.avgEntryPrice, 100);
+  near(r.price, ((200 + 1) / 2) * 0.996); // mirrored: exit moves up toward the market
+});
+
+test('bank covering the whole remaining cost → discount skipped, not a zero price', () => {
+  const entries = [{ executedQty: 1, cummulativeQuoteQty: 100 }];
+  const r = rebalanceClose(entries, [], 'long', 0.45, 100);
+  near(r.price, 100 * 1.0045); // falls back to the unadjusted exit
+  const r2 = rebalanceClose(entries, [], 'long', 0.45, 150);
+  near(r2.price, 100 * 1.0045);
+});
+
+test('bank omitted or zero — behaviour identical to before', () => {
+  const entries = [{ executedQty: 1, cummulativeQuoteQty: 100 }];
+  near(rebalanceClose(entries, [], 'long', 0.45).price, 100.45);
+  near(rebalanceClose(entries, [], 'long', 0.45, 0).price, 100.45);
+});

@@ -506,3 +506,230 @@ test('flap: short mirrors it — arming needs the price ABOVE the micro buy-back
   const above = priceJob(110).hybridShort(obj, 1, obj.SELL[1]);
   assert.equal(above.role, 'micro');
 });
+
+// ===== a micro is ALWAYS the hybrid's to finish — the arm knob gates NEW scalps only =====
+// Seen live: with a micro resting on rung #3 the user raised "Grid from order" to #4.
+// The rung fell out of the scalp gate and the classic machine adopted the micro as if
+// it were the whole-position close — its fill would have ended the cycle with most of
+// the position still held.
+
+test('arm raised past a FILLED micro: still banked (REARM), never a classic DONE', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'FILLED', {
+        orderId: 400,
+        role: 'micro',
+        quantity: '1.000',
+        price: '90.27',
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90.27,
+      }),
+    ],
+  });
+  obj.param['field-gridArm'] = '3'; // scalp now allowed only from rung #3 — rung #2 holds the micro
+
+  const r = priceJob(93).hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r.status, 'REARM'); // the oscillation is real money — bank it wherever the aim points
+});
+
+test('arm raised past a LIVE micro: pulled and handed back, not adopted by classic', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 401, role: 'micro', quantity: '1.000', price: '90.27' }),
+    ],
+  });
+  obj.param['field-gridArm'] = '3';
+
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.data.orderId, 401);
+  assert.equal(r.swap, true); // the classic close is owed the same tick
+});
+
+test('deeper rung filled under a LIVE micro: the stale micro is pulled, scalp moves down', () => {
+  const obj = scalpObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 }),
+      mkOrder('BUY', 'FILLED', {
+        orderId: 2,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90,
+        price: '90.00',
+      }),
+      mkOrder('BUY', 'FILLED', {
+        orderId: 3,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 80,
+        price: '80.00',
+      }),
+    ],
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 402, role: 'micro', quantity: '1.000', price: '90.27' }),
+      mkOrder('SELL', null, { quantity: '3.000', price: '90.36' }),
+    ],
+  });
+
+  const r = priceJob(85).hybridLong(obj, 1, obj.BUY[1]); // rung #2 is no longer the deepest
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.data.orderId, 402);
+  assert.equal(r.swap, true);
+});
+
+// ===== the TAIL: the rest of the position rests NEXT TO the micro =====
+// User's partition: sells on the book always add up to the whole position, so a
+// burst spike fills both orders and the cycle closes on the exchange — instead of
+// racing the engine's reaction time. The tail sits on the rung right above the
+// carrying one, priced like the whole-position close of rungs 0..D-1, bank folded in.
+
+const microNew = (over = {}) =>
+  mkOrder('SELL', 'NEW', { orderId: 600, role: 'micro', quantity: '1.000', price: '90.27', ...over });
+
+test('tail: a live micro gets the remainder resting right above it', () => {
+  const obj = scalpObj({ sells: [mkOrder('SELL', null), microNew()] });
+  const r = priceJob(90).hybridLong(obj, 0, obj.BUY[0]);
+
+  assert.equal(r.method, 'newOrder');
+  assert.equal(r.role, 'tail');
+  assert.equal(r.data.quantity, '1.000'); // everything the micro does not cover
+  assert.equal(r.data.price, '100.40'); // rung 0's own close: 100 × 1.004
+});
+
+test('tail: the bank lowers it, like any exit', () => {
+  const obj = scalpObj({ sells: [mkOrder('SELL', null), microNew()] });
+  obj.gridRealized = 1;
+  const r = priceJob(90).hybridLong(obj, 0, obj.BUY[0]);
+
+  assert.equal(r.data.price, '99.40'); // (100 − 1) × 1.004 — each banked micro pulls it down
+});
+
+test('tail: no micro resting → no tail, the rung stays byte-identical classic', () => {
+  const obj = scalpObj(); // the deepest slot is empty — nothing to accompany
+  const j = priceJob(90);
+  assert.deepEqual(j.hybridLong(obj, 0, obj.BUY[0]), j.long(obj, 0, obj.BUY[0]));
+});
+
+// Three rungs held mid-transition: the micro moved to #3, an old tail still
+// rests on #1 while its place is now #2.
+function threeRungObj(sells) {
+  return mkObj({
+    buys: [
+      mkOrder('BUY', 'FILLED', { orderId: 1, executedQty: 1.0, cummulativeQuoteQty: 100 }),
+      mkOrder('BUY', 'FILLED', {
+        orderId: 2,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90,
+        price: '90.00',
+      }),
+      mkOrder('BUY', 'FILLED', {
+        orderId: 3,
+        executedQty: 1.0,
+        cummulativeQuoteQty: 80,
+        price: '80.00',
+      }),
+    ],
+    sells,
+    param: { 'field-gridLevel': '2', 'field-profit': '0.2', 'field-commission': '0.2' },
+  });
+}
+
+test('tail: the ladder moved — a live tail off its slot is pulled', () => {
+  const obj = threeRungObj([
+    mkOrder('SELL', 'NEW', { orderId: 601, role: 'tail', quantity: '1.000', price: '100.40' }),
+    mkOrder('SELL', null),
+    mkOrder('SELL', 'NEW', { orderId: 602, role: 'micro', quantity: '1.000', price: '80.24' }),
+  ]);
+  const r = priceJob(80).hybridLong(obj, 0, obj.BUY[0]);
+
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.data.orderId, 601);
+  assert.equal(r.swap, true);
+});
+
+test('tail: oversell guard — while another close still rests, no tail is added', () => {
+  const obj = threeRungObj([
+    mkOrder('SELL', 'NEW', { orderId: 601, role: 'tail', quantity: '1.000', price: '100.40' }),
+    mkOrder('SELL', null),
+    mkOrder('SELL', 'NEW', { orderId: 602, role: 'micro', quantity: '1.000', price: '80.24' }),
+  ]);
+  // slot #2 is the tail's place, but the stray on #1 is still live this tick
+  const r = priceJob(80).hybridLong(obj, 1, obj.BUY[1]);
+
+  assert.equal(r.status, 'pass'); // nothing new on the book until the stray is gone
+});
+
+test('tail: filled while the carrying rung is still held → the cycle goes on', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', 'FILLED', {
+        orderId: 603,
+        role: 'tail',
+        quantity: '1.000',
+        price: '100.40',
+        executedQty: 1.0,
+        cummulativeQuoteQty: 100.4,
+      }),
+      microNew(),
+    ],
+  });
+  const r = priceJob(90).hybridLong(obj, 0, obj.BUY[0]);
+
+  assert.equal(r.status, 'pass'); // rung 0 exited with profit; rung 1 keeps trading
+});
+
+test('tail: filled and nothing else held → the cycle ends', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', 'FILLED', {
+        orderId: 604,
+        role: 'tail',
+        quantity: '1.000',
+        price: '100.40',
+        executedQty: 1.0,
+        cummulativeQuoteQty: 100.4,
+      }),
+      mkOrder('SELL', 'FILLED', {
+        orderId: 605,
+        role: 'micro',
+        quantity: '1.000',
+        price: '90.27',
+        executedQty: 1.0,
+        cummulativeQuoteQty: 90.27,
+      }),
+    ],
+  });
+  const r = priceJob(91).hybridLong(obj, 0, obj.BUY[0]);
+
+  assert.equal(r.status, Status.DONE);
+});
+
+test('tail: a role-less leftover close off the tail slot is pulled the same way', () => {
+  // the classic close of rung 1 kept resting while the ladder deepened to #3:
+  // it now covers the wrong remainder and blocks the real tail on slot #2
+  const obj = threeRungObj([
+    mkOrder('SELL', 'NEW', { orderId: 610, quantity: '1.000', price: '100.40' }),
+    mkOrder('SELL', null),
+    mkOrder('SELL', 'NEW', { orderId: 611, role: 'micro', quantity: '1.000', price: '80.24' }),
+  ]);
+  const r = priceJob(80).hybridLong(obj, 0, obj.BUY[0]);
+
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.data.orderId, 610);
+  assert.equal(r.swap, true);
+});
+
+test('tail: a close already ON the tail slot is the tail de facto — left alone', () => {
+  // the classic close of rungs 1-2 placed BEFORE the scalp took rung #3 over:
+  // right volume, right slot — no reason to touch it (the burst catcher stays)
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', 'NEW', { orderId: 612, quantity: '1.000', price: '100.40' }),
+      microNew(),
+    ],
+  });
+  const r = priceJob(90).hybridLong(obj, 0, obj.BUY[0]);
+
+  assert.notEqual(r.method, 'cancelOrder');
+});
