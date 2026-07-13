@@ -1,5 +1,18 @@
 const EventEmitter = require('events');
 const WebSocket = require('ws');
+const { isTestnet } = require('./runMode');
+
+// The public price stream MUST come from the same exchange the orders live on.
+// This used to be hardcoded to mainnet while BINANCE_MODE=test put every order on
+// testnet — two different order books with two different prices. The hybrid scalp
+// reads this stream to decide whether the price is inside the pause zone, so it was
+// comparing a MAINNET tick against a micro priced off TESTNET fills: it armed and
+// cancelled the scalp on a market its orders were not in, and the micro sat on the
+// testnet book at a price the testnet market never traded at. Same for the price in
+// the UI header — plausible, and from the wrong exchange.
+function streamBase() {
+  return isTestnet() ? 'wss://stream.testnet.binance.vision/ws/' : 'wss://stream.binance.com:9443/ws/';
+}
 
 class StreamAPI extends EventEmitter {
   static instances = new Map();
@@ -41,8 +54,8 @@ class StreamAPI extends EventEmitter {
       return;
     }
 
-    const url = `wss://stream.binance.com:9443/ws/${this.symbol}@ticker`;
-    console.log(`🔄 StreamAPI Connecting ${this.symbol}...`);
+    const url = `${streamBase()}${this.symbol}@ticker`;
+    console.log(`🔄 StreamAPI Connecting ${this.symbol} (${isTestnet() ? 'testnet' : 'real'})...`);
 
     this.ws = new WebSocket(url);
 
