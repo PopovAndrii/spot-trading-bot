@@ -266,11 +266,11 @@ Releases live on `main` as semver tags (`vMAJOR.MINOR.PATCH`); `src/package.json
 mirrors the tag. `main` = released line, `dev` = integration. Bump rule:
 **patch** = fixes, **minor** = features (backward-compatible), **major** = breaking.
 
-1. On `dev` (tested), bump the version — edits `package.json`, no tag yet:
+1. On `dev` (tested), bump the version — edits `package.json`, no tag yet.
+   `npm` runs inside the container (already in `/var/www/src`), git on the host:
    ```sh
-   cd src && npm version <patch|minor|major> --no-git-tag-version
-   cd ..
-   git commit -am "Release vX.Y.Z"
+   npm version 0.0.0 --no-git-tag-version
+   git commit -am "Release v0.0.0"
    git push origin dev
    ```
 2. Merge `dev → main` via a GitLab Merge Request (keep `main` protected: merge only via MR):
