@@ -174,6 +174,10 @@ class JsonTimerSender extends EventEmitter {
 
     this.busy = false;
 
+    // A hybrid swap cancelled the resting exit this pass; the replacement is owed on
+    // the next one, and it must not wait a full ladder's worth of polling.
+    this.swapPending = false;
+
     this.apiFailStreak = 0;
     this.apiOutageNotified = false;
 
@@ -783,6 +787,13 @@ class JsonTimerSender extends EventEmitter {
         // currentOrder['id'] !== [key] !!!
         applyOrderResult(obj[result.message.side][currentOrder['id']], currentOrder, result.message);
 
+        // A hybrid swap (the full close yielding to the micro, or the micro yielding
+        // back) is a cancel now and a placement on the NEXT pass — and a pass is
+        // orders × requestFrequency, ten seconds on a full ladder. Ten seconds with
+        // the position carrying no exit order at all. Kick an out-of-band tick the
+        // moment this pass ends and the replacement lands in ~50 ms instead.
+        if (currentOrder.swap) this.swapPending = true;
+
         this.#notifyOrderEvent(
           currentOrder,
           result.message,
@@ -832,6 +843,14 @@ class JsonTimerSender extends EventEmitter {
             // when nothing was queued (the common quiet tick) or already flushed.
             telegram.flush(this.symbol);
             this.busy = false;
+
+            // A hybrid swap pulled the resting exit this pass and its replacement is
+            // owed on the next one. Do not make the position wait a full ladder for
+            // it — kickTick needs busy to be down, which is why this fires here.
+            if (this.swapPending) {
+              this.swapPending = false;
+              this.#kickTick();
+            }
           });
       }
 

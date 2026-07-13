@@ -737,13 +737,29 @@ class Job {
     return gridExitThreshold(entry, close, obj.param?.['field-gridExit']);
   }
 
-  // Scalp gate for the deepest held rung: the live price must sit on the entry
-  // side of the split (long: P < split, short: P > split), and the micro's own
-  // close price must stay strictly inside that zone too — the micro must NEVER
-  // cross the split line. Unknown price / missing data → false (classic DCA).
-  // The live switch is checked first: off = no new scalp, and the caller's
-  // out-of-zone branch pulls whatever the scalp left resting.
-  #scalpMode(obj, D, strategy, microPrice) {
+  // Scalp gate for the deepest held rung. Unknown price / missing data → false
+  // (classic DCA). The live switch is checked first: off = no new scalp, and the
+  // caller's out-of-zone branch pulls whatever the scalp left resting.
+  //
+  // Two thresholds, not one, and they are deliberately different — this asymmetry
+  // IS the anti-flap:
+  //
+  //   ARMING (nothing resting yet): the price must still be on the ENTRY side of the
+  //     MICRO itself. A micro is a limit order placed away from the market, waiting
+  //     for a bounce to come to it; armed once the price is already past it, it is a
+  //     sell below the bid — an instant taker fill at whatever the book offers, which
+  //     is not a scalp at all.
+  //   HOLDING (a micro is on the book): only the SPLIT pulls it. Since the micro must
+  //     always sit inside the split, the arm line and the release line can never
+  //     coincide: the price has to travel the whole micro→split band to flip the
+  //     state. Gate on the split alone (as this did) and the two lines are the same
+  //     one — a price grazing it arms and cancels the scalp tick after tick, which is
+  //     exactly what a narrow ladder produced live. Want a wider dead band? Raise
+  //     Grid exit %: it pushes the split away from the micro.
+  //
+  // The micro must NEVER cross the split — that is a placement invariant, checked
+  // against the raw line in both states.
+  #scalpMode(obj, D, strategy, microPrice, resting = false) {
     if (this.hybridEnabled !== true) return false;
     const P = parseFloat(this.price);
     if (!Number.isFinite(P) || P <= 0) return false;
@@ -751,7 +767,11 @@ class Job {
     if (split == null) return false;
     const m = parseFloat(microPrice);
     if (!Number.isFinite(m) || m <= 0) return false;
-    return strategy === 'long' ? P < split && m < split : P > split && m > split;
+
+    const inside = (x, line) => (strategy === 'short' ? x > line : x < line);
+
+    if (!inside(m, split)) return false; // no room under the split → no scalp, ever
+    return inside(P, resting ? split : m);
   }
 
   // Hybrid dispatcher: everything is classic DCA except the deepest held grid
@@ -803,17 +823,21 @@ class Job {
 
     const micro = this.#gridClose(obj, el, close, closeSide);
 
-    if (!this.#scalpMode(obj, D, strategy, micro.price)) {
+    // Is a micro already on the book? The gate holds a resting one to a different
+    // line than it uses to arm a new one (see #scalpMode).
+    const resting =
+      close.role === 'micro' &&
+      close.orderId != null &&
+      (close.status === state.NEW || close.status === state.PARTIALLY_FILLED);
+
+    if (!this.#scalpMode(obj, D, strategy, micro.price, resting)) {
       // Classic mode. A leftover live micro must yield first — otherwise the
       // classic machine would poll it as if it were the full close.
-      if (
-        close.role === 'micro' &&
-        close.orderId != null &&
-        (close.status === state.NEW || close.status === state.PARTIALLY_FILLED)
-      ) {
+      if (resting) {
         return {
           status: null,
           method: 'cancelOrder',
+          swap: true,
           side: closeSide,
           id: i,
           data: { id: i, symbol, orderId: close.orderId },
@@ -830,6 +854,7 @@ class Job {
         return {
           status: null,
           method: 'cancelOrder',
+          swap: true,
           side: closeSide,
           id: i,
           data: { id: i, symbol, orderId: close.orderId },
@@ -995,7 +1020,16 @@ class Job {
     out.split = new Decimal(split).toFixed(tick);
     out.fits = below(parseFloat(micro.price));
     out.inZone = Number.isFinite(P) && below(P);
-    out.armed = out.enabled && out.fits && out.inZone;
+
+    // The gate is asymmetric (see #scalpMode), so the table has to be too, or it will
+    // promise a scalp in the band between the micro and the split — where a resting
+    // one is held, but a new one is never armed.
+    const line = out.resting ? split : parseFloat(micro.price);
+    out.armed =
+      out.enabled &&
+      out.fits &&
+      Number.isFinite(P) &&
+      (strategy === 'short' ? P > line : P < line);
     return out;
   }
 }

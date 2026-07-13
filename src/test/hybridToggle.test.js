@@ -60,7 +60,7 @@ function scalpObj(param = {}, sells = null) {
 
 function scalpJob(enabled = true) {
   const j = new Job(false);
-  j.price = 91; // inside the scalp zone
+  j.price = 90; // below the micro (90.27) → the scalp can arm
   j.hybridEnabled = enabled;
   return j;
 }

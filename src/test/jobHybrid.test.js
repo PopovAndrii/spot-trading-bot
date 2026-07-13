@@ -116,7 +116,7 @@ test('hybrid: deepest fill still in the DCA base (D < gridStart) → classic eve
 
 test('hybrid: non-deepest indices delegate to classic even while the scalp is on', () => {
   const obj = scalpObj();
-  const j = priceJob(91); // 91 < 92.69 → scalp zone for rung 1
+  const j = priceJob(90); // 90 < micro 90.27 → the scalp can arm
   assert.deepEqual(j.hybridLong(obj, 0, obj.BUY[0]), j.long(obj, 0, obj.BUY[0]));
 });
 
@@ -138,7 +138,7 @@ test('hybrid: ladder below the deepest fill keeps arming entries (buys follow th
       mkOrder('SELL', null, { quantity: '6.000', price: '88.00' }),
     ],
   });
-  const r = priceJob(91).hybridLong(obj, 2, obj.BUY[2]);
+  const r = priceJob(90).hybridLong(obj, 2, obj.BUY[2]);
   assert.equal(r.method, 'newOrder');
   assert.equal(r.side, 'BUY');
   assert.equal(r.data.price, '80.00'); // safety entry keeps resting deeper
@@ -148,7 +148,7 @@ test('hybrid: ladder below the deepest fill keeps arming entries (buys follow th
 
 test('scalp: P below the split → micro SELL of ONLY the deepest rung volume (role micro)', () => {
   const obj = scalpObj();
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]); // 91 < 92.69
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]); // 90 < micro 90.27 → arms
   assert.equal(r.method, 'newOrder');
   assert.equal(r.side, 'SELL');
   assert.equal(r.role, 'micro');
@@ -179,7 +179,7 @@ test('scalp: empty-string gridExit (broken SpinBox restore) falls back to 50', (
   const obj = scalpObj({
     param: { 'field-gridLevel': '2', 'field-gridExit': '' },
   });
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]); // split stays 92.69
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]); // split stays 92.69
   assert.equal(r.role, 'micro');
 });
 
@@ -192,7 +192,7 @@ test('yield: scalp on + resting full close → cancel it (micro takes the slot)'
       mkOrder('SELL', 'NEW', { orderId: 300, quantity: '2.000', price: '95.38' }),
     ],
   });
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]);
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.method, 'cancelOrder');
   assert.equal(r.data.orderId, 300);
 });
@@ -204,7 +204,7 @@ test('yield: scalp on + resting micro → keep polling it (no churn)', () => {
       mkOrder('SELL', 'NEW', { orderId: 301, role: 'micro', quantity: '1.000', price: '90.18' }),
     ],
   });
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]);
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.method, 'getOrder');
   assert.equal(r.data.orderId, 301);
 });
@@ -237,7 +237,7 @@ test('yield: manual-pulled close in the scalp zone → pass (user decision wins)
   const obj = scalpObj({
     sells: [mkOrder('SELL', null), mkOrder('SELL', 'CANCELED', { orderId: 304, manual: true })],
   });
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]);
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.status, 'pass');
 });
 
@@ -255,7 +255,7 @@ test('REARM: entry FILLED + micro FILLED → banked, regardless of the current p
       }),
     ],
   });
-  for (const j of [priceJob(91), priceJob(93), job]) {
+  for (const j of [priceJob(90), priceJob(93), job]) {
     const r = j.hybridLong(obj, 1, obj.BUY[1]);
     assert.equal(r.status, 'REARM');
     assert.equal(r.method, false);
@@ -270,7 +270,7 @@ test('no REARM: the FULL close filled (no micro role) → classic DONE path', ()
       mkOrder('SELL', 'FILLED', { orderId: 306, executedQty: 2.0, cummulativeQuoteQty: 190.76 }),
     ],
   });
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]);
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.status, Status.DONE);
   assert.equal(r.method, 'cancelOpenOrders');
 });
@@ -282,7 +282,7 @@ test('canceled partial predecessor on the slot: micro re-placed for the remainde
       mkOrder('SELL', 'CANCELED', { orderId: 307, role: 'micro', executedQty: 0.4 }),
     ],
   });
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]);
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.method, 'newOrder');
   assert.equal(r.role, 'micro');
   assert.equal(r.data.quantity, '0.600'); // 1.0 filled − 0.4 already sold
@@ -295,7 +295,7 @@ test('canceled predecessor already closed the whole rung → REARM (banked de-fa
       mkOrder('SELL', 'CANCELED', { orderId: 308, role: 'micro', executedQty: 1.0 }),
     ],
   });
-  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]);
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.status, 'REARM');
 });
 
@@ -325,7 +325,7 @@ function scalpShortObj(over = {}) {
 
 test('short scalp: P above the split → micro BUY-back of the deepest rung volume', () => {
   const obj = scalpShortObj();
-  const r = priceJob(108).hybridShort(obj, 1, obj.SELL[1]); // 108 > 107.29
+  const r = priceJob(110).hybridShort(obj, 1, obj.SELL[1]); // 110 > micro 109.67 → arms
   assert.equal(r.method, 'newOrder');
   assert.equal(r.side, 'BUY');
   assert.equal(r.role, 'micro');
@@ -429,4 +429,80 @@ test('rearmGridLeg: resets status/orderId/fills/role, keeps qty & price', () => 
   assert.equal(obj.SELL[0].hybrid, 3); // ×N counter survives the re-arm
   assert.equal(obj.BUY[0].quantity, '1.000');
   assert.equal(obj.SELL[0].price, '100.00');
+});
+
+// ===== the anti-flap asymmetry =====
+//
+// The gate arms on the MICRO and releases on the SPLIT. Gate both on the split — as
+// it did — and the two lines are one: a price grazing it arms and cancels the scalp
+// tick after tick, burning the exchange and leaving the position without an exit
+// order in between. Seen live on a narrow BNBUSDT ladder, where the micro sat seven
+// cents under the split.
+//
+// The band in the fixture: micro 90.27 … split 92.69.
+
+test('flap: price inside the band does NOT arm a new micro — it would sell into the book', () => {
+  const obj = scalpObj(); // nothing resting yet
+  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]); // 90.27 < 91 < 92.69
+
+  // A sell limit at 90.27 with the market at 91 is not a scalp — it is a market sell
+  // dressed as one: it crosses the book and fills instantly at whatever is bid.
+  assert.equal(r.role, undefined);
+  assert.equal(r.data.quantity, '2.000'); // the whole-position close rests instead
+  assert.equal(r.data.price, '95.38');
+});
+
+test('flap: price inside the band KEEPS a resting micro — it is not yanked', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 500, quantity: '1.000', price: '90.27', role: 'micro' }),
+    ],
+  });
+  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]); // same 91 as above
+
+  assert.equal(r.method, 'getOrder'); // just polled — the micro stays on the book
+  assert.equal(r.data.orderId, 500);
+});
+
+test('flap: only the split releases a resting micro, and the swap is flagged', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 500, quantity: '1.000', price: '90.27', role: 'micro' }),
+    ],
+  });
+  const r = priceJob(93).hybridLong(obj, 1, obj.BUY[1]); // 93 > split 92.69
+
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.data.orderId, 500);
+  // `swap` tells the engine the position is now without an exit order and the
+  // replacement is owed NOW, not one full ladder of polling later.
+  assert.equal(r.swap, true);
+});
+
+test('flap: the full close yielding to the micro is flagged as a swap too', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 300, quantity: '2.000', price: '95.38' }),
+    ],
+  });
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]); // below the micro → arm
+
+  assert.equal(r.method, 'cancelOrder');
+  assert.equal(r.data.orderId, 300);
+  assert.equal(r.swap, true);
+});
+
+test('flap: short mirrors it — arming needs the price ABOVE the micro buy-back', () => {
+  const obj = scalpShortObj(); // micro 109.67, split 107.29
+  const inBand = priceJob(108).hybridShort(obj, 1, obj.SELL[1]); // 107.29 < 108 < 109.67
+
+  // A buy-back limit at 109.67 with the market at 108 sits ABOVE it → instant fill.
+  assert.equal(inBand.role, undefined);
+  assert.equal(inBand.data.quantity, '2.000');
+
+  const above = priceJob(110).hybridShort(obj, 1, obj.SELL[1]);
+  assert.equal(above.role, 'micro');
 });

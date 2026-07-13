@@ -378,8 +378,14 @@ export class LoadDataCalculator {
     if (!view.fits) {
       return `<span class="fill-badge micro-badge micro-blocked" title="no scalp: the micro at ${price} must stay ${side} the split at ${view.split} — raise Grid exit % or lower Micro profit %">micro ${price} ✕</span>`;
     }
-    if (!view.inZone) {
-      return `<span class="fill-badge micro-badge micro-wait" title="the price is out of the scalp zone (past the split at ${view.split}) — the whole-position close rests instead">micro ${price} …</span>`;
+    if (!view.armed) {
+      // Two ways to be waiting, and the difference matters: past the split the scalp
+      // has yielded outright, while merely above the micro it is only holding fire —
+      // arming there would sell into the book instead of resting for a bounce.
+      const why = view.inZone
+        ? `the price has not come back under the micro at ${price} — arming now would sell straight into the book, not rest for a bounce`
+        : `the price is out of the scalp zone (past the split at ${view.split}) — the whole-position close rests instead`;
+      return `<span class="fill-badge micro-badge micro-wait" title="${why}">micro ${price} …</span>`;
     }
     return `<span class="fill-badge micro-badge micro-live" title="micro arming: ${quantity} @ ${price}">micro ${price} × ${quantity}</span>`;
   }
@@ -424,9 +430,11 @@ export class LoadDataCalculator {
     } else if (!view.fits) {
       state = 'blocked';
       text = `no room for the micro on #${view.deepest} — raise Grid exit %`;
-    } else if (!view.inZone) {
+    } else if (!view.armed) {
       state = 'wait';
-      text = 'price out of the zone — full close rests';
+      text = view.inZone
+        ? `price is above the micro — waiting for it to come back under ${view.micro.price}`
+        : 'price out of the zone — full close rests';
     } else {
       state = 'live';
       text = `arming the micro on #${view.deepest}`;
