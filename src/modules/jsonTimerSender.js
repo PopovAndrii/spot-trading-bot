@@ -135,6 +135,57 @@ function partialFillDelta(stored, message) {
   return { executedQty, cummulativeQuoteQty };
 }
 
+// Is this order still the exchange's to fill?
+const isOpen = (status) => status === 'NEW' || status === 'PARTIALLY_FILLED';
+
+// The one order in the system that rests AT the market and exists to be hit: the
+// micro. Cancelling it blind is a race against its own fill — and the engine pulls
+// it at exactly the moment it is most likely to have been hit (the price is moving,
+// the ladder is deepening, the arm is shifting). Classic never had this problem: it
+// only ever cancels closes sitting above the market, which cannot fill while they
+// are being pulled. That unspoken invariant — "we only cancel the dead" — is what
+// the scalp broke, and one lost fill deadlocked the whole cycle.
+//
+// So a cancel marked `probe` asks before it swings. Returns the getOrder to run
+// first, or null when the call needs no probe. Pure/testable.
+function probeCall(currentOrder, slot) {
+  if (currentOrder?.probe !== true) return null;
+  if (currentOrder.method !== 'cancelOrder') return null;
+  if (currentOrder.data?.orderId == null) return null;
+
+  return {
+    ...currentOrder,
+    method: 'getOrder',
+    status: slot?.status ?? null, // the stale status → any real one reads as a change
+  };
+}
+
+// The exchange refused a cancel because the order is not open (`gone`, -2011): it
+// filled between two polls, or the user pulled it by hand. Nothing was cancelled,
+// but retrying can never cancel it either — the order is already resolved, and the
+// slot that still calls it NEW is the thing that is wrong.
+//
+// Retried blind, that deadlocks the entire cycle, and it did, live: a micro filled
+// unobserved, every pass re-cancelled the phantom, and the whole-position close —
+// which may only be placed once every lower close is off the book — was never
+// reached. The position sat with no exit order on the exchange for hours.
+//
+// So a cancel is never the last word on an order it did not cancel: go ask what
+// really happened. Returns the getOrder to run in its place (the normal result path
+// then records the truth, fill data included, so a filled micro banks and re-prices
+// the exit), or null when the result needs no follow-up. Pure/testable.
+function cancelFollowUp(currentOrder, result, slot) {
+  if (currentOrder?.method !== 'cancelOrder') return null;
+  if (result?.gone !== true) return null;
+  if (currentOrder.data?.orderId == null) return null; // nothing to ask about
+
+  return {
+    ...currentOrder,
+    method: 'getOrder',
+    status: slot?.status ?? null, // the stale status → any real one is a change
+  };
+}
+
 // Fields to persist into the slot after an API result changed the order state.
 // Pure — the iterator applies it with Object.assign.
 //
@@ -803,7 +854,37 @@ class JsonTimerSender extends EventEmitter {
           continue;
         } // processed order (api request not needed) or test loop
 
-        const result = await this.#runToApi(currentOrder);
+        let result = null;
+
+        // Pulling the micro? Ask before swinging: an order that already filled must
+        // be BANKED, never "cancelled". Costs one poll per micro pull. See probeCall.
+        const probe = probeCall(currentOrder, obj[currentOrder.side]?.[currentOrder.id]);
+
+        if (probe) {
+          const polled = await this.#runToApi(probe);
+
+          // Resolved out from under us (filled, or pulled by hand) → there is nothing
+          // to cancel. Record what really happened and let the next pass act on it.
+          if (polled?.success === true && !isOpen(polled.message?.status)) {
+            currentOrder = probe;
+            result = polled;
+          }
+        }
+
+        if (result === null) result = await this.#runToApi(currentOrder);
+
+        // Last resort: it filled in the gap between the probe and the cancel. A cancel
+        // that cancelled nothing must not be the last word on the order.
+        const followUp = cancelFollowUp(
+          currentOrder,
+          result,
+          obj[currentOrder.side]?.[currentOrder.id]
+        );
+
+        if (followUp) {
+          currentOrder = followUp;
+          result = await this.#runToApi(currentOrder);
+        }
 
         if (result === null || result.success === false) {
           continue;
@@ -1224,3 +1305,5 @@ module.exports.cycleProfit = cycleProfit;
 module.exports.freshPrice = freshPrice;
 module.exports.orderResultPatch = orderResultPatch;
 module.exports.applyOrderResult = applyOrderResult;
+module.exports.cancelFollowUp = cancelFollowUp;
+module.exports.probeCall = probeCall;

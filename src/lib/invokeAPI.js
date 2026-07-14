@@ -197,6 +197,16 @@ class InvokeApi {
       const message = this.#getCatchMsg(err);
 
       this.getConsoleMsg(message, false);
+
+      // -2011 "Unknown order sent": this order is not open — it filled between two
+      // polls, or the user pulled it by hand. Nothing was canceled, so it is not a
+      // success; but retrying can never succeed either, and a caller that blindly
+      // retries deadlocks. `gone` says WHICH failure it is, so the caller can go ask
+      // the exchange what really happened instead of re-cancelling a phantom.
+      if (err.response?.data?.code === -2011) {
+        return { success: false, gone: true, message };
+      }
+
       return { success: false, message };
     }
   }

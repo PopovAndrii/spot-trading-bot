@@ -839,6 +839,7 @@ class Job {
       return {
         status: null,
         method: 'cancelOrder',
+        probe: true,
         swap: true,
         side: closeSide,
         id: i,
@@ -962,6 +963,7 @@ class Job {
         return {
           status: null,
           method: 'cancelOrder',
+          probe: true,
           swap: true,
           side: closeSide,
           id: i,
