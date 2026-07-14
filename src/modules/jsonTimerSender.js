@@ -113,9 +113,9 @@ function cycleProfit(obj) {
 
 // Live price for the hybrid frontier decision: the cached stream tick if it is
 // fresh enough, otherwise null — the caller then falls back to a bookTicker
-// request. maxAgeMs default 10s: the @ticker stream pushes about once a second
-// and its heartbeat reconnects after 30s of silence, so 10s of quiet already
-// means the cache cannot be trusted for a money decision. Pure/testable.
+// request. maxAgeMs default 10s: on a liquid pair the @ticker stream pushes about
+// once a second, so 10s of quiet already means the cache cannot be trusted for a
+// money decision — on an illiquid pair it simply means no trades. Pure/testable.
 function freshPrice(price, ts, now, maxAgeMs = 10_000) {
   const p = parseFloat(price);
   if (!Number.isFinite(p) || p <= 0) return null;
