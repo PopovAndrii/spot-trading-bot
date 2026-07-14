@@ -316,6 +316,9 @@ class WebSocketRouter {
             // keep the idle price ticking (parity with pre-Start Long/Short)
             ts.watchPrice(currentSymbol);
 
+            // keep the idle price ticking (parity with pre-Start Long/Short)
+            ts.watchPrice(currentSymbol);
+
             pair.updateSymbol({ symbol: currentSymbol, status: statusPair.STOP });
 
             for (const client of this.clients.get(currentSymbol) || []) {
