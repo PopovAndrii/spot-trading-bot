@@ -19,7 +19,11 @@
 }
 
 .wrapper {
-  height: 100vh;
+  // 100dvh (dynamic viewport) not 100vh: on mobile Firefox 100vh is the large
+  // viewport, so with the browser's bottom toolbar shown the last row (danger
+  // zone + fixed console bar) fell below the fold and was unreachable. dvh
+  // tracks the visible height so the scroll container reveals everything.
+  height: 100dvh;
   overflow-y: auto;
   padding-bottom: 2.5rem;
   transition: padding-bottom 0.3s ease;

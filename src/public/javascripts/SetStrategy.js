@@ -73,7 +73,7 @@ export class SetStrategy {
     const defaultData = {
       'field-currency': data['price'],
       'field-strategy': this.strategyName,
-      'field-deposit': data['balance'], //1.074 0.00417, // 430$
+      'field-deposit': data['balance'], // 1.074 0.00417, // 430$
       'field-orderSize': data['minNotional'], // 0.028, // >= 10$
       'info-minQuoteAsset': '(min: ' + data['minQuoteAsset'] + ' ' + data['quoteAsset'] + ')',
       'field-profit': 0.4, // %

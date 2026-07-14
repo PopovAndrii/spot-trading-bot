@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const JsonTimerSender = require('../modules/jsonTimerSender.js');
+const { strategyConflict } = JsonTimerSender; // the module IS the class; helpers hang off it
 const { pair, statusPair } = require('./pair.js');
 const { UserStreamAPI } = require('./UserStreamApi.js');
 
@@ -56,7 +57,7 @@ class WebSocketRouter {
         ws.isAlive = true;
       });
 
-      ws.on('message', (msg) => {
+      ws.on('message', async (msg) => {
         let data;
         try {
           data = JSON.parse(msg);
@@ -216,6 +217,25 @@ class WebSocketRouter {
             }
 
             const ts = this.timerSenders.get(currentSymbol);
+
+            // The saved grid decides which side this pair trades — never the toggle
+            // in the browser. Disagreement means the engine would trade one strategy
+            // over the other's table; refuse the start instead. See strategyConflict.
+            const conflict = strategyConflict(
+              await ts.savedStrategy(currentSymbol),
+              data.strategy
+            );
+
+            if (conflict) {
+              return this.safeSend(ws, {
+                event: 'notification',
+                data: {
+                  message: `⚠️ ${currentSymbol}: ${conflict}`,
+                  type: 'warning',
+                  persist: true,
+                },
+              });
+            }
 
             ts.start(currentSymbol, data.strategy, {
               autoRestart: data.autoRestart === true,

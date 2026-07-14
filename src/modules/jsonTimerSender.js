@@ -93,6 +93,26 @@ function partialFillDelta(stored, message) {
   return { executedQty, cummulativeQuoteQty };
 }
 
+// A cycle's strategy is a property of the GRID ON DISK, not of the toggle in the
+// browser — the grid's entries and closes are already laid out for one side.
+//
+// Start believed the toggle. With a short cycle saved, picking Long and pressing
+// Start ran the LONG engine over the SHORT's table: the short's buy-back, resting on
+// the BUY side, read as an entry buy. Meanwhile the table redrew from the file and
+// the toggle snapped back to Short on its own. Seen live.
+//
+// So the two must agree or nothing starts. Returns the refusal text, or null when
+// the start is sound (no grid on disk yet → any strategy is fine). Pure/testable.
+function strategyConflict(saved, requested) {
+  if (saved !== 'long' && saved !== 'short') return null;
+  if (saved === requested) return null;
+
+  return (
+    `this pair holds a ${saved.toUpperCase()} cycle — its grid is on disk and its orders may be live. ` +
+    `Stop and delete the series, or Calculate + Save a new grid, before starting ${String(requested).toUpperCase()}.`
+  );
+}
+
 class JsonTimerSender extends EventEmitter {
   constructor(wss, strategy = null) {
     super();
@@ -460,7 +480,7 @@ class JsonTimerSender extends EventEmitter {
       telegram.push(
         this.symbol,
         `filled ${side} #${num} ${qty} @ ${avg.toFixed(this.tickDecimals)}` +
-          ` ≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
+        ` ≈ ${quote.toFixed(this.tickDecimals)} ${this.quoteAsset || ''}`
       );
     }
   }
@@ -511,8 +531,8 @@ class JsonTimerSender extends EventEmitter {
             const notional = (parseFloat(quantity) || 0) * (parseFloat(price) || 0);
             logBus.log(
               `⚠️ ${this.symbol}: cycle closed, ${quantity} ${base} left unsold ` +
-                `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
-                `Funds are on the exchange; decide manually (swap or keep).`
+              `(~${notional.toFixed(8)} ${quote}) — below exchange minimum to re-close. ` +
+              'Funds are on the exchange; decide manually (swap or keep).'
             );
           }
 
@@ -534,8 +554,8 @@ class JsonTimerSender extends EventEmitter {
           const profit = cycleProfit(obj);
           telegram.send(
             `🏁 <b>Done</b> ${this.symbol}\n` +
-              `Profit: <b>${profit >= 0 ? '+' : ''}${profit.toFixed(this.tickDecimals)}</b> ${this.quoteAsset || ''}\n` +
-              `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+            `Profit: <b>${profit >= 0 ? '+' : ''}${profit.toFixed(this.tickDecimals)}</b> ${this.quoteAsset || ''}\n` +
+            `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
           );
 
           await writeFileAtomic(this.#filePath(`${Date.now()}-`), JSON.stringify(obj, null, 2));
@@ -782,15 +802,28 @@ class JsonTimerSender extends EventEmitter {
       }
       telegram.send(
         `🟢 <b>Start</b> ${this.symbol}\n` +
-          `Strategy: <b>${this.strategy}</b>\n` +
-          (startPrice ? `Price: <b>${startPrice}</b> ${this.quoteAsset || ''}\n` : '') +
-          `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
+        `Strategy: <b>${this.strategy}</b>\n` +
+        (startPrice ? `Price: <b>${startPrice}</b> ${this.quoteAsset || ''}\n` : '') +
+        `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
       );
     }
   }
 
   #filePath(timestamp = '') {
     return path.join(__dirname, '../data', `${timestamp}${this.symbol}-${this.exchangeName}.json`);
+  }
+
+  // Which strategy is the saved cycle? Read straight off the grid on disk — the one
+  // authority on it. null = no grid (or unreadable), i.e. nothing to conflict with.
+  // Asked BEFORE start(), so it cannot lean on this.symbol.
+  async savedStrategy(symbol) {
+    try {
+      const file = path.join(__dirname, '../data', `${symbol}-${this.exchangeName}.json`);
+      const saved = JSON.parse(await fs.readFile(file, 'utf8'))?.param?.['field-strategy'];
+      return saved === 'short' || saved === 'long' ? saved : null;
+    } catch {
+      return null;
+    }
   }
 
   async stop() {
@@ -864,8 +897,8 @@ class JsonTimerSender extends EventEmitter {
       // Telegram: the cycle looped — new grid built around the fresh price.
       telegram.send(
         `🔄 <b>Restart</b> ${this.symbol}\n` +
-          `Strategy: <b>${this.strategy}</b>\n` +
-          `Price: <b>${price}</b> ${this.quoteAsset || ''}`
+        `Strategy: <b>${this.strategy}</b>\n` +
+        `Price: <b>${price}</b> ${this.quoteAsset || ''}`
       );
 
       this.emit('restarted', { symbol: this.symbol, price });
@@ -925,3 +958,4 @@ module.exports.markOpenAsCanceled = markOpenAsCanceled;
 module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
 module.exports.manualStuckSlots = manualStuckSlots;
 module.exports.cycleProfit = cycleProfit;
+module.exports.strategyConflict = strategyConflict;

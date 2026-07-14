@@ -2,10 +2,10 @@
 
 .line {
   display: grid;
-  gap: 0.25rem;
+  gap: 1.0rem;
   grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
   justify-items: center;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0.5rem;
 
   &.line-press {
     grid-template-columns: repeat(auto-fit, minmax(0, max-content));

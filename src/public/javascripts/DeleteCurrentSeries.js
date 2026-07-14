@@ -35,7 +35,7 @@ export class DeleteCurrentSeries {
 
   async delete(currency) {
     try {
-      const res = await fetch(`/spotbot/series/delete`, {
+      const res = await fetch('/spotbot/series/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: currency }),
