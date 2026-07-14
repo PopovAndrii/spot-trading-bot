@@ -6,6 +6,8 @@ const {
   Status,
   rebalancedClose,
   deepestFilledIndex,
+  slotQty,
+  slotQuote,
   bankGridLeg,
   hybridDirty,
 } = require('../lib/job');
@@ -90,18 +92,24 @@ function manualStuckSlots(obj, pending = { BUY: new Map(), SELL: new Map() }) {
 }
 
 // Realized quote flow of a finished cycle from the ACTUAL fills: Σ(SELL quote) −
-// Σ(BUY quote) over FILLED orders. For both long and short this equals the cycle
-// profit in the quote asset (long: buy low / sell high; short: sell high / buy
-// back low — the sign works out either way). Read-only — used only for the
-// Telegram completion notice. Pure/testable.
+// Σ(BUY quote). For both long and short this equals the cycle profit in the quote
+// asset (long: buy low / sell high; short: sell high / buy back low — the sign
+// works out either way). Read-only — used only for the Telegram completion notice.
+//
+// "Actual" means every fill the slot has ever carried, not just the FILLED ones: an
+// order that partially filled and was then pulled moved real money, and so did the
+// orders a slot has replaced (slotQuote folds in filledQuote). Counting only FILLED
+// reported a +10 USDT cycle as a −72 USDT one. Pure/testable.
 function cycleProfit(obj) {
   const sumFilledQuote = (arr) =>
     (arr || []).reduce((acc, o) => {
-      if (!o || o.status !== 'FILLED') return acc;
-      const quote =
-        o.cummulativeQuoteQty !== undefined && o.cummulativeQuoteQty !== null
-          ? parseFloat(o.cummulativeQuoteQty)
-          : (parseFloat(o.price) || 0) * (parseFloat(o.executedQty ?? o.quantity) || 0);
+      if (!o) return acc;
+      // FILLED without fill data = an old config: price × quantity is all we have.
+      if (o.status === 'FILLED' && (o.cummulativeQuoteQty === undefined || o.cummulativeQuoteQty === null)) {
+        const legacy = (parseFloat(o.price) || 0) * (parseFloat(o.executedQty ?? o.quantity) || 0);
+        return acc + (Number.isFinite(legacy) ? legacy : 0);
+      }
+      const quote = slotQuote(o);
       return acc + (Number.isFinite(quote) ? quote : 0);
     }, 0);
   // Hybrid: grid legs bank each oscillation and then reset their fills (rearmGridLeg
@@ -248,7 +256,34 @@ function orderResultPatch(currentOrder, message) {
 // no-op for them. Mutates and returns the slot. Pure/testable.
 function applyOrderResult(slot, currentOrder, message) {
   if (currentOrder.method === 'newOrder' && !currentOrder.role) delete slot.role;
+  bankSlotFills(slot, message);
   return Object.assign(slot, orderResultPatch(currentOrder, message));
+}
+
+// The fills of the order LEAVING the slot, before the arriving one overwrites them.
+//
+// A slot outlives its orders: a close is placed, partially fills, is pulled when the
+// bank moves the exit, and a fresh close takes its place. executedQty holds the fill
+// of the CURRENT order only, so the moment a new orderId lands, the base and quote
+// the pulled order actually traded vanish from the books — while the money sits on
+// the exchange. Live, that closed 0.141 BNB for 81.96 USDT and then reported the
+// position as still open.
+//
+// So the outgoing fills are added into the slot's running totals, which every reader
+// folds back in (slotQty/slotQuote). rearmGridLeg clears them with the rest of the
+// leg: by then the profit is banked in gridRealized and the base is flat, so keeping
+// them would double-count. Mutates the slot. Pure/testable.
+function bankSlotFills(slot, message) {
+  if (!slot) return slot;
+
+  const qty = Number(slot.executedQty) || 0;
+  if (qty <= 0) return slot; // nothing traded under the outgoing order
+  // Same order coming back from a poll — not a replacement, its fills are its own.
+  if (slot.orderId != null && message?.orderId === slot.orderId) return slot;
+
+  slot.filledQty = (Number(slot.filledQty) || 0) + qty;
+  slot.filledQuote = (Number(slot.filledQuote) || 0) + (Number(slot.cummulativeQuoteQty) || 0);
+  return slot;
 }
 
 class JsonTimerSender extends EventEmitter {
@@ -779,10 +814,20 @@ class JsonTimerSender extends EventEmitter {
             });
             if (res && res.success !== false) {
               c.status = 'CANCELED';
+              // A pulled close may have filled part of the position on its way out,
+              // and the cancel response is where the exchange says how much. Record
+              // it: the slot is about to be re-used, and only these numbers keep that
+              // base and quote on the books (bankSlotFills carries them over).
+              if (res.message?.executedQty !== undefined) {
+                c.executedQty = parseFloat(res.message.executedQty) || 0;
+                c.cummulativeQuoteQty = parseFloat(res.message.cummulativeQuoteQty) || 0;
+              }
               repriced = true;
+              const partial = Number(c.executedQty) || 0;
               logBus.log(
                 `🔁 ${this.symbol}: ${closeSide} #${j + 1} @ ${c.price} pulled — ` +
-                'the bank changed the exit, re-placing at the recomputed price'
+                'the bank changed the exit, re-placing at the recomputed price' +
+                (partial > 0 ? ` (it had closed ${partial} ${this.baseAsset || ''} — kept on the books)` : '')
               );
             }
           }

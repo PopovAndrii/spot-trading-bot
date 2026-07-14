@@ -39,19 +39,22 @@ function rebalancedClose(obj, i, strategy) {
   const entrySide = strategy === 'long' ? 'BUY' : 'SELL'; // what we built the position with
   const closeSide = strategy === 'long' ? 'SELL' : 'BUY'; // what we close with
 
-  // Position entry: actually filled orders 0..i.
+  // Position entry: everything rungs 0..i actually bought — a FILLED order, or a
+  // slot still carrying the fills of an order that was replaced in it (filledQty).
   const entries = [];
   for (let k = 0; k <= i; k++) {
     const e = obj[entrySide][k];
-    if (!e || e.status !== state.FILLED) continue;
-    if (e.executedQty === undefined || e.cummulativeQuoteQty === undefined) {
+    if (!e) continue;
+    if (e.status !== state.FILLED && slotQty(e) <= 0) continue;
+    if (e.status === state.FILLED && (e.executedQty === undefined || e.cummulativeQuoteQty === undefined)) {
       return null; // incomplete data (old config) → fall back to precompute
     }
     entries.push(e);
   }
 
-  // Closes that actually closed something (partial/canceled-with-fill).
-  const closes = (obj[closeSide] || []).filter((c) => (Number(c.executedQty) || 0) > 0);
+  // Closes that actually closed something (partial/canceled-with-fill, including
+  // fills inherited from an order the slot has since replaced).
+  const closes = (obj[closeSide] || []).filter((c) => slotQty(c) > 0);
   if (closes.length === 0) return null; // no partials → precompute
 
   const profit = parseFloat(obj['param']['field-profit']) || 0;
@@ -75,12 +78,35 @@ function rebalancedClose(obj, i, strategy) {
   };
 }
 
-// Real average fill price of an entry slot (cummulativeQuoteQty / executedQty),
-// falling back to the slot's resting price when fill data is missing (old config).
-// null when neither is known. Pure.
+// What a SLOT has really executed — the money question, and it is not the same as
+// what its CURRENT order has executed.
+//
+// A slot is one rung of the ladder, but over a cycle it carries a succession of
+// orders: a close is placed, partially fills, gets pulled (the bank moved the exit),
+// and a fresh one takes its place. The fill of the pulled order is real — the base
+// changed hands, the quote landed — yet it lived only in executedQty, which the
+// next order's result overwrites with its own zero. That is how a cycle sold 0.141
+// BNB for 81.96 USDT and then reported the position as still open: the money was on
+// the exchange and gone from the books.
+//
+// So a replaced order's fills are added into filledQty/filledQuote before its slot
+// is reused (see applyOrderResult), and every reader of a slot's fills asks these
+// two helpers instead of executedQty. Absent fields = 0, so pre-existing configs
+// read exactly as they did. Pure.
+function slotQty(slot) {
+  return (Number(slot?.executedQty) || 0) + (Number(slot?.filledQty) || 0);
+}
+
+function slotQuote(slot) {
+  return (Number(slot?.cummulativeQuoteQty) || 0) + (Number(slot?.filledQuote) || 0);
+}
+
+// Real average fill price of an entry slot (quote / qty), falling back to the
+// slot's resting price when fill data is missing (old config). null when neither
+// is known. Pure.
 function entryFillPrice(slot) {
-  const qty = Number(slot?.executedQty) || 0;
-  const quote = Number(slot?.cummulativeQuoteQty) || 0;
+  const qty = slotQty(slot);
+  const quote = slotQuote(slot);
   if (qty > 0 && quote > 0) return quote / qty;
   const p = parseFloat(slot?.price);
   return Number.isFinite(p) && p > 0 ? p : null;
@@ -90,8 +116,7 @@ function entryFillPrice(slot) {
 // SELL minus quote spent on the BUY. Works for both long and short (entry/close
 // sides differ, but sellQuote − buyQuote is the leg profit either way). Pure.
 function gridLegProfit(buySlot, sellSlot) {
-  const q = (o) => Number(o?.cummulativeQuoteQty) || 0;
-  return q(sellSlot) - q(buySlot);
+  return slotQuote(sellSlot) - slotQuote(buySlot);
 }
 
 // Re-arm a grid leg in place: reset both paired slots (BUY[i]/SELL[i]) to
@@ -107,6 +132,11 @@ function rearmGridLeg(obj, i) {
     s.orderId = null;
     delete s.executedQty;
     delete s.cummulativeQuoteQty;
+    // The leg's whole history goes with it: its profit is banked into gridRealized
+    // and its base is back to zero. Left behind, the accumulators would be counted
+    // a second time by every reader of the leg's fills.
+    delete s.filledQty;
+    delete s.filledQuote;
     delete s.manual;
     delete s.role;
   }
@@ -718,12 +748,13 @@ class Job {
     let held = new Decimal(0);
     for (let k = 0; k <= D; k++) {
       const e = obj[entrySide]?.[k];
-      if (!e || e.status !== state.FILLED) continue;
-      if (e.executedQty === undefined) return false;
-      held = held.plus(e.executedQty);
+      if (!e) continue;
+      if (e.status !== state.FILLED && slotQty(e) <= 0) continue;
+      if (e.status === state.FILLED && e.executedQty === undefined) return false;
+      held = held.plus(slotQty(e));
     }
     for (const c of obj[closeSide] || []) {
-      held = held.minus(Number(c?.executedQty) || 0);
+      held = held.minus(slotQty(c));
     }
 
     const step = parseInt(obj.param?.['field-stepSize'], 10) || 0;
@@ -1231,6 +1262,8 @@ module.exports = {
   Status,
   rebalancedClose,
   deepestFilledIndex,
+  slotQty,
+  slotQuote,
   entryFillPrice,
   gridLegProfit,
   rearmGridLeg,

@@ -36,13 +36,22 @@ const Decimal = require('decimal.js');
 // back as plain numbers for the callers.
 function rebalanceClose(entries, closes, strategy, feesPct, bankedQuote = 0) {
   const closeArr = Array.isArray(closes) ? closes : closes ? [closes] : [];
-  const sum = (arr, key) =>
-    (arr || []).reduce((s, e) => s.plus(Number(e[key]) || 0), new Decimal(0));
+  // A slot's fills = what its current order executed PLUS what the orders it has
+  // already replaced executed (filledQty/filledQuote — see slotQty in job.js). A
+  // close that partially filled and was then pulled and re-placed still closed
+  // that base: read it back, or the next close is sized for a position that is
+  // no longer held. Absent accumulators = 0, so old configs are unchanged.
+  const sum = (arr, key, banked) =>
+    (arr || []).reduce(
+      (s, e) => s.plus(Number(e[key]) || 0).plus(Number(e[banked]) || 0),
+      new Decimal(0)
+    );
 
-  const remainingBase = sum(entries, 'executedQty').minus(sum(closeArr, 'executedQty'));
-  const remainingQuote = sum(entries, 'cummulativeQuoteQty').minus(
-    sum(closeArr, 'cummulativeQuoteQty')
-  );
+  const base = (arr) => sum(arr, 'executedQty', 'filledQty');
+  const quote = (arr) => sum(arr, 'cummulativeQuoteQty', 'filledQuote');
+
+  const remainingBase = base(entries).minus(base(closeArr));
+  const remainingQuote = quote(entries).minus(quote(closeArr));
 
   if (remainingBase.lte(0)) return null; // position already fully closed
 
