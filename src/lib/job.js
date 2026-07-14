@@ -776,6 +776,46 @@ class Job {
     return gridExitThreshold(entry, close, obj.param?.['field-gridExit']);
   }
 
+  // The Grid exit % the micro NEEDS on this rung — the knob, already turned.
+  //
+  // A blocked micro (the micro crosses the split) refuses in silence and the cycle
+  // quietly runs as plain DCA. The table said "raise Grid exit %" and stopped there,
+  // which leaves the one question that matters unanswered: raise it to WHAT. On a
+  // pair like ETHBTC the whole gap is a tick or two wide, so guessing costs a cycle.
+  //
+  // Both ends of the split move with the rung, not with the knob, so the answer is a
+  // sweep of the only free variable: the lowest whole percent that fits, chosen
+  // NEAREST the current setting (the split is not always monotonic in pct — a far
+  // side may also fit, and jumping there would be a bigger change than asked for).
+  // null = no percent fits (the micro needs more room than the whole gap has — the
+  // knob to turn is Micro profit %) or the endpoints are unknown. Read-only.
+  requiredGridExit(obj, D, strategy, microPrice) {
+    const entrySide = strategy === 'long' ? 'BUY' : 'SELL';
+    const closeSide = strategy === 'long' ? 'SELL' : 'BUY';
+    const entry = entryFillPrice(obj[entrySide]?.[D]);
+    if (entry == null) return null;
+    const full = this.#fullClose(obj, D, strategy);
+    const close = parseFloat(full ? full.price : obj[closeSide]?.[D]?.price);
+    if (!Number.isFinite(close) || close <= 0) return null;
+
+    const m = parseFloat(microPrice);
+    if (!Number.isFinite(m) || m <= 0) return null;
+
+    const cur = Number(obj.param?.['field-gridExit']);
+    const from = Number.isFinite(cur) ? cur : 50;
+    const fits = (pct) => {
+      const s = gridExitThreshold(entry, close, pct);
+      return strategy === 'short' ? m > s : m < s;
+    };
+
+    let best = null;
+    for (let pct = 0; pct <= 100; pct++) {
+      if (!fits(pct)) continue;
+      if (best == null || Math.abs(pct - from) < Math.abs(best - from)) best = pct;
+    }
+    return best;
+  }
+
   // Scalp gate for the deepest held rung. Unknown price / missing data → false
   // (classic DCA). The live switch is checked first: off = no new scalp, and the
   // caller's out-of-zone branch pulls whatever the scalp left resting.
@@ -1210,6 +1250,10 @@ class Job {
       micro: null,
       split: null,
       fits: false,
+      // The Grid exit % that WOULD fit, when the current one does not (null = no
+      // percent fits, or nothing to compute it from). The UI prints it, and the
+      // auto-exit switch turns the knob to it.
+      needExit: null,
       inZone: false,
       armed: false,
       resting: false,
@@ -1243,6 +1287,10 @@ class Job {
     out.split = new Decimal(split).toFixed(tick);
     out.fits = below(parseFloat(micro.price));
     out.inZone = Number.isFinite(P) && below(P);
+
+    if (!out.fits) {
+      out.needExit = this.requiredGridExit(obj, D, strategy, micro.price);
+    }
 
     // The gate is asymmetric (see #scalpMode), so the table has to be too, or it will
     // promise a scalp in the band between the micro and the split — where a resting

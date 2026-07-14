@@ -224,6 +224,22 @@ export class LoadDataCalculator {
     // Hybrid grid: the switch is the source of truth (no hidden field-* input).
     // Serialize it into param as 'on'/'off' so the engine can read field-hybrid.
     this.defaultData['field-hybrid'] = document.getElementById('hybrid')?.checked ? 'on' : 'off';
+    this.defaultData['field-autoExit'] = document.getElementById('autoExit')?.checked
+      ? 'on'
+      : 'off';
+  }
+
+  // Auto exit rides with the hybrid params: a runtime decision, re-read every tick,
+  // so the flip lands on the LIVE cycle through the same param route (no rebuild —
+  // it does not touch the ladder). Written whether the robot runs or not: stopped,
+  // it is picked up off the file on Start.
+  autoExit() {
+    document.getElementById('settings-auto-exit')?.addEventListener('ui-switch-change', (e) => {
+      // detail.value is the STRING "true"/"false" — Boolean("false") is true, which
+      // is what once turned every OFF into an ON (see hybrid()).
+      const on = String(e.detail?.value) === 'true';
+      this.saveRuntimeParam('field-autoExit', on ? 'on' : 'off');
+    });
   }
 
   // Wire the Hybrid-grid switch. It means two different things depending on the
@@ -378,7 +394,13 @@ export class LoadDataCalculator {
       return `<span class="fill-badge micro-badge micro-live" title="micro resting on the book: ${quantity} @ ${price}">micro ${price} × ${quantity}</span>`;
     }
     if (!view.fits) {
-      return `<span class="fill-badge micro-badge micro-blocked" title="no scalp: the micro at ${price} must stay ${side} the split at ${view.split} — raise Grid exit % or lower Micro profit %">micro ${price} ✕</span>`;
+      // The engine has already worked out WHICH value would fit (needExit) — printing
+      // "raise it" without the number is what sent a whole cycle chasing the knob.
+      const fix =
+        view.needExit != null
+          ? `raise Grid exit % to ${view.needExit}`
+          : 'no Grid exit % fits this gap — lower Micro profit %';
+      return `<span class="fill-badge micro-badge micro-blocked" title="no scalp: the micro at ${price} must stay ${side} the split at ${view.split} — ${fix}">micro ${price} ✕</span>`;
     }
     if (!view.armed) {
       // Two ways to be waiting, and the difference matters: past the split the scalp
@@ -431,7 +453,10 @@ export class LoadDataCalculator {
       text = `scalping order #${view.deepest}`;
     } else if (!view.fits) {
       state = 'blocked';
-      text = `no room for the micro on #${view.deepest} — raise Grid exit %`;
+      text =
+        view.needExit != null
+          ? `no room for the micro on #${view.deepest} — raise Grid exit % to ${view.needExit}`
+          : `no room for the micro on #${view.deepest} — no Grid exit % fits, lower Micro profit %`;
     } else if (!view.armed) {
       state = 'wait';
       text = view.inZone

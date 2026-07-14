@@ -306,6 +306,11 @@ class JsonTimerSender extends EventEmitter {
     this.apiFailStreak = 0;
     this.apiOutageNotified = false;
 
+    // Which blocked-micro state we have already reported ("rung:neededPercent"), so
+    // the warning goes out once per rung instead of once per tick. Cleared the moment
+    // the micro fits again.
+    this.blockedNotice = null;
+
     this.baseAsset = '';
     this.quoteAsset = '';
     this.tickDecimals = 2; // price decimals for notifications; refreshed from the grid on start
@@ -687,6 +692,75 @@ class JsonTimerSender extends EventEmitter {
     this.job.price = p;
   }
 
+  // A blocked micro — the scalp does not fit under the split — is the one hybrid
+  // state that needs a decision, and the engine used to refuse in silence: the cycle
+  // ran on as plain DCA and nothing said why. The table said "raise Grid exit %" and
+  // left the only question that matters unanswered: raise it to WHAT. On a pair whose
+  // whole gap is a tick or two wide (ETHBTC) guessing costs a cycle.
+  //
+  // Job.view already computes the percent that would fit (needExit), so this is the
+  // fork: field-autoExit ON turns the knob to it, OFF says exactly which knob and to
+  // what — once per rung, not once per tick. Auto writes the file itself: the param
+  // is re-read off disk every tick (#mergeLiveEdits), so an in-memory-only change
+  // would be gone before the next pass reads it.
+  async #blockedMicro(obj, strategy) {
+    const view = this.job.view(obj, strategy);
+
+    // Not blocked (or nothing to block): clear the notice, so a LATER block on this
+    // rung is news again rather than a state we have "already reported".
+    if (!view?.enabled || !view.micro || view.deepest == null || view.fits) {
+      this.blockedNotice = null;
+      return;
+    }
+
+    const param = obj.param || {};
+    const auto = param['field-autoExit'] === 'on' || param['field-autoExit'] === true;
+    const need = view.needExit;
+    const cur = param['field-gridExit'];
+
+    if (auto && need != null && String(need) !== String(cur)) {
+      param['field-gridExit'] = String(need);
+      await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
+
+      const line =
+        `🎚️ ${this.symbol}: Grid exit ${cur}% → ${need}% — the micro on #${view.deepest} ` +
+        `(${view.micro.price}) did not fit under the split (${view.split})`;
+      console.log(line);
+      logBus.log(line);
+      telegram.send(
+        `🎚️ <b>${this.symbol}</b>: auto exit\n` +
+        `Grid exit <b>${cur}% → ${need}%</b>\n` +
+        `micro #${view.deepest} @ ${view.micro.price} — now it fits`
+      );
+
+      this.blockedNotice = null;
+      this.#kickTick(); // re-run at once: the scalp can be armed on this very rung
+      return;
+    }
+
+    const key = `${view.deepest}:${need ?? '-'}`;
+    if (this.blockedNotice === key) return; // already said it for this rung
+    this.blockedNotice = key;
+
+    // No percent fits when the micro needs more room than the WHOLE gap has — then
+    // Grid exit % is the wrong knob and only a smaller Micro profit % helps.
+    const fix =
+      need != null
+        ? `raise Grid exit % to ${need} (now ${cur})`
+        : `lower Micro profit % (now ${param['field-microProfit']}) — no Grid exit % fits this gap`;
+
+    const line =
+      `⚠️ ${this.symbol}: no room for the micro on #${view.deepest} — micro ${view.micro.price} ` +
+      `vs split ${view.split}. ${fix}. Until then the cycle runs as plain DCA.`;
+    console.log(line);
+    logBus.log(line);
+    telegram.send(
+      `⚠️ <b>${this.symbol}</b>: micro blocked on #${view.deepest}\n` +
+      `micro <b>${view.micro.price}</b> vs split <b>${view.split}</b>\n` +
+      `${fix}`
+    );
+  }
+
   // Attach the engine's own scalp numbers (Job.view) to a table payload. Shallow
   // copy on purpose: `obj` is the very object #jobIterator persists, and the cycle
   // file must not grow a UI-only key. Never throws — a broken view must not take
@@ -743,6 +817,8 @@ class JsonTimerSender extends EventEmitter {
       // neither does a disabled hybrid draining its micro — the scalp gate is shut
       // by the switch before it ever reads the price.
       if (enabled) await this.#refreshJobPrice();
+
+      if (enabled) await this.#blockedMicro(obj, strategy.method);
 
       if (!hybrid && (await this.#maybePrepareRecoveryClose(obj, strategy))) return;
 
@@ -1112,6 +1188,7 @@ class JsonTimerSender extends EventEmitter {
 
       this.apiFailStreak = 0;
       this.apiOutageNotified = false;
+      this.blockedNotice = null;
 
       this.manualPulls = { BUY: new Set(), SELL: new Set() };
       this.manualReplaces = { BUY: new Map(), SELL: new Map() };

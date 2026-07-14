@@ -65,17 +65,21 @@ export class LoadDataFromFileCalculator {
       }
     }
 
-    // Hybrid-grid switch: restore from the saved param (same pattern as Restart).
-    // Old configs without field-hybrid leave it off.
-    const hybridSw = document.getElementById('settings-hybrid');
-    if (hybridSw) {
-      const input = hybridSw.querySelector('input');
-      const on = String(data.param['field-hybrid']) === 'on';
+    // Hybrid-grid and Auto-exit switches: restore from the saved param (same pattern
+    // as Restart). Old configs carry neither field, which reads as off.
+    const restoreSwitch = (id, key) => {
+      const sw = document.getElementById(id);
+      if (!sw) return;
+      const input = sw.querySelector('input');
+      const on = String(data.param[key]) === 'on';
       input.checked = on;
       if (on) input.setAttribute('checked', '');
       else input.removeAttribute('checked');
-      hybridSw.setAttribute('aria-checked', on ? 'true' : 'false');
-    }
+      sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    };
+
+    restoreSwitch('settings-hybrid', 'field-hybrid');
+    restoreSwitch('settings-auto-exit', 'field-autoExit');
     this.loadDataCalculator.toggleHybridFields();
 
     this.#fillInData(data);

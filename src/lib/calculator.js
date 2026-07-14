@@ -77,6 +77,10 @@ class Calculator {
       'field-hybrid': 'off',
       'field-microProfit': 0.1, // % net profit for a grid micro-order (on top of commission)
       'field-gridExit': 50, // % between S_{F-1} and S_F where grid mode yields to the exit close
+      // When the micro does not fit under the split the scalp is refused and the
+      // cycle runs as plain DCA. 'on' = the engine raises gridExit to the percent
+      // that fits; 'off' = it says which knob to turn, and waits for you.
+      'field-autoExit': 'off',
       'field-trackPrice': 0.15, // does not participate in the construction
       'field-activeOrders': 3, // does not participate in the construction
       'field-requestFrequency': 500, // does not participate in the construction

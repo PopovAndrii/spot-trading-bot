@@ -303,18 +303,32 @@ router.post('/calculator/param', async (req, res, next) => {
       'field-microProfit': { min: 0.01, max: 2, dec: 2, label: 'Micro profit %' },
     };
 
+    // Switches, not numbers: stored as 'on'/'off' like field-hybrid, so the engine
+    // reads them the same way. Auto exit turns Grid exit % up to whatever the blocked
+    // micro needs, instead of only warning about it (see #blockedMicro).
+    const FLAGS = {
+      'field-autoExit': { label: 'Auto exit' },
+    };
+
+    const flag = FLAGS[msg.key];
     const limit = LIMITS[msg.key];
-    if (!limit) {
+    if (!limit && !flag) {
       return res.status(400).json({ message: 'Invalid param key' });
     }
 
-    const num = Number(msg.value);
-    if (!Number.isFinite(num)) {
-      return res.status(400).json({ message: 'Invalid param value' });
+    let value;
+    if (flag) {
+      value = msg.value === true || msg.value === 'on' || msg.value === 'true' ? 'on' : 'off';
+    } else {
+      const num = Number(msg.value);
+      if (!Number.isFinite(num)) {
+        return res.status(400).json({ message: 'Invalid param value' });
+      }
+      const rounded = limit.dec > 0 ? Number(num.toFixed(limit.dec)) : Math.round(num);
+      value = Math.min(limit.max, Math.max(limit.min, rounded));
     }
-    const rounded = limit.dec > 0 ? Number(num.toFixed(limit.dec)) : Math.round(num);
-    const value = Math.min(limit.max, Math.max(limit.min, rounded));
 
+    const label = (limit || flag).label;
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
 
@@ -337,7 +351,7 @@ router.post('/calculator/param', async (req, res, next) => {
     await writeFileAtomic(filePath, jsonString, 'utf8');
 
     // value, not msg.value: show what was actually saved (after clamp)
-    res.json({ message: `${limit.label} = <b>${value}</b> saved for ${symbol}` });
+    res.json({ message: `${label} = <b>${value}</b> saved for ${symbol}` });
   } catch (err) {
     console.error('Error saving param:', err);
     res.status(500).json({ message: 'Error saving param' });
