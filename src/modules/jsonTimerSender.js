@@ -93,6 +93,26 @@ function partialFillDelta(stored, message) {
   return { executedQty, cummulativeQuoteQty };
 }
 
+// A cycle's strategy is a property of the GRID ON DISK, not of the toggle in the
+// browser — the grid's entries and closes are already laid out for one side.
+//
+// Start believed the toggle. With a short cycle saved, picking Long and pressing
+// Start ran the LONG engine over the SHORT's table: the short's buy-back, resting on
+// the BUY side, read as an entry buy. Meanwhile the table redrew from the file and
+// the toggle snapped back to Short on its own. Seen live.
+//
+// So the two must agree or nothing starts. Returns the refusal text, or null when
+// the start is sound (no grid on disk yet → any strategy is fine). Pure/testable.
+function strategyConflict(saved, requested) {
+  if (saved !== 'long' && saved !== 'short') return null;
+  if (saved === requested) return null;
+
+  return (
+    `this pair holds a ${saved.toUpperCase()} cycle — its grid is on disk and its orders may be live. ` +
+    `Stop and delete the series, or Calculate + Save a new grid, before starting ${String(requested).toUpperCase()}.`
+  );
+}
+
 class JsonTimerSender extends EventEmitter {
   constructor(wss, strategy = null) {
     super();
@@ -793,6 +813,19 @@ class JsonTimerSender extends EventEmitter {
     return path.join(__dirname, '../data', `${timestamp}${this.symbol}-${this.exchangeName}.json`);
   }
 
+  // Which strategy is the saved cycle? Read straight off the grid on disk — the one
+  // authority on it. null = no grid (or unreadable), i.e. nothing to conflict with.
+  // Asked BEFORE start(), so it cannot lean on this.symbol.
+  async savedStrategy(symbol) {
+    try {
+      const file = path.join(__dirname, '../data', `${symbol}-${this.exchangeName}.json`);
+      const saved = JSON.parse(await fs.readFile(file, 'utf8'))?.param?.['field-strategy'];
+      return saved === 'short' || saved === 'long' ? saved : null;
+    } catch {
+      return null;
+    }
+  }
+
   async stop() {
     clearTimeout(this.timer);
 
@@ -925,3 +958,4 @@ module.exports.markOpenAsCanceled = markOpenAsCanceled;
 module.exports.needsRecoveryConsolidation = needsRecoveryConsolidation;
 module.exports.manualStuckSlots = manualStuckSlots;
 module.exports.cycleProfit = cycleProfit;
+module.exports.strategyConflict = strategyConflict;
