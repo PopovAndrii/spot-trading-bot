@@ -236,6 +236,7 @@ export class SpotWS {
           })
         );
         this.#btnRule(true);
+        startBtn.disabled = true; // re-enabled by spotStatus/updateTableData below
         this.notifications.showNotification('Start of Spot Trading', 'success', 8000);
         this.isRunning = true;
       } else {
@@ -247,6 +248,7 @@ export class SpotWS {
           })
         );
         this.#btnRule();
+        startBtn.disabled = true; // re-enabled by spotStatus/updateTableData below
         this.notifications.showNotification('Pause of Spot Trading', 'warning', 10000);
         this.isRunning = false;
       }
@@ -292,6 +294,7 @@ export class SpotWS {
     if (deleteCurrentSeries) deleteCurrentSeries.disabled = true;
 
     const startBtn = document.getElementById('startBtn');
+    startBtn.disabled = false; // server has confirmed the state — re-arm for the next click
     if (status) {
       startBtn.classList.add('danger');
       startBtn.classList.remove('success');

@@ -716,10 +716,6 @@ class JsonTimerSender extends EventEmitter {
       // readLoop's finally (and before the Done finale below). See telegram.js.
       telegram.open(this.symbol);
 
-      // Batch this pass's per-order notices into one Telegram message; flushed in
-      // readLoop's finally (and before the Done finale below). See telegram.js.
-      telegram.open(this.symbol);
-
       let i = 0;
 
       // never started 0
@@ -942,12 +938,6 @@ class JsonTimerSender extends EventEmitter {
         // the position carrying no exit order at all. Kick an out-of-band tick the
         // moment this pass ends and the replacement lands in ~50 ms instead.
         if (currentOrder.swap) this.swapPending = true;
-
-        this.#notifyOrderEvent(
-          currentOrder,
-          result.message,
-          obj[result.message.side][currentOrder['id']]
-        );
 
         this.#notifyOrderEvent(
           currentOrder,
