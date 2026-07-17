@@ -1,7 +1,8 @@
 {
   "name": "Binance Trading bot",
-  "version": "1.1.3",
+  "version": "2.0.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "build-css": "sass scss/:public/stylesheets/ --no-source-map",
     "gen-qr": "node ./tools/gen-qr.js",

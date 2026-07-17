@@ -36,3 +36,17 @@ yarn-error.log
 *.md
 !README*.md
 README-secret.md
+
+# dev/deploy-only — never needed inside the image (prod copies src/ selectively;
+# the builder only needs scss to compile CSS, so these can be dropped entirely)
+**/graphify-out
+.claude/
+init
+src/test
+src/tools
+src/php
+src/.env.example
+src/nodemon.json
+src/eslint.config.cjs
+src/.stylelintrc.json
+src/.stylelintignore
