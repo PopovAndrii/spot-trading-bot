@@ -9,9 +9,9 @@ and image updates.
 ## Everyday commands
 
 ```bash
-docker compose pull && docker compose up -d   # update to the latest image
-docker compose logs -f                         # follow logs
-docker compose down                            # stop (data is kept)
+docker compose pull && docker compose up -d   # update
+docker compose logs -f   # follow logs
+docker compose down       # stop (data is kept)
 ```
 
 ## Back up your state
@@ -33,5 +33,5 @@ A cycle holds real position state. Take a `binance-data.tgz` snapshot before a
 ## Prefer a visible host folder?
 
 Instead of a named volume, you can keep the state in a plain `./data` folder you can see:
-in `docker-compose.yml` replace `binance-data:/var/www/src/data` with
+in `compose.yml` replace `binance-data:/var/www/src/data` with
 `./data:/var/www/src/data`, then run `mkdir -p data` before the first start.

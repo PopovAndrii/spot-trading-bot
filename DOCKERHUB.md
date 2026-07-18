@@ -4,7 +4,7 @@ Self-hosted spot trading bot for Binance, with a web dashboard. You run it on
 your own machine, with **your own** Binance API keys — the image ships with no
 keys and never sends your credentials anywhere. Runs on testnet out of the box.
 
-- **Image:** `autoxarkov/binance-bot`
+- **Image:** `5879/binance-bot`
 - **Tags:** `latest`, `X.Y.Z` (pin a version for stability)
 - **Architectures:** `linux/amd64`, `linux/arm64` (Intel & Apple Silicon)
 
@@ -14,12 +14,12 @@ keys and never sends your credentials anywhere. Runs on testnet out of the box.
 
 You only need Docker with Compose v2, and one file.
 
-**1. Create a folder with this `docker-compose.yml`:**
+**1. Create a folder with this `compose.yml`:**
 
 ```yaml
 services:
   app:
-    image: autoxarkov/binance-bot:latest
+    image: 5879/binance-bot:latest
     container_name: binance-bot
     restart: unless-stopped
     ports:
@@ -106,9 +106,9 @@ Your money state (open cycles, sessions) lives in the named volume `binance-data
 so it survives restarts and image updates.
 
 ```bash
-docker compose pull && docker compose up -d   # update to the latest image
-docker compose logs -f                         # follow logs
-docker compose down                            # stop (data is kept)
+docker compose pull && docker compose up -d   # update
+docker compose logs -f   # follow logs
+docker compose down       # stop (data is kept)
 ```
 
 Back up your state (find the exact volume name with `docker volume ls` — Compose
@@ -120,7 +120,7 @@ docker run --rm -v "$VOL":/data -v "$PWD":/backup \
   alpine tar czf /backup/binance-data.tgz -C /data .
 ```
 
-Prefer a visible host folder over a named volume? In `docker-compose.yml` replace
+Prefer a visible host folder over a named volume? In `compose.yml` replace
 `binance-data:/var/www/src/data` with `./data:/var/www/src/data`, then run
 `mkdir -p data` before the first start.
 

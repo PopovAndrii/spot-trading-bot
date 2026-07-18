@@ -1,16 +1,16 @@
 # Getting Started
 
 You need **Docker with Compose v2** and one file. The bot runs from the published
-image `autoxarkov/binance-bot` — no repository clone, no build.
+image `5879/binance-bot` — no repository clone, no build.
 
 ## Minimal start
 
-**1. Create a folder with this `docker-compose.yml`:**
+**1. Create a folder with this `compose.yml`:**
 
 ```yaml
 services:
   app:
-    image: autoxarkov/binance-bot:latest
+    image: 5879/binance-bot:latest
     container_name: binance-bot
     restart: unless-stopped
     ports:
@@ -61,7 +61,7 @@ credentials from step 2.
 Everyday commands:
 
 ```bash
-docker compose pull && docker compose up -d   # update to the latest image
-docker compose logs -f                         # follow logs
-docker compose down                            # stop (data is kept)
+docker compose pull && docker compose up -d   # update
+docker compose logs -f   # follow logs
+docker compose down       # stop (data is kept)
 ```

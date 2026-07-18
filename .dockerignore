@@ -5,8 +5,7 @@ src/data/*
 
 Dockerfile
 # docker-config/ НЕ игнорируем: prod-образ копирует entrypoint.sh внутрь
-docker-compose.yml
-docker-compose.yaml
+compose.public.yml
 compose.yml
 compose.prod.yml
 Homestead.json
