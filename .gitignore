@@ -24,3 +24,9 @@
 *ash_history
 graphify-out
 /.claude
+
+# VitePress docs
+/docs/node_modules
+/docs/.vitepress/dist
+/docs/.vitepress/cache
+/public
