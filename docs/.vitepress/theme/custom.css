@@ -1,0 +1,18 @@
+/* Home hero: place the image to the LEFT of the text on desktop.
+   The default theme puts it on the right; reversing the flex row swaps them.
+   Below 960px the hero stacks vertically, so this only applies on wide screens. */
+@media (min-width: 960px) {
+  .VPHero .container {
+    flex-direction: row-reverse;
+  }
+
+  /* Hero image size. */
+  .VPHero .image-src {
+    max-width: 500px;
+    max-height: 500px;
+  }
+
+  .VPHero .image-container {
+    transform: none;
+  }
+}

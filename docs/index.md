@@ -5,6 +5,10 @@ hero:
   name: Spot Trading Bot for Binance
   text: DCA / Grid hybrid
   tagline: A self-hosted, non-custodial spot bot that averages a position down, closes the whole grid at a profit, and scalps the oscillations in between.
+  image:
+    light: /img/hero-light.png
+    dark: /img/hero-dark.png
+    alt: DCA / Grid hybrid dashboard
   actions:
     - theme: brand
       text: Get Started
@@ -33,3 +37,9 @@ Every new version is added to this list with a short note on what changed. Newes
 | Version | Notes |
 |---|---|
 | **`2.0.0`** | First test release. |
+
+## Source
+
+Open source under GPLv3.
+
+- **GitLab (canonical):** [gitlab.com/AndreyPopov/exchange-crypto](https://gitlab.com/AndreyPopov/exchange-crypto)

@@ -33,6 +33,7 @@ export default defineConfig({
       { text: 'DCA / Grid', link: '/dca-grid/overview' },
       { text: 'Expert', link: '/expert/expert-mode' },
       { text: 'Hybrid', link: '/hybrid/overview' },
+      { text: 'Example', link: '/hybrid/walkthrough' },
     ],
 
     sidebar: [
@@ -67,6 +68,7 @@ export default defineConfig({
           { text: 'The scalp summary bar', link: '/hybrid/summary-bar' },
           { text: 'Grid marks: ✓ and ✗', link: '/hybrid/grid-marks' },
           { text: 'Badges & prices', link: '/hybrid/badges' },
+          { text: 'A full session, step by step', link: '/hybrid/walkthrough' },
         ],
       },
       {

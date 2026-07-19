@@ -45,3 +45,9 @@ Hybrid can be toggled while the bot runs. Switching it on aims the scalp at the 
 the price is currently stuck on. It does **not** rebuild the ladder — the DCA grid and
 its averaged close stay exactly where they were.
 :::
+
+## See it run
+
+For all of the above on live data — an empty grid filling, the scalp banking bounces,
+Auto exit raising the split, and the whole position closing — walk through
+[a full recorded session](/hybrid/walkthrough).
