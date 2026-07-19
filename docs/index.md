@@ -2,8 +2,8 @@
 layout: home
 
 hero:
-  name: Binance Trading Bot
-  text: DCA / Grid hybrid for spot
+  name: Spot Trading Bot for Binance
+  text: DCA / Grid hybrid
   tagline: A self-hosted, non-custodial spot bot that averages a position down, closes the whole grid at a profit, and scalps the oscillations in between.
   actions:
     - theme: brand
@@ -23,3 +23,13 @@ features:
   - title: Testnet first
     details: Ships with no keys and defaults to Binance testnet. Your API keys stay in your own .env, on your own machine.
 ---
+
+## Releases
+
+Current version: **`2.0.0`** — first test release.
+
+Every new version is added to this list with a short note on what changed. Newest first.
+
+| Version | Notes |
+|---|---|
+| **`2.0.0`** | First test release. |

@@ -1,4 +1,4 @@
-# Binance Trading Bot
+# Spot Trading Bot for Binance
 
 Self-hosted spot trading bot for Binance, with a web dashboard. You run it on
 your own machine, with **your own** Binance API keys — the image ships with no
@@ -7,6 +7,22 @@ keys and never sends your credentials anywhere. Runs on testnet out of the box.
 - **Image:** `5879/binance-bot`
 - **Tags:** `latest`, `X.Y.Z` (pin a version for stability)
 - **Architectures:** `linux/amd64`, `linux/arm64` (Intel & Apple Silicon)
+
+---
+
+## Why this bot
+
+| # | Advantage |
+|---|---|
+| 1 | **Non-custodial & self-hosted.** Runs on your own machine with your own keys. The bot holds no funds and has no withdrawal permission — your keys never leave your `.env`. |
+| 2 | **Averages the entry down.** A DCA ladder of ever-deeper, ever-larger safety orders pulls your average entry down as price falls, instead of a single all-in buy. |
+| 3 | **One take-profit from real fills.** The whole position is closed by a single exit, sized to everything held so far and recomputed from your **actual** fills — it tracks reality, not the original plan. |
+| 4 | **Scalps the wait (Hybrid).** While the grid sits below its exit, small partial closes harvest the up-and-down chop and **bank** profit that pulls the whole-position exit closer. |
+| 5 | **Reaches deeper than Binance's ~18% order cap.** Binance rejects a limit buy placed too far below market (its percent-price filter, ~18%). Because the grid keeps only a limited number of live orders — the **Active orders** setting — near the price and places deeper rungs *progressively* as price falls, the ladder extends far below that single-order cap over a falling move. |
+| 6 | **Respects exchange filters automatically.** Every order is rounded to the pair's tick size, step size, and minimum notional, so orders aren't rejected by the exchange. |
+| 7 | **Testnet-first, with a safety fallback.** Ships with no keys and defaults to Binance testnet; `real` mode without real keys silently falls back to testnet, so you can't trade real funds by accident. |
+| 8 | **Manual per-order control (Expert Mode).** Cancel and re-place individual live orders by hand when you want to intervene. |
+| 9 | **Free, open source, and yours to run 24/7.** GPLv3, self-hosted — no subscription, no third party between you and the exchange. |
 
 ---
 
@@ -25,7 +41,7 @@ services:
     ports:
       - "${PORT:-3002}:${PORT:-3002}"
     volumes:
-      - binance-data:/var/www/src/data
+      - ./data:/var/www/src/data
       - /etc/localtime:/etc/localtime:ro
     env_file:
       - path: .env
@@ -35,15 +51,14 @@ services:
       STATUS_APP: ${STATUS_APP:-false}
       STATUS_LOGIN: ${STATUS_LOGIN:-true}
       PORT: ${PORT:-3002}
-
-volumes:
-  binance-data:
 ```
 
-**2. Create your `.env`** (interactive — asks for a login/password and Binance keys,
-then writes a `.env` next to the compose file):
+**2. Create the `data/` folder and your `.env`** (the `.env` step is interactive —
+asks for a login/password and Binance keys, then writes a `.env` next to the compose
+file):
 
 ```bash
+mkdir -p data
 docker compose run --rm -v "$PWD":/out -e ENV_OUT=/out/.env app npm run setup-user
 ```
 
@@ -102,8 +117,8 @@ of `NODE_ENV`:
 
 ## Data, updates, and control
 
-Your money state (open cycles, sessions) lives in the named volume `binance-data`,
-so it survives restarts and image updates.
+Your money state (open cycles, sessions) lives in the **`data/` folder next to your
+`compose.yml`** (`data/SYMBOL-binance.json`), so it survives restarts and image updates.
 
 ```bash
 docker compose pull && docker compose up -d   # update
@@ -111,18 +126,11 @@ docker compose logs -f   # follow logs
 docker compose down       # stop (data is kept)
 ```
 
-Back up your state (find the exact volume name with `docker volume ls` — Compose
-prefixes it with your folder name, e.g. `binance-bot_binance-data`):
+Back up your state — it's a plain folder, just copy it:
 
 ```bash
-VOL=$(docker volume ls -q | grep binance-data)
-docker run --rm -v "$VOL":/data -v "$PWD":/backup \
-  alpine tar czf /backup/binance-data.tgz -C /data .
+tar czf data-backup.tgz data/   # or: cp -r data data.bak
 ```
-
-Prefer a visible host folder over a named volume? In `compose.yml` replace
-`binance-data:/var/www/src/data` with `./data:/var/www/src/data`, then run
-`mkdir -p data` before the first start.
 
 ---
 
@@ -137,6 +145,11 @@ process. Full text in the `LICENSE` file (also included inside the image).
 ---
 
 ## Disclaimer
+
+**Not affiliated with Binance.** This is an independent, unofficial open-source
+project — **not** created, endorsed, or supported by Binance. "Binance" and related
+marks belong to their respective owner and are used only to describe the exchange this
+software connects to, through the public API with **your own** keys.
 
 This software is provided **"as is", without warranty of any kind**, express or
 implied. It is a tool, **not financial advice**.

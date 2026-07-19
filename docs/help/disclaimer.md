@@ -1,5 +1,13 @@
 # Disclaimer
 
+## Not affiliated with Binance
+
+This is an **independent, unofficial** open-source project. It is **not** created,
+endorsed, sponsored, or supported by Binance in any way. "Binance" and any related
+names or logos are trademarks of their respective owner, used here only to describe
+the exchange this software connects to. The bot talks to Binance solely through the
+public API, using **your own** API keys.
+
 ## License
 
 **Copyright © 2026 Andrii Popov.**

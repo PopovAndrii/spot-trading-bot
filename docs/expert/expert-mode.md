@@ -46,3 +46,27 @@ understand the consequence for the averaged close and the [scalp](/hybrid/overvi
 For flattening a whole pair at once, use [Managing a pair](/dca-grid/pair-controls)
 instead. Test your workflow on [testnet](/guide/testnet-vs-real) first.
 :::
+
+## Expert Mode and the hybrid scalp
+
+Expert Mode and the [hybrid scalp](/hybrid/overview) can be on at the same time, but
+they do not share territory equally:
+
+- **Plain DCA rungs** — everything above the scalp's arm — are safe to edit. The bot
+  passes over any order you cancel or re-place by hand and keeps managing the rest.
+- **The carrying rung** (the deepest held entry, where the micro lives) belongs to the
+  scalp. Inside the scalp zone any resting close that is not the micro — including one
+  you placed by hand — is pulled to make room for the micro. Your edit will be
+  overridden on the next tick.
+- **The tail slot** (the rung right above the carrying one) sizes its order against the
+  position. A manual order sitting on that slot blocks the tail, and a manual close
+  resting elsewhere is not subtracted from it — the combined sell volume can exceed
+  what the account holds, and the exchange will start rejecting orders.
+
+The same applies to the **whole-position exit**: the hybrid re-prices it from the
+actual fills (and lowers it as micro profit is banked), so an exit you moved by hand
+will not survive the next scalp cycle.
+
+**Rule of thumb:** to hand-edit the exit or anything near the scalp, switch the hybrid
+**off** first — it is a live toggle — make your changes, then decide whether to turn it
+back on. Editing plain DCA rungs does not require this.

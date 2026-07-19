@@ -39,5 +39,5 @@ Stop → Check and Cancel all → Delete current series → reconfigure. Full st
 
 ## Did I back up my state?
 
-Your cycles and banked profit live in the `binance-data` volume. Snapshot it before
-updates — see [Backup & Updates](/operations/backup).
+Your cycles and banked profit live in the `data/` folder next to your `compose.yml`.
+Copy it before updates — see [Backup & Updates](/operations/backup).

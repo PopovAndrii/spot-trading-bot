@@ -11,7 +11,7 @@ const base = process.env.CI_PAGES_URL
 export default defineConfig({
   base,
   lang: 'en-US',
-  title: 'Binance Trading Bot',
+  title: 'Spot Trading Bot for Binance',
   description: 'Self-hosted DCA / Grid hybrid spot trading bot for Binance.',
   cleanUrls: true,
   lastUpdated: true,
@@ -19,7 +19,15 @@ export default defineConfig({
   // dashboard (unreachable at build time).
   ignoreDeadLinks: [/^https?:\/\/localhost/],
 
+  // Favicon lives in docs/public and is served at the site root. Prepend `base`
+  // so the path stays correct under the GitLab Pages subpath in production.
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}favicon.svg` }],
+  ],
+
   themeConfig: {
+    logo: '/logo.svg',
+
     nav: [
       { text: 'Guide', link: '/guide/overview' },
       { text: 'DCA / Grid', link: '/dca-grid/overview' },

@@ -3,6 +3,18 @@
 You need **Docker with Compose v2** and one file. The bot runs from the published
 image `5879/binance-bot` — no repository clone, no build.
 
+## Where to run it
+
+The bot manages open positions continuously, so it should run **24/7**.
+
+- **Strongly recommended: a Linux web server / VPS** that stays on around the clock.
+  A laptop that sleeps or a home PC you shut down leaves the bot unable to watch and
+  close its open cycles.
+- **Not a phone.** The dashboard is a wide desktop layout — it does not fit a
+  portrait mobile screen. Use it from a desktop browser.
+- **Not Windows.** The bot has not been tested on Windows and there are no near-term
+  plans to support it. Run it on Linux.
+
 ## Minimal start
 
 **1. Create a folder with this `compose.yml`:**
@@ -16,7 +28,7 @@ services:
     ports:
       - "${PORT:-3002}:${PORT:-3002}"
     volumes:
-      - binance-data:/var/www/src/data
+      - ./data:/var/www/src/data
       - /etc/localtime:/etc/localtime:ro
     env_file:
       - path: .env
@@ -26,15 +38,14 @@ services:
       STATUS_APP: ${STATUS_APP:-false}
       STATUS_LOGIN: ${STATUS_LOGIN:-true}
       PORT: ${PORT:-3002}
-
-volumes:
-  binance-data:
 ```
 
-**2. Create your `.env`** — interactive; asks for a dashboard login/password and
-your Binance keys, then writes a `.env` next to the compose file:
+**2. Create the `data/` folder** (so it's owned by you, not root) **and your `.env`** —
+the `.env` step is interactive: it asks for a dashboard login/password and your
+Binance keys, then writes a `.env` next to the compose file:
 
 ```bash
+mkdir -p data
 docker compose run --rm -v "$PWD":/out -e ENV_OUT=/out/.env app npm run setup-user
 ```
 
