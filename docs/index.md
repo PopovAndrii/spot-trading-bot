@@ -30,13 +30,14 @@ features:
 
 ## Releases
 
-Current version: **`2.0.0`** — first test release.
+Current version: **`2.0.1`**.
 
 Every new version is added to this list with a short note on what changed. Newest first.
 
-| Version | Notes |
-|---|---|
-| **`2.0.0`** | First test release. |
+| Version | Date | Notes |
+|---|---|---|
+| **`2.0.1`** | 2026-07-20 | Live re-place of the resting micro when Micro profit % changes (atomic `cancelReplace`). VitePress docs site, rebrand + new logo, Docker Hub image rename. Fixes: resting micro shows its real book price; re-place popup price rounded to tick. |
+| **`2.0.0`** | 2026-07-17 | First test release. DCA/Grid hybrid strategy — safety-order ladder, averaged grid close that follows real fills, and a micro-scalp that banks oscillations and pulls the exit closer. Live hybrid controls on a running cycle, Telegram trade notices, testnet-first, and Docker Hub distribution. |
 
 ## Source
 
