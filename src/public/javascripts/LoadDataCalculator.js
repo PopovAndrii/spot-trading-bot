@@ -528,7 +528,11 @@ export class LoadDataCalculator {
         side: type,
         index,
         orderId: o.orderId ?? null,
-        price: o.price ?? '',
+        // Round to tick before it prefills the editor: a price that came from our
+        // own arithmetic (not Binance's clean string) can carry a float tail like
+        // 0.028964999999999998, and the popup would show it verbatim. No Decimal in
+        // the browser, so Number().toFixed(tick) does the same decimalCount rounding.
+        price: o.price != null && o.price !== '' ? Number(o.price).toFixed(dec) : '',
         grid: gridPrice ?? '',
         dec,
       });
