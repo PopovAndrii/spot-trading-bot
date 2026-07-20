@@ -1280,7 +1280,17 @@ class Job {
     // over) → there is no micro to describe, and a "× 0.000" badge would be a lie.
     if (parseFloat(micro.quantity) <= 0) return out;
 
-    out.micro = micro;
+    // A resting micro sits on the book at the price it was PLACED at — not the
+    // recompute, which tracks the CURRENT Micro profit % and drifts away the moment
+    // that knob is turned under a live order (lower it for an easier fill and the
+    // badge would show a price the exchange never held). Show what is actually
+    // there; the engine never re-prices a resting micro, it only polls it. The
+    // fit/arm logic below stays on the recompute the engine gates on, so the badge
+    // reads "real" while the decision stays consistent with #scalpMode.
+    out.micro =
+      out.resting && close.price != null
+        ? { ...micro, price: new Decimal(close.price).toFixed(tick) }
+        : micro;
 
     if (split == null) return out; // unknown price or fill data → the engine stays classic
 

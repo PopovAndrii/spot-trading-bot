@@ -143,6 +143,22 @@ test('view: a resting micro is reported as resting, with its real price and volu
   assert.equal(v.micro.quantity, '0.085');
 });
 
+test('view: a resting micro shows its REAL book price, not the recompute', () => {
+  // The micro was placed at an OLDER, higher Micro profit % and rests at 583.10.
+  // The knob was since lowered, so #gridClose now recomputes 582.12 — but the book
+  // still holds 583.10, and the engine never re-prices a resting order. The badge
+  // must show what is really on the exchange, or it reports a price that was never
+  // there (the whole point of the resting branch).
+  const obj = cycle();
+  obj.SELL[3] = order('SELL', 'NEW', '583.10', '0.085', { orderId: 6143954, role: 'micro' });
+
+  const v = job().view(obj, 'long');
+
+  assert.equal(v.resting, true);
+  assert.equal(v.micro.price, '583.10'); // the real book price, NOT the 582.12 recompute
+  assert.equal(v.micro.quantity, '0.085');
+});
+
 test('view: banked oscillations surface — and each one pulls the close down', () => {
   const obj = cycle();
   obj.gridRealized = 0.2464;

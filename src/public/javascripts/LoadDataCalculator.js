@@ -414,10 +414,11 @@ export class LoadDataCalculator {
     return `<span class="fill-badge micro-badge micro-live" title="micro arming: ${quantity} @ ${price}">micro ${price} × ${quantity}</span>`;
   }
 
-  // The scalp in one line above the table: the live price against the split it is
-  // measured on, the micro, the REAL whole-position close (recomputed from the
-  // fills — it drifts away from the plan column as the cycle runs), and everything
-  // the grid has banked so far. Hidden entirely on a classic cycle.
+  // The scalp in one line above the table: the split the micro is measured on, the
+  // REAL whole-position close (recomputed from the fills — it drifts away from the
+  // plan column as the cycle runs), and everything the grid has banked so far. The
+  // live price (already in the stream, top-right) and the micro (its own row badge,
+  // at its real book price) are NOT repeated here. Hidden on a classic cycle.
   #hybridBar(view, dec = 2) {
     const bar = document.getElementById('hybrid-bar');
     if (!bar) return;
@@ -468,9 +469,7 @@ export class LoadDataCalculator {
     }
 
     out.push(cell('', text, `hybrid-bar__state is-${state}`));
-    if (view.price) out.push(cell('price', view.price));
     if (view.split) out.push(cell('split', view.split));
-    if (view.micro) out.push(cell('micro', `${view.micro.price} × ${view.micro.quantity}`));
     if (view.close) out.push(cell('close', `${view.close.price} × ${view.close.quantity}`));
     out.push(cell('banked', banked, Number(view.banked) > 0 ? 'is-live' : ''));
 
