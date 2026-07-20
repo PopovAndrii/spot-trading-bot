@@ -238,7 +238,12 @@ function orderResultPatch(currentOrder, message) {
     patch.role = currentOrder.role;
   }
 
-  if (currentOrder.method === 'newOrder') {
+  // cancelReplace persists the SENT price/quantity for the same reason newOrder
+  // does: the moved micro is re-priced at send time, so the slot must hold the sent
+  // value — otherwise the table shows the stale price and, worse, the next tick's
+  // drift check compares the recompute against a stale resting price and re-moves an
+  // order that is already where it should be (churn).
+  if (currentOrder.method === 'newOrder' || currentOrder.method === 'cancelReplace') {
     if (currentOrder.data?.price !== undefined) patch.price = currentOrder.data.price;
     if (currentOrder.data?.quantity !== undefined) patch.quantity = currentOrder.data.quantity;
   }

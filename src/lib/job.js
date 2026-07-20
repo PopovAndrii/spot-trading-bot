@@ -1058,6 +1058,47 @@ class Job {
           data: { id: i, symbol, orderId: close.orderId },
         };
       }
+
+      // Follow the Micro profit %/commission knob on the LIVE micro, not only on the
+      // next arm: #gridClose has re-priced the target from the real entry fill, and
+      // when the knob moved it a whole tick or more, carry the resting micro there.
+      // WHY an atomic cancel-replace and not cancel-then-place: a bare cancel sets
+      // resting=false, so the re-place must clear the ARMING gate (inside(P, micro)),
+      // which refuses inside the micro→split band and drops the scalp into a full
+      // close, leaving the rung naked for a tick. cancelReplace is a MOVE of a scalp
+      // already being HELD: reaching here means the hold gate (P inside split) and
+      // the fit gate (recomputed micro under the split) both passed in #scalpMode.
+      // gridExit is excluded for free — it never enters microClosePrice, so it moves
+      // no micro price and the drift stays 0. Both prices are toFixed(tick), so after
+      // the move the recompute equals the resting price → drift 0 → fires once per
+      // knob turn, never churns.
+      const tick = parseInt(obj.param?.['field-tickSize'], 10) || 0;
+      const tickVal = tick > 0 ? Math.pow(10, -tick) : 1;
+      const drift = Math.abs(parseFloat(micro.price) - parseFloat(close.price));
+      if (
+        drift >= tickVal / 2 &&
+        parseFloat(micro.quantity) > 0 &&
+        !this.#belowMin(micro.quantity, micro.price)
+      ) {
+        return {
+          status: null,
+          method: 'cancelReplace',
+          side: closeSide,
+          id: i,
+          role: 'micro',
+          data: {
+            id: i,
+            symbol,
+            side: closeSide,
+            type: 'LIMIT',
+            timeInForce: 'GTC',
+            quantity: micro.quantity,
+            price: micro.price,
+            orderId: close.orderId,
+          },
+        };
+      }
+
       return {
         status: close.status,
         method: 'getOrder',
@@ -1129,10 +1170,12 @@ class Job {
   // Grid close order (price + quantity) computed at placement time, like DCA's
   // rebalancedClose. Price = the rung's own entry LEVEL marked by microProfit +
   // commission (matches the displayed micro column). Quantity = what the entry
-  // actually filled MINUS what a canceled partial predecessor on the same slot
-  // already sold/bought back (frontier moves and rollbacks cancel live closes —
-  // without the subtraction the re-placed micro oversells the rung), floored to
-  // stepSize. Zero left → the oscillation is de-facto complete (caller banks it).
+  // actually filled MINUS what this close slot has ALREADY sold/bought back across
+  // EVERY order that rested on it (slotQty = the live order's fill + fills banked
+  // from replaced predecessors — a cancel-replace or a micro↔full-close swap leaves
+  // the earlier fill in filledQty; counting only the live executedQty would re-sell
+  // it and oversell the rung), floored to stepSize. Zero left → the oscillation is
+  // de-facto complete (caller banks it).
   #gridClose(obj, entry, close, closeSide) {
     const p = obj.param || {};
     const microProfit = p['field-microProfit'] ?? 0.1;
@@ -1143,7 +1186,7 @@ class Job {
 
     const price = microClosePrice(entry.price, microProfit, commission, tick, strategy);
     const execQty = new Decimal(entry.executedQty || entry.quantity || 0);
-    const already = new Decimal(Number(close?.executedQty) || 0);
+    const already = new Decimal(slotQty(close));
     const quantity = Decimal.max(execQty.minus(already), 0)
       .toDecimalPlaces(step, Decimal.ROUND_DOWN)
       .toFixed(step);

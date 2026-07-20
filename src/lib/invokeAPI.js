@@ -211,6 +211,45 @@ class InvokeApi {
     }
   }
 
+  // Atomic move of a resting order to a new price/quantity: cancel + place in one
+  // exchange call. STOP_ON_FAILURE means the new order is placed ONLY if the cancel
+  // succeeds, and the filters are evaluated BEFORE the cancel — so the outcome is
+  // all-or-nothing: either the order moves, or nothing changes and the old one stays
+  // resting. A cancel that cancelled nothing (order filled/pulled between poll and
+  // move) throws, handled below → caller re-polls next pass. On HTTP 200 both legs
+  // succeeded; the order the caller must now track is newOrderResponse.
+  async cancelReplace(data) {
+    try {
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.cancelAndReplace(data.symbol, data.side, data.type, 'STOP_ON_FAILURE', {
+          cancelOrderId: data.orderId,
+          price: data.price,
+          quantity: data.quantity,
+          timeInForce: data.timeInForce,
+        })
+      );
+
+      const placed = res.data.newOrderResponse;
+
+      const msg = [
+        placed.orderId,
+        placed.symbol,
+        placed.status,
+        placed.side,
+        this.#fmtNum(placed.symbol, placed.price, 'price'),
+        this.#fmtNum(placed.symbol, placed.origQty, 'qty'),
+      ];
+
+      this.getConsoleMsg(`cancelReplace(${data.id}) ${msg.join(' | ')}`);
+      return { success: true, message: placed };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
+
+      this.getConsoleMsg(message, false);
+      return { success: false, message };
+    }
+  }
+
   async openOrders(data) {
     try {
       // REST openOrders(options) expects an OBJECT; a string symbol was ignored

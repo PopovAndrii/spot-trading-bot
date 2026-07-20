@@ -197,16 +197,114 @@ test('yield: scalp on + resting full close → cancel it (micro takes the slot)'
   assert.equal(r.data.orderId, 300);
 });
 
-test('yield: scalp on + resting micro → keep polling it (no churn)', () => {
+test('yield: scalp on + resting micro at the target → keep polling it (no churn)', () => {
+  // Resting micro sits at the CURRENT-knob target (90 × 1.003 = 90.27): drift 0, so
+  // the live re-place is not triggered and the micro is simply polled.
   const obj = scalpObj({
     sells: [
       mkOrder('SELL', null),
-      mkOrder('SELL', 'NEW', { orderId: 301, role: 'micro', quantity: '1.000', price: '90.18' }),
+      mkOrder('SELL', 'NEW', { orderId: 301, role: 'micro', quantity: '1.000', price: '90.27' }),
     ],
   });
   const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
   assert.equal(r.method, 'getOrder');
   assert.equal(r.data.orderId, 301);
+});
+
+// ===== live re-place: the resting micro follows the Micro profit %/commission knob =====
+
+test('re-place: Micro profit % lowered, drift ≥ tick, still fits → atomic cancelReplace to the new price', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', {
+        orderId: 401,
+        role: 'micro',
+        quantity: '1.000',
+        price: '90.27', // the old-knob target (microProfit 0.1)
+        executedQty: 0,
+        cummulativeQuoteQty: 0,
+      }),
+    ],
+  });
+  obj.param['field-microProfit'] = '0'; // target → 90 × 1.002 = 90.18 (drift 0.09)
+
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r.method, 'cancelReplace');
+  assert.equal(r.role, 'micro');
+  assert.equal(r.data.orderId, 401); // the order being moved
+  assert.equal(r.data.price, '90.18'); // recomputed target
+  assert.equal(r.data.quantity, '1.000'); // whole rung, nothing sold yet
+});
+
+test('re-place: resting micro already at the target → no drift → keeps polling (getOrder)', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 402, role: 'micro', quantity: '1.000', price: '90.27' }),
+    ],
+  });
+  // knobs unchanged → recompute equals the resting price → drift 0
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r.method, 'getOrder');
+  assert.equal(r.data.orderId, 402);
+});
+
+test('re-place: price INSIDE the micro→split band → still cancelReplace, never collapses to a full close', () => {
+  // Regression guard for the anti-flap gate: a bare cancel would drop resting=false
+  // and the re-place would hit the ARMING gate (refuses in this band) → full close.
+  // The atomic move is a HOLD-gated transfer, so it happens here all the same.
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 403, role: 'micro', quantity: '1.000', price: '90.27' }),
+    ],
+  });
+  obj.param['field-microProfit'] = '0'; // target → 90.18, drift 0.09
+
+  const r = priceJob(91).hybridLong(obj, 1, obj.BUY[1]); // P=91 ∈ (micro, split=92.69)
+  assert.equal(r.method, 'cancelReplace');
+  assert.equal(r.role, 'micro');
+  assert.equal(r.data.price, '90.18');
+});
+
+test('re-place: only Grid exit % changed → micro price unmoved → no re-place (getOrder)', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'NEW', { orderId: 404, role: 'micro', quantity: '1.000', price: '90.27' }),
+    ],
+  });
+  obj.param['field-gridExit'] = '90'; // moves the split, not microClosePrice → drift 0
+
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r.method, 'getOrder');
+  assert.equal(r.data.orderId, 404);
+});
+
+test('re-place: partially filled micro → replacement carries only the remainder (slotQty)', () => {
+  const obj = scalpObj({
+    sells: [
+      mkOrder('SELL', null),
+      mkOrder('SELL', 'PARTIALLY_FILLED', {
+        orderId: 405,
+        role: 'micro',
+        quantity: '1.000',
+        price: '90.27',
+        executedQty: 0.4, // this order's fill
+        cummulativeQuoteQty: 36,
+        filledQty: 0.1, // banked from a replaced predecessor
+        filledQuote: 9,
+      }),
+    ],
+  });
+  obj.param['field-microProfit'] = '0'; // target → 90.18, drift 0.09
+
+  const r = priceJob(90).hybridLong(obj, 1, obj.BUY[1]);
+  assert.equal(r.method, 'cancelReplace');
+  assert.equal(r.data.price, '90.18');
+  // entry filled 1.0 − slotQty (0.4 + 0.1) already sold = 0.5 left
+  assert.equal(r.data.quantity, '0.500');
 });
 
 test('yield: price crossed the split with a resting micro → cancel it (full close returns)', () => {
@@ -340,6 +438,24 @@ test('short scalp: P at/below the split → classic whole buy-back', () => {
   assert.equal(r.role, undefined);
   assert.equal(r.data.quantity, '2.000');
   assert.equal(r.data.price, '104.58');
+});
+
+test('short re-place: Micro profit % lowered → atomic cancelReplace of the BUY-back micro', () => {
+  const obj = scalpShortObj({
+    buys: [
+      mkOrder('BUY', null),
+      mkOrder('BUY', 'NEW', { orderId: 501, role: 'micro', quantity: '1.000', price: '109.67' }),
+    ],
+  });
+  obj.param['field-microProfit'] = '0'; // target → 110 × 0.998 = 109.78 (drift 0.11)
+
+  const r = priceJob(110).hybridShort(obj, 1, obj.SELL[1]);
+  assert.equal(r.method, 'cancelReplace');
+  assert.equal(r.side, 'BUY');
+  assert.equal(r.role, 'micro');
+  assert.equal(r.data.orderId, 501);
+  assert.equal(r.data.price, '109.78');
+  assert.equal(r.data.quantity, '1.000');
 });
 
 test('short: unknown price → identical to pure DCA', () => {
