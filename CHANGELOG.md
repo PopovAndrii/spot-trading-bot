@@ -16,3 +16,16 @@
 
 - Resting micro now shows its real order-book price instead of a stale/derived value.
 - Re-place popup price is rounded to tick, removing float artifacts in the displayed price.
+
+## v2.0.0
+
+### Added
+
+- First test release of the DCA / Grid hybrid strategy.
+- DCA safety-order ladder that averages the entry down — each rung deeper and larger than the last.
+- Averaged grid close: the whole position exits as one take-profit that follows your real fills, not a static plan.
+- Micro-scalp that banks the oscillations while the position waits and pulls the exit price closer.
+- Live hybrid controls adjustable on a running cycle.
+- Telegram trade notifications.
+- Testnet-first: ships with no keys, defaults to Binance testnet.
+- Docker Hub distribution.
