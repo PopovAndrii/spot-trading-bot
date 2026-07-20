@@ -1,5 +1,18 @@
 const EventEmitter = require('events');
 const WebSocket = require('ws');
+const { isTestnet } = require('./runMode');
+
+// The public price stream MUST come from the same exchange the orders live on.
+// This used to be hardcoded to mainnet while BINANCE_MODE=test put every order on
+// testnet — two different order books with two different prices. The hybrid scalp
+// reads this stream to decide whether the price is inside the pause zone, so it was
+// comparing a MAINNET tick against a micro priced off TESTNET fills: it armed and
+// cancelled the scalp on a market its orders were not in, and the micro sat on the
+// testnet book at a price the testnet market never traded at. Same for the price in
+// the UI header — plausible, and from the wrong exchange.
+function streamBase() {
+  return isTestnet() ? 'wss://stream.testnet.binance.vision/ws/' : 'wss://stream.binance.com:9443/ws/';
+}
 
 class StreamAPI extends EventEmitter {
   static instances = new Map();
@@ -41,13 +54,18 @@ class StreamAPI extends EventEmitter {
       return;
     }
 
-    const url = `wss://stream.binance.com:9443/ws/${this.symbol}@ticker`;
-    console.log(`🔄 StreamAPI Connecting ${this.symbol}...`);
+    const url = `${streamBase()}${this.symbol}@ticker`;
+    console.log(`🔄 StreamAPI Connecting ${this.symbol} (${isTestnet() ? 'testnet' : 'real'})...`);
 
     this.ws = new WebSocket(url);
 
     this.ws.on('open', () => {
       console.log(`🟢 Start Stream: ${this.symbol}`);
+      // The socket is alive right now — start the liveness clock from here, not
+      // from whatever a previous connection left behind. Without this reset the
+      // watchdog re-fired 10s after every reconnect on the stale timestamp and
+      // looped forever.
+      this.lastMessageTime = Date.now();
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         // recovered after a long outage we already signaled via
         // maxReconnectReached — notify the listeners
@@ -67,6 +85,19 @@ class StreamAPI extends EventEmitter {
       } catch (err) {
         console.error(`❌ JSON parse error for ${this.symbol}:`, err.message);
       }
+    });
+
+    // Liveness comes from the protocol, not from trades. The @ticker stream only
+    // pushes when the ticker changes, so an illiquid pair (ETHBTC on testnet) can
+    // legitimately stay silent for minutes while the socket is perfectly healthy.
+    // Binance pings every 20s regardless; ws answers pong on its own, we only note
+    // the time. Same for a server pong.
+    this.ws.on('ping', () => {
+      this.lastMessageTime = Date.now();
+    });
+
+    this.ws.on('pong', () => {
+      this.lastMessageTime = Date.now();
     });
 
     this.ws.on('close', (code, reason) => {
@@ -94,6 +125,7 @@ class StreamAPI extends EventEmitter {
     console.log(`⏹️ Stop stream for ${this.symbol}...`);
 
     this.stopHeartbeat();
+    this.lastMessageTime = null; // the next connection starts its own clock
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -121,8 +153,9 @@ class StreamAPI extends EventEmitter {
 
       const timeSinceLastMsg = Date.now() - this.lastMessageTime;
 
-      // If there's no data for 30 seconds → reconnect
-      if (timeSinceLastMsg > 30 * 1000) {
+      // 60s: Binance pings every 20s, so silence this long means two missed pings
+      // in a row — the socket really is gone, not just the market standing still.
+      if (timeSinceLastMsg > 60 * 1000) {
         console.warn(
           `⚠️ ${this.symbol}: no data ${Math.round(timeSinceLastMsg / 1000)}s, reconnecting...`
         );

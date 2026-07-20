@@ -17,6 +17,7 @@
             <input type="radio" class="UIbg-input" name="strategy" value="long" id="long">
             <label class="UIbg-btn" for="long">Long</label>
           </div>
+          <div class="stream-currency"></div>
         </div>
 
         <div>
@@ -57,6 +58,36 @@
             <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 20 , max: 150 , step: 0, hint:'The Martingale factor affects the size of the gap in the closing order (final sale). The higher the Martingale factor, the more effectively and frequently the end of the series is triggered. However, this causes the balance to be depleted very quickly. With a low Martingale factor, the order grid is very wide and provides good overlap in percentage terms. However, the final order in the series is located slightly further away than desired. Range: minimum 25-35; optimal 35-80; excellent 80-100+.' }); %>
             <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0.01 , max: 2 , step: 2, hint:'Progressive Step—allows you to control the percentage of overlap between price drops (Long) and rises (Short). The greater the overlap (>20%), the lower the risk-which is good. At the same time, orders are triggered less frequently-which is bad. You need to find the optimal balance depending on the amount of currency in your exchange account.'}); %>
             <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
+          </div>
+
+        </div>
+
+        <!-- Hybrid params live OUTSIDE #group-spinbox on purpose: none of them build
+               the ladder (the calculator never reads gridLevel or gridExit, and reads
+               microProfit only for the displayed micro column). They are decisions the
+               Job re-reads every tick, so they must stay adjustable while the robot
+               runs — the scalp is armed and re-aimed by watching the live price, which
+               is exactly when the settings block is locked. -->
+        <div class="line" id="group-hybrid">
+          <%- include('../views/ui/SpinBox', { id:'field-gridLevel' , label:'Grid from order' , min:1, max:50, step:0, hint:'From which order number (down the ladder) the deepest filled order may run the pause-scalp. Orders above it never scalp — pure DCA. Changeable while the bot is running: switching Hybrid on aims it at the order the price is currently stuck on, and you can retype it — e.g. raise it to make the scalp ignore this order and wait for a deeper one.' }); %>
+          <%- include('../views/ui/SpinBox', { id:'field-microProfit' , label:'Micro profit %' , min:0.01, max:2 , step: 2, hint:'Net take-profit of each grid micro-order, on top of commission. Smaller = banks bounces more often, and fits into a narrower pause gap. Default 0.1. Changeable while the bot is running.' }); %>
+          <%- include('../views/ui/SpinBox', { id:'field-gridExit' , label:'Grid exit %' , min:0, max:100 , step: 0, hint:'Split of the pause gap between the deepest filled order and the whole-position close (live stream price). Below the split the micro-scalp trades the deepest order&#39;s own volume; above it the normal full close rests. 0 = at the deepest fill (no scalp), 100 = at the close, default 50 = midway. The micro never crosses this line — so if micro profit + commission needs more room than this split leaves, no scalp is placed at all: raise this. Changeable while the bot is running.' }); %>
+
+          <!-- The knob, turned for you. A micro that does not fit under the split is
+                 refused SILENTLY: the cycle runs on as plain DCA. Off, the robot says
+                 which knob and to what ("raise Grid exit % to 92"); on, it sets that
+                 value itself the moment the rung blocks. Live — like the params it
+                 rides beside, it is re-read every tick. -->
+          <div class="UIsw info lg r-1 label-top" role="switch" tabindex="0" id="settings-auto-exit">
+            <label class="UIsw-label" for="autoExit">Auto exit
+              <span class="UIql" tabindex="0">
+                <span class="UIql__text">When the micro does not fit under the split, raise Grid exit % to the value that fits — automatically, on the running cycle. Off: the robot only warns you, in the log and in Telegram, and names the value. Changeable while the bot is running.</span>
+              </span>
+            </label>
+            <input type="checkbox" id="autoExit" name="auto-exit-switch" hidden>
+            <span class="UIsw-slider"></span>
+            <span class="UIsw-slider__on">on</span>
+            <span class="UIsw-slider__off">off</span>
           </div>
         </div>
 
@@ -106,11 +137,13 @@
               </svg>
             </button>
           </div>
-          <div class="stream-currency">
-          </div>
         </div>
 
       </form>
+
+      <!-- The pause-scalp, in one line: filled by LoadDataCalculator from the
+             engine's own numbers (obj.hybridView). Hidden on a classic cycle. -->
+      <div id="hybrid-bar" class="hybrid-bar" hidden></div>
 
       <table id="settings-table" class="t t-border t-striped t-hover">
         <thead>
@@ -146,6 +179,18 @@
               <use href="/sprite.svg#trash"></use>
             </svg>
           </button>
+
+          <div class="UIsw r-1" role="switch" tabindex="0" id="settings-hybrid">
+            <label class="UIsw-label" for="hybrid">Hybrid grid
+              <span class="UIql" tabindex="0">
+                <span class="UIql__text">DCA + pause-scalp. The DCA grid is untouched: the averaged whole-position close keeps descending with martingale and always covers everything. While the price sits in the lower part of the gap below that close (see Grid exit %), the deepest filled order scalps its own volume: sells at its micro-profit, re-buys the dip, banks every bounce (&times;N). Off = pure DCA.</span>
+              </span>
+            </label>
+            <input type="checkbox" id="hybrid" name="hybrid-switch" hidden>
+            <span class="UIsw-slider"></span>
+            <span class="UIsw-slider__on">on</span>
+            <span class="UIsw-slider__off">off</span>
+          </div>
 
           <div class="UIsw r-1" role="switch" tabindex="0" id="settings-expert-mode">
             <label class="UIsw-label" for="expert">Expert Mode

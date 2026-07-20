@@ -2,6 +2,51 @@
 // the only ESM module and worked only thanks to require(esm) in Node ≥22.
 const Decimal = require('decimal.js');
 
+// Hybrid grid micro take-profit price: an entry price marked up (long close =
+// SELL) or down (short close = BUY) by microProfit + commission. Single source of
+// truth — used by the Calculator rows (for display) and by the Job at placement
+// time (from the real fill). entryPrice is a number/string; returns a tick-rounded
+// string.
+function microClosePrice(entryPrice, microProfit, commission, tick, strategy) {
+  const total = new Decimal(microProfit).plus(commission);
+  const factor =
+    strategy === 'short' ? new Decimal(100).minus(total) : new Decimal(100).plus(total);
+  return new Decimal(entryPrice).times(factor).div(100).toFixed(tick);
+}
+
+// Hybrid v2 exit threshold T_F: where the frontier rung stops micro-recycling and
+// the whole position is closed with ONE averaged order. Interpolates between the
+// two neighboring averaged-close prices — S_{F-1} (position without the frontier
+// rung) and S_F (position including it): T = S_{F-1} + pct/100 × (S_F − S_{F-1}).
+// pct comes from field-gridExit; 50 (the default) is the midpoint from the spec,
+// 0 sticks to S_{F-1}, 100 to S_F. Pure interpolation — direction-agnostic, so
+// long (S_F below S_{F-1}) and short (mirrored) use the same formula. Invalid pct
+// falls back to 50. Returns a number (comparison only — no tick rounding here).
+function gridExitThreshold(sPrev, sF, pct) {
+  // pct == null / '' guarded explicitly: Number(null) and Number('') are 0
+  // (finite), which would silently turn a missing field — or an old config
+  // restored into an empty SpinBox — into "exit at S_{F-1}" instead of the default.
+  const p = pct == null || pct === '' ? NaN : Number(pct);
+  const share = new Decimal(Number.isFinite(p) ? p : 50).div(100);
+  const prev = new Decimal(sPrev);
+  return prev.plus(new Decimal(sF).minus(prev).times(share)).toNumber();
+}
+
+// Will the scalp even be ALLOWED on this rung, once it fills? The engine refuses a
+// micro that would cross the split (job's #scalpMode) and it refuses SILENTLY: the
+// cycle then runs as plain DCA and nothing in the table says why. Answered here off
+// the PLANNED ladder, because both ends of the pause are already on the row — the
+// rung's own entry, and the whole-position close through it — so the question can be
+// settled before a single order fills, which is when the knob actually gets set.
+//
+// A forecast, not a promise: the real fills land a tick or two off the plan, and the
+// live answer comes from Job.view. Same two functions either way, so they agree.
+function microFit(entry, close, micro, pct, strategy) {
+  const split = gridExitThreshold(entry, close, pct);
+  const m = parseFloat(micro);
+  return { split, fits: strategy === 'short' ? m > split : m < split };
+}
+
 class Calculator {
   // The grid is built by a factory, not the constructor: `new Calculator()` now
   // returns a normal instance (instanceof works); the entry point is the static
@@ -25,6 +70,17 @@ class Calculator {
       'field-fibonachiStep': 0.2, // fibonachi
       'field-martingail': 49,
       'field-indent': 0.0,
+      // Hybrid DCA/GRID: when 'on', each rung also gets its OWN micro take-profit
+      // (own entry price marked up by microProfit + commission) so a grid leg can
+      // bank an oscillation independently of the DCA averaged close. Off = the
+      // classic single-averaged-close behavior, output byte-for-byte unchanged.
+      'field-hybrid': 'off',
+      'field-microProfit': 0.1, // % net profit for a grid micro-order (on top of commission)
+      'field-gridExit': 50, // % between S_{F-1} and S_F where grid mode yields to the exit close
+      // When the micro does not fit under the split the scalp is refused and the
+      // cycle runs as plain DCA. 'on' = the engine raises gridExit to the percent
+      // that fits; 'off' = it says which knob to turn, and waits for you.
+      'field-autoExit': 'off',
       'field-trackPrice': 0.15, // does not participate in the construction
       'field-activeOrders': 3, // does not participate in the construction
       'field-requestFrequency': 500, // does not participate in the construction
@@ -46,11 +102,22 @@ class Calculator {
     );
   };
 
+  // Hybrid enabled? Turns on the per-rung micro take-profit field. Accepts 'on',
+  // boolean true, or 1 — parseNumbers() coerces a boolean true to 1, so we match
+  // that too. Kept intentionally lax so a stray value never crashes the grid.
+  #hybridOn() {
+    const h = this.data['field-hybrid'];
+    return h === 'on' || h === true || h === 1;
+  }
+
   long = () => {
     const mainObj = [];
     const step = this.data['field-stepSize'];
     const tick = this.data['field-tickSize'];
     const currency = new Decimal(this.data['field-currency']);
+    const hybrid = this.#hybridOn();
+    const microProfit = new Decimal(this.data['field-microProfit'] ?? 0);
+    const commission = new Decimal(this.data['field-commission']);
 
     let balanceTotal = new Decimal(this.data['field-deposit']);
 
@@ -112,15 +179,39 @@ class Calculator {
       // Spent in quote currency (money = price × qty); quote precision = price tickSize
       const spentQuote = actualSpent.toFixed(tick);
 
-      mainObj.push({
+      // The actual placed entry price (rounded to tick) — the exchange fills the
+      // BUY here, so the micro take-profit must be measured from this, not the
+      // full-precision internal value, or the banked profit drifts by a rounding tick.
+      const entryPrice = buyPrice.toFixed(tick);
+
+      const row = {
         overlapRange: overlapRange.toFixed(2),
-        buyCurrency: buyPrice.toFixed(tick),
+        buyCurrency: entryPrice,
         buy: buy.toFixed(step),
         totalSell: totalSell.toFixed(step),
         sellCurrency: sellCurrency.toFixed(tick),
         didBuy: spentQuote,
         calcBalance: balanceTotal.toFixed(tick),
-      });
+      };
+
+      if (hybrid) {
+        // Grid micro take-profit for THIS rung: its own entry price marked up by
+        // microProfit + commission. The DCA path ignores it; job's hybrid path uses
+        // it for rungs at/below the activation level, so each leg banks its own bounce.
+        row.microSellCurrency = microClosePrice(entryPrice, microProfit, commission, tick, 'long');
+
+        const fit = microFit(
+          entryPrice,
+          row.sellCurrency,
+          row.microSellCurrency,
+          this.data['field-gridExit'],
+          'long'
+        );
+        row.microSplit = new Decimal(fit.split).toFixed(tick);
+        row.microFits = fit.fits;
+      }
+
+      mainObj.push(row);
     }
     return mainObj;
   };
@@ -141,6 +232,9 @@ class Calculator {
     const step = this.data['field-stepSize'];
     const tick = this.data['field-tickSize'];
     const currency = new Decimal(this.data['field-currency']);
+    const hybrid = this.#hybridOn();
+    const microProfit = new Decimal(this.data['field-microProfit'] ?? 0);
+    const commission = new Decimal(this.data['field-commission']);
 
     let currentBalance = new Decimal(this.data['field-deposit']);
     const initialDeposit = new Decimal(this.data['field-deposit']);
@@ -199,19 +293,43 @@ class Calculator {
       // Spent in quote currency (money = qty × price); quote precision = price tickSize
       const spentQuote = currentOrderSell.times(sellPrice).toFixed(tick);
 
-      mainObj.push({
+      // The actual placed entry price (rounded to tick) — the exchange fills the
+      // SELL here, so measure the micro buy-back from this rounded value.
+      const entryPrice = sellPrice.toFixed(tick);
+
+      const row = {
         overlapRange: overlapRange.toFixed(2),
         buyCurrency: buyPrice.toFixed(tick),
         buy: initialDeposit.minus(currentBalance).toFixed(step),
         totalSell: currentOrderSell.toFixed(step),
-        sellCurrency: sellPrice.toFixed(tick),
+        sellCurrency: entryPrice,
         didBuy: spentQuote,
         calcBalance: currentBalance.toFixed(step),
-      });
+      };
+
+      if (hybrid) {
+        // Mirror of long: grid micro take-profit is a BUY-back at THIS rung's own
+        // sell entry price marked down by microProfit + commission.
+        row.microBuyCurrency = microClosePrice(entryPrice, microProfit, commission, tick, 'short');
+
+        // Mirrored too: the pause runs from the rung's own SELL entry down to the
+        // whole-position buy-back, and the micro must stay ABOVE the split.
+        const fit = microFit(
+          entryPrice,
+          row.buyCurrency,
+          row.microBuyCurrency,
+          this.data['field-gridExit'],
+          'short'
+        );
+        row.microSplit = new Decimal(fit.split).toFixed(tick);
+        row.microFits = fit.fits;
+      }
+
+      mainObj.push(row);
     }
 
     return mainObj;
   };
 }
 
-module.exports = { Calculator };
+module.exports = { Calculator, microClosePrice, gridExitThreshold };

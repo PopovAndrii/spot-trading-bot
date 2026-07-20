@@ -1,0 +1,24 @@
+# GitLab Pages — builds the VitePress documentation in docs/ and publishes the
+# static site. The repository can stay PRIVATE while the site is PUBLIC: set
+#   Settings → General → Visibility → "Pages access control" = Everyone
+#
+# The site's base path is taken from CI_PAGES_URL at build time
+# (see docs/.vitepress/config.mjs), so it needs no hard-coded project name.
+pages:
+  stage: deploy
+  image: node:20-alpine
+  rules:
+    # Publish only from the default branch.
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  cache:
+    key: docs-npm
+    paths:
+      - docs/node_modules/
+  script:
+    - cd docs
+    - npm ci
+    - npm run build
+    - mv .vitepress/dist ../public
+  artifacts:
+    paths:
+      - public

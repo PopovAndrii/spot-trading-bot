@@ -15,12 +15,21 @@
 .spotbot {
   &-danger-zone {
     display: grid;
-    gap: 0.25rem;
-    grid-template-columns: auto auto 1fr;
+    gap: 0.75rem;
+    grid-template-columns: auto auto 1fr auto;
     align-items: center;
 
     >:nth-child(3) {
       justify-self: end;
     }
+  }
+}
+
+// Hybrid switch: gray when off, blue when on.
+#settings-hybrid > input:checked ~ .UIsw-slider {
+  border-color: var(--c-i-500);
+
+  &::before {
+    background-color: var(--c-i-500);
   }
 }

@@ -65,6 +65,23 @@ export class LoadDataFromFileCalculator {
       }
     }
 
+    // Hybrid-grid and Auto-exit switches: restore from the saved param (same pattern
+    // as Restart). Old configs carry neither field, which reads as off.
+    const restoreSwitch = (id, key) => {
+      const sw = document.getElementById(id);
+      if (!sw) return;
+      const input = sw.querySelector('input');
+      const on = String(data.param[key]) === 'on';
+      input.checked = on;
+      if (on) input.setAttribute('checked', '');
+      else input.removeAttribute('checked');
+      sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    };
+
+    restoreSwitch('settings-hybrid', 'field-hybrid');
+    restoreSwitch('settings-auto-exit', 'field-autoExit');
+    this.loadDataCalculator.toggleHybridFields();
+
     this.#fillInData(data);
     this.loadDataCalculator.calculate(data);
   }
@@ -89,6 +106,15 @@ export class LoadDataFromFileCalculator {
       // locked during a cycle (params-locked), so syncing them here is cosmetic.
       el.value = value;
     });
+
+    // "Grid from order" must show the LIVE scalp floor, not the saved config: while
+    // a cycle runs the switch (or a hand edit) aims it via field-gridArm, and that
+    // is what #gridStartIndex obeys. Showing field-gridLevel here would make the
+    // field lie about what the robot is actually doing. Direct .value, same reason
+    // as the loop above.
+    const arm = obj.param['field-gridArm'];
+    const level = document.getElementById('field-gridLevel');
+    if (level && arm) level.value = String(arm);
 
     // We do NOT build the table here: it's authoritatively rendered by
     // loadDataCalculator.calculate() (called right after in getStateCalculator) with

@@ -9,7 +9,9 @@ const { writeFileAtomic } = require('../lib/atomicWrite');
 const { pair, statusPair } = require('../lib/pair');
 const { archiveIfActive } = require('../lib/cycleArchive');
 const { decimalCount, roundToStep } = require('../lib/format');
+const { Job, hybridSwitch } = require('../lib/job');
 const logBus = require('../lib/logBus');
+const telegram = require('../lib/telegram');
 
 const API = InvokeApi.getInstance();
 
@@ -53,6 +55,24 @@ router.get('/:currency', async function (req, res, next) {
 });
 
 // get calc table data
+// The table's scalp block for a cycle the ENGINE is not driving — a page load, a
+// stopped bot. Same Job.view the live tick emits, minus the price it has no source
+// for here, and that costs almost nothing: the split, the micro and whether it FITS
+// under the split are properties of the fills and the params. So the question that
+// actually gets asked — "will this even scalp, or is Grid exit % too tight?" — is
+// answerable with the robot stopped, which is exactly when you set the number.
+// Only the live half (inZone/armed) waits for the engine. Never throws.
+function hybridView(obj) {
+  try {
+    const job = new Job(false);
+    job.price = null;
+    return job.view(obj, obj?.param?.['field-strategy'] === 'short' ? 'short' : 'long');
+  } catch (err) {
+    console.error('hybridView:', err);
+    return null;
+  }
+}
+
 router.post('/table/:symbol', async (req, res, next) => {
   try {
     const rawSymbol = req.body.message;
@@ -75,7 +95,7 @@ router.post('/table/:symbol', async (req, res, next) => {
       return res.status(500).json({ data: {}, message: 'Invalid JSON in file' });
     }
 
-    res.json({ data: jsonData });
+    res.json({ data: { ...jsonData, hybridView: hybridView(jsonData) } });
   } catch (err) {
     if (err.code === 'ENOENT') {
       const msg = '🟡 File not found.';
@@ -271,22 +291,44 @@ router.post('/calculator/param', async (req, res, next) => {
       return res.status(400).json({ message: 'Pair is required' });
     }
 
+    // Params the Job re-reads every tick, so writing them here re-aims a RUNNING
+    // cycle. The three hybrid ones qualify because none of them builds the ladder:
+    // the calculator never reads gridArm or gridExit, and reads microProfit only for
+    // the displayed micro column. `dec` = decimal places allowed (0 = integer).
     const LIMITS = {
-      'field-activeOrders': { min: 2, max: 50 },
-      'field-requestFrequency': { min: 500, max: 5000 },
+      'field-activeOrders': { min: 2, max: 50, dec: 0, label: 'Active orders' },
+      'field-requestFrequency': { min: 500, max: 5000, dec: 0, label: 'Request frequency' },
+      'field-gridArm': { min: 1, max: 50, dec: 0, label: 'Grid from order' },
+      'field-gridExit': { min: 0, max: 100, dec: 0, label: 'Grid exit %' },
+      'field-microProfit': { min: 0.01, max: 2, dec: 2, label: 'Micro profit %' },
     };
 
+    // Switches, not numbers: stored as 'on'/'off' like field-hybrid, so the engine
+    // reads them the same way. Auto exit turns Grid exit % up to whatever the blocked
+    // micro needs, instead of only warning about it (see #blockedMicro).
+    const FLAGS = {
+      'field-autoExit': { label: 'Auto exit' },
+    };
+
+    const flag = FLAGS[msg.key];
     const limit = LIMITS[msg.key];
-    if (!limit) {
+    if (!limit && !flag) {
       return res.status(400).json({ message: 'Invalid param key' });
     }
 
-    const num = Number(msg.value);
-    if (!Number.isFinite(num)) {
-      return res.status(400).json({ message: 'Invalid param value' });
+    let value;
+    if (flag) {
+      value = msg.value === true || msg.value === 'on' || msg.value === 'true' ? 'on' : 'off';
+    } else {
+      const num = Number(msg.value);
+      if (!Number.isFinite(num)) {
+        return res.status(400).json({ message: 'Invalid param value' });
+      }
+      const rounded = limit.dec > 0 ? Number(num.toFixed(limit.dec)) : Math.round(num);
+      value = Math.min(limit.max, Math.max(limit.min, rounded));
     }
-    const value = Math.min(limit.max, Math.max(limit.min, Math.round(num)));
 
+    const label = (limit || flag).label;
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
 
@@ -309,10 +351,68 @@ router.post('/calculator/param', async (req, res, next) => {
     await writeFileAtomic(filePath, jsonString, 'utf8');
 
     // value, not msg.value: show what was actually saved (after clamp)
-    res.json({ message: `${msg.key} = <b>${value}</b> saved for ${symbol}` });
+    res.json({ message: `${label} = <b>${value}</b> saved for ${symbol}` });
   } catch (err) {
     console.error('Error saving param:', err);
     res.status(500).json({ message: 'Error saving param' });
+  }
+});
+
+// The live hybrid switch: arm or disarm the pause-scalp on a cycle that is already
+// running. It writes NOTHING but param — the engine re-reads param on every tick
+// (#mergeLiveEdits), so the next pass routes itself. Deliberately not the
+// calculator form: that one rebuilds BUY/SELL and would blow a live ladder away.
+// Arming also snapshots the rung the price is currently stuck on (field-gridArm),
+// which is the whole reason this is a button and not a config value — you press it
+// when you SEE the price oscillating on a deep order.
+//
+// Two segments like the other live patches, and not by taste: a single-segment
+// path is swallowed by router.post('/:symbol') above it.
+router.post('/calculator/hybrid', async (req, res) => {
+  try {
+    const msg = req.body.message || {};
+    if (!msg.pair) {
+      return res.status(400).json({ message: 'Pair is required' });
+    }
+    const on = msg.on === true || msg.on === 'true' || msg.on === 'on';
+
+    const symbol = String(msg.pair).replace(/[^a-zA-Z0-9_-]/g, '');
+    const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
+
+    let data;
+    try {
+      data = JSON.parse(await fs.readFile(filePath, 'utf8'));
+    } catch {
+      return res.status(404).json({ message: `No cycle for ${symbol}` });
+    }
+    if (!data.param || typeof data.param !== 'object') {
+      data.param = {};
+    }
+
+    const entrySide = data.param['field-strategy'] === 'short' ? 'SELL' : 'BUY';
+    data.param = hybridSwitch(data.param, data[entrySide], on);
+
+    await writeFileAtomic(filePath, JSON.stringify(data, null, 2), 'utf8');
+
+    // Report the level the scalp is actually aimed at, and hand it back so the UI
+    // can put it in the "Grid from order" field — the whole point is that the user
+    // sees where it landed and can retype it.
+    const level = data.param['field-gridArm'] || data.param['field-gridLevel'];
+    const off = 'off — the scalp yields, the whole-position close returns';
+
+    const line = `${on ? '🔀' : '➖'} ${symbol}: hybrid grid ${on ? `on, from order #${level}` : off}`;
+    console.log(line);
+    logBus.log(line);
+
+    res.json({
+      level: on ? Number(level) : null,
+      message: on
+        ? `Hybrid grid <b>on</b> for ${symbol}, scalping from order <b>#${level}</b>. Change it in "Grid from order".`
+        : `Hybrid grid <b>off</b> for ${symbol} — the scalp yields, the full close returns`,
+    });
+  } catch (err) {
+    console.error('Error switching hybrid:', err);
+    res.status(500).json({ message: 'Error switching hybrid' });
   }
 });
 
@@ -336,6 +436,9 @@ router.post('/cancel/allorders', async (req, res, next) => {
   if (pair.needsAttention(symbol)) {
     pair.updateSymbol({ symbol, status: statusPair.STOP });
   }
+
+  // result.message = how many resting orders were actually pulled (0 = no-op)
+  telegram.send(`✖️ <b>Canceled all orders</b> ${symbol} (${result.message} pulled)`);
 
   res.json(result);
 });
@@ -380,6 +483,8 @@ router.post('/series/delete', async (req, res) => {
   pair.deleteSymbol(symbol);
 
   logBus.clearSymbol(symbol);
+
+  telegram.send(`🗑 <b>Series deleted</b> ${symbol}`);
 
   res.json({ success: true, message: 'No active orders.<br>Series deleted' });
 });

@@ -1,0 +1,329 @@
+{
+  "param": {
+    "field-currency": "0.02899",
+    "field-strategy": "long",
+    "field-tickSize": "5",
+    "field-stepSize": "4",
+    "field-deposit": "0.99562",
+    "field-orderSize": "0.0036",
+    "field-profit": "0.2",
+    "field-commission": "0.20",
+    "field-martingail": "90",
+    "field-fibonachiStep": "0.02",
+    "field-indent": "0.01",
+    "field-gridLevel": "3",
+    "field-microProfit": "0.1",
+    "field-gridExit": "76",
+    "field-activeOrders": "3",
+    "field-requestFrequency": "1500",
+    "strategyList": "fibonacci",
+    "field-hybrid": "on"
+  },
+  "BUY": [
+    {
+      "status": "FILLED",
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.0036",
+      "price": "0.02899",
+      "timeInForce": "GTC",
+      "orderId": 228260,
+      "executedQty": 0.0036,
+      "cummulativeQuoteQty": 0.00010436
+    },
+    {
+      "status": "FILLED",
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.0068",
+      "price": "0.02898",
+      "timeInForce": "GTC",
+      "orderId": 228261,
+      "executedQty": 0.0068,
+      "cummulativeQuoteQty": 0.00019706
+    },
+    {
+      "status": "FILLED",
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.0130",
+      "price": "0.02897",
+      "timeInForce": "GTC",
+      "orderId": 229210,
+      "executedQty": 0.013,
+      "cummulativeQuoteQty": 0.00037661
+    },
+    {
+      "status": "FILLED",
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.0247",
+      "price": "0.02895",
+      "timeInForce": "GTC",
+      "orderId": 229178,
+      "executedQty": 0.0247,
+      "cummulativeQuoteQty": 0.00071506
+    },
+    {
+      "status": "NEW",
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.0470",
+      "price": "0.02892",
+      "timeInForce": "GTC",
+      "orderId": 229179,
+      "executedQty": 0,
+      "cummulativeQuoteQty": 0
+    },
+    {
+      "status": "NEW",
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.0894",
+      "price": "0.02888",
+      "timeInForce": "GTC",
+      "orderId": 229180,
+      "executedQty": 0,
+      "cummulativeQuoteQty": 0
+    },
+    {
+      "status": "NEW",
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.1704",
+      "price": "0.02880",
+      "timeInForce": "GTC",
+      "orderId": 229445,
+      "executedQty": 0,
+      "cummulativeQuoteQty": 0
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.3252",
+      "price": "0.02868",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "0.6222",
+      "price": "0.02849",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "1.1953",
+      "price": "0.02817",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "2.3123",
+      "price": "0.02767",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "4.5238",
+      "price": "0.02687",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "9.0153",
+      "price": "0.02562",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "BUY",
+      "type": "LIMIT",
+      "quantity": "18.5260",
+      "price": "0.02369",
+      "timeInForce": "GTC",
+      "orderId": null
+    }
+  ],
+  "SELL": [
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.0036",
+      "price": "0.02910",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": "CANCELED",
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.0104",
+      "price": "0.02910",
+      "timeInForce": "GTC",
+      "orderId": 229209,
+      "executedQty": 0,
+      "cummulativeQuoteQty": 0
+    },
+    {
+      "status": "CANCELED",
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.0234",
+      "price": "0.02904",
+      "timeInForce": "GTC",
+      "orderId": 229429,
+      "hybrid": 1,
+      "executedQty": 0,
+      "cummulativeQuoteQty": 0
+    },
+    {
+      "status": "NEW",
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.0481",
+      "price": "0.02905",
+      "timeInForce": "GTC",
+      "orderId": 229451,
+      "executedQty": 0,
+      "cummulativeQuoteQty": 0
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.0951",
+      "price": "0.02906",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.1845",
+      "price": "0.02903",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.3549",
+      "price": "0.02897",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "0.6801",
+      "price": "0.02889",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "1.3023",
+      "price": "0.02875",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "2.4976",
+      "price": "0.02853",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "4.8099",
+      "price": "0.02817",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "9.3337",
+      "price": "0.02759",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "18.3490",
+      "price": "0.02668",
+      "timeInForce": "GTC",
+      "orderId": null
+    },
+    {
+      "status": null,
+      "symbol": "ETHBTC",
+      "side": "SELL",
+      "type": "LIMIT",
+      "quantity": "36.8750",
+      "price": "0.02522",
+      "timeInForce": "GTC",
+      "orderId": null
+    }
+  ],
+  "pair": "ETHBTC",
+  "gridRealized": 0.0000011799999999999853
+}
