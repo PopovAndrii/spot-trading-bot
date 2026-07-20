@@ -43,8 +43,21 @@ ENV GIT_BRANCH=$GIT_BRANCH
 COPY --chown=node:node src/package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY --chown=node:node src/ ./
+# Runtime-only source — deliberately selective. The published image carries NO
+# scss sources (only compiled CSS, copied from the builder below), and no tests,
+# dev tools, php, graphify-out, .env.example, or lint/nodemon configs.
+COPY --chown=node:node src/app.js ./app.js
+COPY --chown=node:node src/bin ./bin
+COPY --chown=node:node src/lib ./lib
+COPY --chown=node:node src/modules ./modules
+COPY --chown=node:node src/routes ./routes
+COPY --chown=node:node src/views ./views
+COPY --chown=node:node src/public ./public
+# Compiled stylesheets from the builder (overwrites public/stylesheets so the
+# freshly built style.css wins; scss/ never enters the image).
 COPY --chown=node:node --from=builder /var/www/src/public/stylesheets ./public/stylesheets
+# GPLv3: ship the license text alongside the distributed binary.
+COPY --chown=node:node LICENSE ./LICENSE
 
 COPY docker-config/entrypoint.sh /usr/local/bin/entrypoint.sh
 # data/ исключён .dockerignore'ом — создать пустой, писать будет node

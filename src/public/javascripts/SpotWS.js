@@ -57,7 +57,6 @@ export class SpotWS {
     this.isRunning = false;
     this.btnClickHandler = null;
     this.btnStart();
-
     this.#watchOnStrategy();
   }
 

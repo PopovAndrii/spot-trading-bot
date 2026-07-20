@@ -313,7 +313,6 @@ class WebSocketRouter {
           if (data.type === 'stop' && currentSymbol) {
             const ts = this.timerSenders.get(currentSymbol);
             ts.stop();
-
             // keep the idle price ticking (parity with pre-Start Long/Short)
             ts.watchPrice(currentSymbol);
 

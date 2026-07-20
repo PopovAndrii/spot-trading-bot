@@ -7,6 +7,10 @@ const logBus = require('./logBus');
 class InvokeApi {
   static #instance = null;
 
+  // symbol → { price, qty } decimal counts (from field-tickSize/field-stepSize),
+  // registered by the running cycle; used only to format log output.
+  #logDecimals = new Map();
+
   // Single entry point for the client: a singleton without the "constructor
   // returns a different instance" antipattern. Previously `new InvokeApi()`
   // returned an already-existing object — instanceof survived it, but the
@@ -25,8 +29,11 @@ class InvokeApi {
     const api_secret = testnet ? process.env.API_SECRET_TEST : process.env.API_SECRET;
     const baseURL = testnet ? 'https://testnet.binance.vision/' : 'https://api.binance.com';
 
+    // Testnet streams live on port 443 (wss://stream.testnet.binance.vision/ws);
+    // :9443 is a mainnet-only port — with it the testnet user stream never
+    // connected, so executionReport (fill push) silently never arrived.
     this.wssUserURL = testnet
-      ? 'wss://stream.testnet.binance.vision:9443/ws/'
+      ? 'wss://stream.testnet.binance.vision/ws/'
       : 'wss://stream.binance.com:9443/ws/';
 
     // Do not throw an exception so the container does not crash: public endpoints (symbols, prices)
@@ -94,6 +101,24 @@ class InvokeApi {
     return this.client;
   }
 
+  setLogDecimals(symbol, { price, qty } = {}) {
+    this.#logDecimals.set(symbol, {
+      price: Number.isInteger(price) && price >= 0 ? price : null,
+      qty: Number.isInteger(qty) && qty >= 0 ? qty : null,
+    });
+  }
+
+  // "553.58000000" -> "553.58" using the pair's decimals ("1.00000000" -> "1.00"
+  // when tickSize is 2); falls back to trailing-zero trim when decimals are unknown.
+  #fmtNum(symbol, value, kind) {
+    const dec = this.#logDecimals.get(symbol)?.[kind];
+    const n = Number(value);
+    if (dec != null && Number.isFinite(n)) return n.toFixed(dec);
+    return String(value)
+      .replace(/(\.\d*?)0+$/, '$1')
+      .replace(/\.$/, '');
+  }
+
   async newOrder(data) {
     try {
       const res = await this.#withRateLimitRetry(() =>
@@ -108,8 +133,8 @@ class InvokeApi {
         res.data.symbol,
         res.data.status,
         res.data.side,
-        res.data.price,
-        res.data.origQty,
+        this.#fmtNum(res.data.symbol, res.data.price, 'price'),
+        this.#fmtNum(res.data.symbol, res.data.origQty, 'qty'),
       ];
 
       this.getConsoleMsg(`newOrder(${data.id}) ${msg.join(' | ')}`);
@@ -135,8 +160,8 @@ class InvokeApi {
         res.data.symbol,
         res.data.status,
         res.data.side,
-        res.data.price,
-        res.data.origQty,
+        this.#fmtNum(res.data.symbol, res.data.price, 'price'),
+        this.#fmtNum(res.data.symbol, res.data.origQty, 'qty'),
       ];
 
       this.getConsoleMsg(`getOrder(${data.id}) ${msg.join(' | ')}`);
@@ -162,12 +187,61 @@ class InvokeApi {
         res.data.symbol,
         res.data.status,
         res.data.side,
-        res.data.price,
-        res.data.origQty,
+        this.#fmtNum(res.data.symbol, res.data.price, 'price'),
+        this.#fmtNum(res.data.symbol, res.data.origQty, 'qty'),
       ];
 
       this.getConsoleMsg(`cancelOrder() ${msg.join(' | ')}`);
       return { success: true, message: res.data };
+    } catch (err) {
+      const message = this.#getCatchMsg(err);
+
+      this.getConsoleMsg(message, false);
+
+      // -2011 "Unknown order sent": this order is not open — it filled between two
+      // polls, or the user pulled it by hand. Nothing was canceled, so it is not a
+      // success; but retrying can never succeed either, and a caller that blindly
+      // retries deadlocks. `gone` says WHICH failure it is, so the caller can go ask
+      // the exchange what really happened instead of re-cancelling a phantom.
+      if (err.response?.data?.code === -2011) {
+        return { success: false, gone: true, message };
+      }
+
+      return { success: false, message };
+    }
+  }
+
+  // Atomic move of a resting order to a new price/quantity: cancel + place in one
+  // exchange call. STOP_ON_FAILURE means the new order is placed ONLY if the cancel
+  // succeeds, and the filters are evaluated BEFORE the cancel — so the outcome is
+  // all-or-nothing: either the order moves, or nothing changes and the old one stays
+  // resting. A cancel that cancelled nothing (order filled/pulled between poll and
+  // move) throws, handled below → caller re-polls next pass. On HTTP 200 both legs
+  // succeeded; the order the caller must now track is newOrderResponse.
+  async cancelReplace(data) {
+    try {
+      const res = await this.#withRateLimitRetry(() =>
+        this.client.cancelAndReplace(data.symbol, data.side, data.type, 'STOP_ON_FAILURE', {
+          cancelOrderId: data.orderId,
+          price: data.price,
+          quantity: data.quantity,
+          timeInForce: data.timeInForce,
+        })
+      );
+
+      const placed = res.data.newOrderResponse;
+
+      const msg = [
+        placed.orderId,
+        placed.symbol,
+        placed.status,
+        placed.side,
+        this.#fmtNum(placed.symbol, placed.price, 'price'),
+        this.#fmtNum(placed.symbol, placed.origQty, 'qty'),
+      ];
+
+      this.getConsoleMsg(`cancelReplace(${data.id}) ${msg.join(' | ')}`);
+      return { success: true, message: placed };
     } catch (err) {
       const message = this.#getCatchMsg(err);
 

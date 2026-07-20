@@ -1,0 +1,49 @@
+# Binance Trading Bot — run from the published Docker Hub image (no build, no repo clone).
+#
+# ── Quick start ────────────────────────────────────────────────────────────
+#   1. Create the data folder (owned by you, not root):
+#        mkdir -p data
+#   2. Create your .env (login, password, Binance keys — interactive):
+#        docker compose run --rm -v "$PWD":/out -e ENV_OUT=/out/.env app npm run setup-user
+#   3. Start the bot:
+#        docker compose up -d
+#   4. Open http://localhost:3002 and log in with the credentials from step 2.
+#
+# ── Everyday ───────────────────────────────────────────────────────────────
+#   docker compose pull && docker compose up -d   # update to the latest image
+#   docker compose logs -f                        # follow logs
+#   docker compose down                           # stop
+#
+# Pin a version instead of :latest by editing the image tag below.
+# NOTE: env_file "required: false" needs Docker Compose >= 2.24. On older
+# versions create the file first:  touch .env
+
+services:
+    app:
+        image: 5879/binance-bot:latest
+        container_name: binance-bot
+        restart: unless-stopped
+        ports:
+            - "${PORT:-3002}:${PORT:-3002}"
+        volumes:
+            # Money state — open cycles & sessions — as a plain folder next to this
+            # file, so you can see and back up data/SYMBOL-binance.json directly.
+            # Run `mkdir -p data` first so it's owned by you, not root.
+            - ./data:/var/www/src/data
+            - /etc/localtime:/etc/localtime:ro
+        env_file:
+            # Your secrets & settings, created by step 1 above.
+            # required:false so the container still starts if it's missing.
+            - path: .env
+              required: false
+        environment:
+            NODE_ENV: ${NODE_ENV:-production}
+            STATUS_APP: ${STATUS_APP:-false}
+            STATUS_LOGIN: ${STATUS_LOGIN:-true}
+            PORT: ${PORT:-3002}
+        healthcheck:
+            test: ["CMD", "curl", "-fsS", "http://localhost:${PORT:-3002}/api/ping"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 20s
