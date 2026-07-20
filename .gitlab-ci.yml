@@ -15,6 +15,9 @@ pages:
     paths:
       - docs/node_modules/
   script:
+    # VitePress `lastUpdated` shells out to git per page; node:20-alpine ships
+    # without it, so install git or the build dies with `spawn git ENOENT`.
+    - apk add --no-cache git
     - cd docs
     - npm ci
     - npm run build
