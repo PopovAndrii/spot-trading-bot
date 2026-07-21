@@ -44,4 +44,4 @@ Every new version is added to this list with a short note on what changed. Newes
 Open source under GPLv3.
 
 - **GitLab (canonical):** [gitlab.com/AndreyPopov/spot-trading-bot](https://gitlab.com/AndreyPopov/spot-trading-bot)
-- **GitHub mirror:** [github.com/AndreyPopov/spot-trading-bot](https://github.com/AndreyPopov/spot-trading-bot)
+- **GitHub mirror:** [github.com/PopovAndrii/spot-trading-bot](https://github.com/PopovAndrii/spot-trading-bot)
