@@ -1,5 +1,7 @@
 # Spot Trading Bot for Binance
 
+![Spot Trading Bot for Binance dashboard](docs/public/img/long_DCA_grid_hybrid/Screenshot_20260719_122737.png)
+
 ## Description
 
 Automatic cryptocurrency exchange.
