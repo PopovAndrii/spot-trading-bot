@@ -1,4 +1,4 @@
-# Exchange 💰 Cryptocurrencies
+# Spot Trading Bot for Binance
 
 ## Description
 
@@ -15,8 +15,8 @@ That is, you have the opportunity to calculate your trading strategy before it i
 ## Installation
 
 ```sh
-git clone git@gitlab.com:AndreyPopov/exchange-crypto.git
-cd ./exchange-crypto
+git clone git@gitlab.com:AndreyPopov/spot-trading-bot.git
+cd ./spot-trading-bot
 ```
 
 The entire environment is based on Docker. It must be installed - [Docker.](https://docs.docker.com/engine/install/) And Docker Desktop on Windows
@@ -196,7 +196,7 @@ git pull
 GIT_COMMIT=$(git rev-parse --short HEAD) GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
   docker compose -f compose.prod.yml up -d --build  # rebuild image + recreate container
 docker compose -f compose.prod.yml ps              # status
-docker logs -f exchange-crypto-app                 # live app logs (pm2-runtime → stdout)
+docker logs -f spot-trading-bot-app                 # live app logs (pm2-runtime → stdout)
 docker compose -f compose.prod.yml down            # stop
 ```
 

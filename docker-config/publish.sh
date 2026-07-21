@@ -14,7 +14,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."   # repo root
 
-IMAGE="${IMAGE:-5879/binance-bot}"
+IMAGE="${IMAGE:-5879/spot-trading-bot}"
 VERSION="${1:-$(node -p "require('./src/package.json').version" 2>/dev/null || echo latest)}"
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo '')"
 GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
