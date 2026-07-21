@@ -1,3 +1,5 @@
+name: spot-trading-bot
+
 services:
     app:
         build:
@@ -10,8 +12,8 @@ services:
                 #   docker compose -f compose.prod.yml build
                 GIT_COMMIT: ${GIT_COMMIT:-}
                 GIT_BRANCH: ${GIT_BRANCH:-}
-        image: exchange-crypto:latest # tag for prod
-        container_name: exchange-crypto-app
+        image: spot-trading-bot:latest # tag for prod
+        container_name: spot-trading-bot-app
         restart: unless-stopped
         working_dir: /var/www/src
         # Bind-mount исходников больше нет (ANALYSIS п.13) — образ выкатывается

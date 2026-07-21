@@ -1,11 +1,13 @@
+name: spot-trading-bot
+
 services:
     app:
         build:
             context: .
             dockerfile: docker-config/Dockerfile
             target: dev # код и node_modules приходят bind-mount'ом
-        image: exchange-crypto
-        container_name: exchange-crypto-${PREFIX_CONTAINER_NAME:-dev}
+        image: spot-trading-bot
+        container_name: spot-trading-bot-${PREFIX_CONTAINER_NAME:-dev}
         restart: unless-stopped
         working_dir: /var/www/src
         volumes:
@@ -14,7 +16,7 @@ services:
             - ./tmp/app/:/home/node/.npm/
             - /etc/localtime:/etc/localtime:ro
         networks:
-            - exchange-crypto
+            - spot-trading-bot
         ports:
             - ${PORT:-3002}:${PORT:-3002}
             # browser-sync (live-reload) — чтобы работал и http://localhost:3000
@@ -40,7 +42,7 @@ services:
     #         - nginx
     # nginx:
     #     image: nginx:latest
-    #     container_name: exchange-crypto-nginx-${PREFIX_CONTAINER_NAME:-dev}
+    #     container_name: spot-trading-bot-nginx-${PREFIX_CONTAINER_NAME:-dev}
     #     restart: unless-stopped
     #     ports:
     #         - ${NGINX_PORT:-8002}:80
@@ -49,9 +51,9 @@ services:
     #         - .:/var/www
     #         - ./docker-config/nginx/conf.d/:/etc/nginx/conf.d/
     #     networks:
-    #         - exchange-crypto
+    #         - spot-trading-bot
 
 networks:
-    exchange-crypto:
+    spot-trading-bot:
         driver: bridge
-        name: exchange-crypto-${PREFIX_CONTAINER_NAME:-dev}
+        name: spot-trading-bot-${PREFIX_CONTAINER_NAME:-dev}

@@ -1,4 +1,4 @@
-# Binance Trading Bot — run from the published Docker Hub image (no build, no repo clone).
+# Spot Trading Bot for Binance — run from the published Docker Hub image (no build, no repo clone).
 #
 # ── Quick start ────────────────────────────────────────────────────────────
 #   1. Create the data folder (owned by you, not root):
@@ -18,10 +18,12 @@
 # NOTE: env_file "required: false" needs Docker Compose >= 2.24. On older
 # versions create the file first:  touch .env
 
+name: spot-trading-bot
+
 services:
     app:
-        image: 5879/binance-bot:latest
-        container_name: binance-bot
+        image: 5879/spot-trading-bot:latest
+        container_name: spot-trading-bot
         restart: unless-stopped
         ports:
             - "${PORT:-3002}:${PORT:-3002}"
