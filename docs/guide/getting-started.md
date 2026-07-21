@@ -1,7 +1,7 @@
 # Getting Started
 
 You need **Docker with Compose v2** and one file. The bot runs from the published
-image `5879/binance-bot` — no repository clone, no build.
+image `5879/spot-trading-bot` — no repository clone, no build.
 
 ## Where to run it
 
@@ -22,8 +22,8 @@ The bot manages open positions continuously, so it should run **24/7**.
 ```yaml
 services:
   app:
-    image: 5879/binance-bot:latest
-    container_name: binance-bot
+    image: 5879/spot-trading-bot:latest
+    container_name: spot-trading-bot
     restart: unless-stopped
     ports:
       - "${PORT:-3002}:${PORT:-3002}"

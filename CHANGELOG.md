@@ -10,7 +10,7 @@
 ### Changed
 
 - Rebrand: new logo, bind-mounted `data/` directory, and a link to the main repository.
-- Docker Hub image renamed to `5879/binance-bot`.
+- Docker Hub image renamed to `5879/spot-trading-bot`.
 
 ### Fixed
 

@@ -10,7 +10,7 @@ an optional **Hybrid** micro-scalp layered on top. Understanding that strategy i
 most of understanding the bot, so those sections are the heart of these docs — this
 page is the map.
 
-::: tip Current version — `2.0.0` (first test release)
+::: tip Current version — `2.0.1`
 See the [release list](/#releases) for version history and notes.
 :::
 

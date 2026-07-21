@@ -4,7 +4,7 @@ Self-hosted spot trading bot for Binance, with a web dashboard. You run it on
 your own machine, with **your own** Binance API keys — the image ships with no
 keys and never sends your credentials anywhere. Runs on testnet out of the box.
 
-- **Image:** `5879/binance-bot`
+- **Image:** `5879/spot-trading-bot`
 - **Tags:** `latest`, `X.Y.Z` (pin a version for stability)
 - **Architectures:** `linux/amd64`, `linux/arm64` (Intel & Apple Silicon)
 
@@ -35,8 +35,8 @@ You only need Docker with Compose v2, and one file.
 ```yaml
 services:
   app:
-    image: 5879/binance-bot:latest
-    container_name: binance-bot
+    image: 5879/spot-trading-bot:latest
+    container_name: spot-trading-bot
     restart: unless-stopped
     ports:
       - "${PORT:-3002}:${PORT:-3002}"

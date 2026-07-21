@@ -15,6 +15,12 @@ The seven moments below are in **trading order** — what the position was doing
 the picture was taken. Every screenshot is shrunk to fit the page; **click one to open it
 full-size in a new tab**.
 
+::: info Demo screenshots
+The screenshots use Binance testnet / demo funds. The balances, prices, and banked profit
+shown here illustrate how the interface behaves; they are not financial advice or a
+promise of live-market results.
+:::
+
 ## The setup
 
 Every screenshot uses the same build. Only the four [hybrid knobs](/hybrid/parameters)

@@ -1,28 +1,59 @@
 import { defineConfig } from 'vitepress'
 
-// Project Pages base path. In GitLab CI, CI_PAGES_URL carries the full site URL
-// (e.g. https://<user>.gitlab.io/<project>/); its pathname is exactly the base
-// VitePress needs, and it adapts to groups/subgroups on its own. Locally the
-// variable is unset, so the site builds at root ("/") for `npm run dev`.
-const base = process.env.CI_PAGES_URL
-  ? new URL(process.env.CI_PAGES_URL).pathname
-  : '/'
+const title = 'Spot Trading Bot for Binance'
+const description = 'Self-hosted DCA / Grid hybrid spot trading bot for Binance.'
+const gitHubRepository = process.env.GITHUB_REPOSITORY
+const gitHubProjectName = gitHubRepository?.split('/')[1]
+
+const withTrailingSlash = (value) => (value.endsWith('/') ? value : `${value}/`)
+const normalizeBasePath = (value) => withTrailingSlash(value.startsWith('/') ? value : `/${value}`)
+
+// Project Pages base path:
+// - GitLab Pages exposes the final URL as CI_PAGES_URL, including groups/subgroups.
+// - GitHub Pages for a project repo needs /<repo>/ unless a custom domain is used.
+// - DOCS_BASE_PATH is a manual override for custom CI/deploy setups.
+const base = process.env.DOCS_BASE_PATH
+  ? normalizeBasePath(process.env.DOCS_BASE_PATH)
+  : process.env.CI_PAGES_URL
+    ? normalizeBasePath(new URL(process.env.CI_PAGES_URL).pathname)
+    : process.env.GITHUB_ACTIONS && gitHubProjectName
+      ? `/${gitHubProjectName}/`
+      : '/'
+
+const siteUrl = process.env.DOCS_SITE_URL
+  ? withTrailingSlash(process.env.DOCS_SITE_URL)
+  : process.env.CI_PAGES_URL
+    ? withTrailingSlash(process.env.CI_PAGES_URL)
+    : process.env.GITHUB_ACTIONS && gitHubRepository
+      ? `https://${gitHubRepository.split('/')[0]}.github.io${base}`
+      : undefined
+
+const absoluteUrl = (path) => (siteUrl ? new URL(path.replace(/^\//, ''), siteUrl).href : `${base}${path.replace(/^\//, '')}`)
 
 export default defineConfig({
   base,
   lang: 'en-US',
-  title: 'Spot Trading Bot for Binance',
-  description: 'Self-hosted DCA / Grid hybrid spot trading bot for Binance.',
+  title,
+  description,
   cleanUrls: true,
   lastUpdated: true,
   // Keep the internal dead-link check on, but allow references to the local
   // dashboard (unreachable at build time).
   ignoreDeadLinks: [/^https?:\/\/localhost/],
 
-  // Favicon lives in docs/public and is served at the site root. Prepend `base`
-  // so the path stays correct under the GitLab Pages subpath in production.
+  // Assets live in docs/public and are served at the site root. Prepend `base`
+  // for icons, and use absolute URLs for social previews when the CI URL is known.
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}favicon.svg` }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:title', content: title }],
+    ['meta', { property: 'og:description', content: description }],
+    ['meta', { property: 'og:image', content: absoluteUrl('/img/hero-light.png') }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:title', content: title }],
+    ['meta', { name: 'twitter:description', content: description }],
+    ['meta', { name: 'twitter:image', content: absoluteUrl('/img/hero-light.png') }],
+    ...(siteUrl ? [['link', { rel: 'canonical', href: siteUrl }]] : []),
   ],
 
   themeConfig: {
