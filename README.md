@@ -10,7 +10,8 @@ Runs with **your own** API keys, defaults to **testnet**, and stores its state l
 
 - **GitLab (canonical):** <https://gitlab.com/AndreyPopov/spot-trading-bot>
 - **GitHub mirror:** <https://github.com/PopovAndrii/spot-trading-bot>
-- **Documentation:** VitePress docs in `docs/`
+- **Documentation site:** <https://exchange-crypto-059f74.gitlab.io/>
+- **Documentation sources:** VitePress docs in `docs/`
 
 ## Quick start
 
