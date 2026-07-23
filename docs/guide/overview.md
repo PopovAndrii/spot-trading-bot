@@ -58,6 +58,20 @@ In `real` mode the bot places live orders with real funds. Start on
 consider real keys. See the [Disclaimer](/help/disclaimer).
 :::
 
+::: info AI-assisted deployment and coding
+Using AI is encouraged, especially for setup, deployment, and repetitive operator
+work. It usually does not break the project by itself — it helps you launch faster
+and reduces routine friction.
+
+But always review AI-generated changes with your own eyes. New features and non-trivial
+edits should be tested on **Binance testnet first**. AI often gets architecture or
+integration details wrong — not only because the model can make mistakes, but also
+because humans frequently describe requirements incompletely.
+
+Treat AI as an accelerator, not as a final authority: inspect the code, verify the
+behavior, and test the risky paths manually.
+:::
+
 ## How to read these docs
 
 - **[Getting Started](/guide/getting-started)** — get it running in a few minutes.
