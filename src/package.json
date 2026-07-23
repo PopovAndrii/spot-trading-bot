@@ -9,7 +9,7 @@
     "gen-qr": "node ./tools/gen-qr.js",
     "dev": "concurrently \"npm:watch-css\" \"npm:start\"",
     "start": "nodemon ./bin/www",
-    "setup-user": "node ./bin/setup-user.js",
+    "setup-user": "npm_config_update_notifier=false node ./bin/setup-user.js", 
     "test": "node --test",
     "prod-runtime": "pm2-runtime start ./bin/www --name my-app",
     "lint": "eslint .",
