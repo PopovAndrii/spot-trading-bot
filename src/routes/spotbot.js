@@ -73,6 +73,26 @@ function hybridView(obj) {
   }
 }
 
+function emptyPairState() {
+  return {
+    BUY: [],
+    SELL: [],
+    param: {},
+  };
+}
+
+async function loadOrCreatePairState(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, 'utf8'));
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+
+    const data = emptyPairState();
+    await writeFileAtomic(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return data;
+  }
+}
+
 router.post('/table/:symbol', async (req, res, next) => {
   try {
     const rawSymbol = req.body.message;
@@ -257,8 +277,7 @@ router.post('/calculator/restart', async (req, res, next) => {
 
     const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
 
-    const content = await fs.readFile(filePath, 'utf8');
-    let data = JSON.parse(content);
+    let data = await loadOrCreatePairState(filePath);
 
     const newData = req.body.message;
     // data = { ...data, ...newData };
@@ -332,8 +351,7 @@ router.post('/calculator/param', async (req, res, next) => {
     const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
     const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
 
-    const content = await fs.readFile(filePath, 'utf8');
-    const data = JSON.parse(content);
+    const data = await loadOrCreatePairState(filePath);
 
     if (!data.param || typeof data.param !== 'object') {
       data.param = {};
@@ -379,12 +397,7 @@ router.post('/calculator/hybrid', async (req, res) => {
     const symbol = String(msg.pair).replace(/[^a-zA-Z0-9_-]/g, '');
     const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
 
-    let data;
-    try {
-      data = JSON.parse(await fs.readFile(filePath, 'utf8'));
-    } catch {
-      return res.status(404).json({ message: `No cycle for ${symbol}` });
-    }
+    const data = await loadOrCreatePairState(filePath);
     if (!data.param || typeof data.param !== 'object') {
       data.param = {};
     }
