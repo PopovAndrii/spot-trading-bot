@@ -65,6 +65,7 @@ export default defineConfig({
       { text: 'Expert', link: '/expert/expert-mode' },
       { text: 'Hybrid', link: '/hybrid/overview' },
       { text: 'Example', link: '/hybrid/walkthrough' },
+      { text: 'Developers', link: '/developer/for-developers' },
     ],
 
     sidebar: [
@@ -115,6 +116,12 @@ export default defineConfig({
         items: [
           { text: 'FAQ & Troubleshooting', link: '/help/faq' },
           { text: 'Disclaimer', link: '/help/disclaimer' },
+        ],
+      },
+      {
+        text: 'Developers',
+        items: [
+          { text: 'For developers', link: '/developer/for-developers' },
         ],
       },
     ],

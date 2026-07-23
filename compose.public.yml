@@ -17,6 +17,11 @@
 # Pin a version instead of :latest by editing the image tag below.
 # NOTE: env_file "required: false" needs Docker Compose >= 2.24. On older
 # versions create the file first:  touch .env
+#
+# Validation note:
+#   `docker compose config` expands variables from a local `.env` into the rendered
+#   output. That is normal, but do not paste that expanded output publicly because
+#   it may contain secrets.
 
 name: spot-trading-bot
 

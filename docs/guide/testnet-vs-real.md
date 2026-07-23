@@ -71,3 +71,8 @@ Testnet order books are **thin**, so fills and slippage there are not representa
 judge the *logic* on testnet, not the *execution*. See the
 [FAQ](/help/faq#testnet-wicks).
 :::
+
+::: danger Testing status and liability
+This project is still **in testing**. It is provided **as is** with **no warranty**,
+and the author accepts **no responsibility** for losses, damages, or trading results.
+:::

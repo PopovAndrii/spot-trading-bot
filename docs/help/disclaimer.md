@@ -22,10 +22,15 @@ text is in the `LICENSE` file (also included inside the image).
 This software is provided **"as is", without warranty of any kind**, express or implied.
 It is a tool, **not financial advice**.
 
+This project is still **in testing**. Expect bugs, edge cases, and behavior changes.
+
 - In `real` mode it places live orders with **real funds**. You are solely responsible
   for every trade, gain, and loss.
 - Cryptocurrency trading carries substantial risk. Never trade money you cannot afford to
   lose. **Test on [testnet](/guide/testnet-vs-real) first.**
+- Do **not** run the same pair in both directions at once on one account
+  (for example `BTCUSDC` Long and `BTCUSDC` Short). Some destructive actions act on the
+  whole symbol and may affect both sides.
 - The authors and contributors accept **no liability** for any financial loss, damages,
   or claims arising from the use of this software.
 - You are responsible for complying with the laws and regulations of your jurisdiction
