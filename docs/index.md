@@ -43,5 +43,13 @@ Every new version is added to this list with a short note on what changed. Newes
 
 Open source under GPLv3.
 
+::: tip Development happens on GitLab
+The **GitLab repository is canonical**: active development, issues, merge requests,
+and releases happen there.
+
+The **GitHub repository is a read-only mirror** for visibility and easier discovery.
+Please open issues and contributions on GitLab.
+:::
+
 - **GitLab (canonical):** [gitlab.com/AndreyPopov/spot-trading-bot](https://gitlab.com/AndreyPopov/spot-trading-bot)
 - **GitHub mirror:** [github.com/PopovAndrii/spot-trading-bot](https://github.com/PopovAndrii/spot-trading-bot)

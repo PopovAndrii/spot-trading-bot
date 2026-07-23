@@ -29,5 +29,6 @@ graphify-out
 /docs/node_modules
 /docs/.vitepress/dist
 /docs/.vitepress/cache
+/docs/.plan.md
 /public
 CLAUDE.md

@@ -8,11 +8,6 @@ Crypto trading bot for **Binance Spot** with an Express.js web UI.
 - Save all temporary build or test files exclusively to the standard system directory `/tmp` for this project.
 - Always clear your temporary files before ending your session.
 
-## Language
-
-- **Chat with the user in Russian.** Code, commits, comments, and docs stay in
-  English (see Git conventions).
-
 ## Runtime / environment
 
 - **Runs in Docker** (docker-compose); `pm2` in prod. **Node.js and npm live
@@ -138,7 +133,7 @@ the singleton API/Stream patterns, and the `STATUS_APP` no-op flag when changing
   says when to commit.
 - **Releases:** keep every release in the SAME style as the previous ones — do
   not change the formatting from release to release. Rules:
-  - **English only**, never Russian.
+  - **English only**
   - **No emoji** anywhere.
   - **Don't change the markdown style** between releases — match how the prior
     release was formatted.
@@ -147,9 +142,3 @@ the singleton API/Stream patterns, and the `STATUS_APP` no-op flag when changing
     fixes + rebalance closing logic, dynamic pairs, prod Docker`). Title is just
     `vX.Y.Z`.
   - Don't invent a new format or add/remove sections each time.
-
-## Parked work
-
-- **Binance.US** (`BINANCE_REGION=com|us`) lives on branch `binance-us`, not `dev`.
-  Blocked: user is in the UK (can't open a Binance.US account; `api.binance.us` is
-  geo-fenced to US IPs), so it can't be live-validated without an actual US user.

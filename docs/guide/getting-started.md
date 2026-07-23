@@ -3,6 +3,13 @@
 You need **Docker with Compose v2** and one file. The bot runs from the published
 image `5879/spot-trading-bot` — no repository clone, no build.
 
+## Project source
+
+- **GitLab** is the canonical repository where development happens.
+- **GitHub** is a public read-only mirror.
+
+If you want to report a bug, discuss a change, or send a merge request, use GitLab.
+
 ## Where to run it
 
 The bot manages open positions continuously, so it should run **24/7**.
@@ -68,6 +75,18 @@ credentials from step 2.
 - Understand [testnet vs real keys](/guide/testnet-vs-real) before touching real funds.
 - Learn the [strategy](/dca-grid/overview) — what the bot is actually doing.
 - Keep your money state safe: [Backup & Updates](/operations/backup).
+
+## Validate your compose file
+
+Before the first start, you can validate the compose file structure:
+
+```bash
+docker compose config
+```
+
+If you validate from a folder that already contains a real `.env`, Compose will expand
+those values into the rendered config output. That is expected, but do not paste that
+expanded output publicly because it may contain secrets.
 
 Everyday commands:
 

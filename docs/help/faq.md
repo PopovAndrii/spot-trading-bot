@@ -37,6 +37,14 @@ they only take effect on the next *Calculate* / new cycle. See the
 Stop → Check and Cancel all → Delete current series → reconfigure. Full steps in
 [Managing a pair](/dca-grid/pair-controls).
 
+## Can I run the same pair in Long and Short at the same time?
+
+Strongly discouraged. Avoid running the same symbol in both directions on one account
+(for example `BTCUSDC` Long and `BTCUSDC` Short simultaneously).
+
+Some destructive actions operate on the **whole symbol**, not on one logical side, so a
+cancel action may affect both the Long and the Short orders.
+
 ## Did I back up my state?
 
 Your cycles and banked profit live in the `data/` folder next to your `compose.yml`.

@@ -18,6 +18,13 @@ any manual orders you placed yourself**. The exchange does not distinguish them,
 this is by design. If you have unrelated orders on the same symbol, they go too.
 :::
 
+::: danger Do not trade one symbol in both directions at once
+Avoid running the same pair in **Long** and **Short** simultaneously on one account
+(for example `BTCUSDC` Long and `BTCUSDC` Short). Destructive actions operate on the
+**whole symbol**, not on a logical direction, so a cancel action may pull orders from
+both sides.
+:::
+
 ## Delete current series
 
 Removes the **saved cycle** for this pair — the stored grid and its state.
