@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: Spot Trading Bot for Binance
+  name: Spot Trading Bot for<br>Binance
   text: DCA / Grid hybrid
   tagline: A self-hosted, non-custodial spot bot that averages a position down, closes the whole grid at a profit, and scalps the oscillations in between.
   image:

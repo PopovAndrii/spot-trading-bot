@@ -84,3 +84,18 @@ Formatting is handled by the configured linters, not Prettier:
 
 Keep public release documentation and tags in the established project format.
 Development happens on GitLab; publish the GitHub mirror only after the GitLab side is ready.
+
+## Release commands
+
+For this project, bump the version in `src/package.json` without creating a git tag automatically:
+
+```sh
+docker compose exec app sh -lc "cd /var/www/src && npm version 2.0.2 --no-git-tag-version"
+```
+
+Then create and push the release tag from the host:
+
+```sh
+git tag -a v2.0.2 -m "Release v2.0.2 — test"
+git push origin v2.0.2
+```

@@ -1,7 +1,7 @@
 {
   "name": "spot-trading-bot",
   "description": "DCA/Grid hybrid. A self-hosted, non-custodial spot bot that averages a position down, closes the whole grid at a profit, and scalps the oscillations in between.",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "license": "GPL-3.0-or-later",
   "scripts": {
@@ -9,7 +9,7 @@
     "gen-qr": "node ./tools/gen-qr.js",
     "dev": "concurrently \"npm:watch-css\" \"npm:start\"",
     "start": "nodemon ./bin/www",
-    "setup-user": "node ./bin/setup-user.js",
+    "setup-user": "npm_config_update_notifier=false node ./bin/setup-user.js",
     "test": "node --test",
     "prod-runtime": "pm2-runtime start ./bin/www --name my-app",
     "lint": "eslint .",
