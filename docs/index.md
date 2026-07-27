@@ -30,12 +30,13 @@ features:
 
 ## Releases
 
-Current version: **`2.0.1`**.
+Current version: **`2.0.2`**.
 
 Every new version is added to this list with a short note on what changed. Newest first.
 
 | Version | Date | Notes |
 |---|---|---|
+| **`2.0.2`** | 2026-07-26 | Public docs link from the repo front page, developer release command examples, AI usage guidance in docs, auto-create pair state for live params, and quieter Docker setup output. |
 | **`2.0.1`** | 2026-07-20 | Live re-place of the resting micro when Micro profit % changes (atomic `cancelReplace`). VitePress docs site, rebrand + new logo, Docker Hub image rename. Fixes: resting micro shows its real book price; re-place popup price rounded to tick. |
 | **`2.0.0`** | 2026-07-17 | First test release. DCA/Grid hybrid strategy — safety-order ladder, averaged grid close that follows real fills, and a micro-scalp that banks oscillations and pulls the exit closer. Live hybrid controls on a running cycle, Telegram trade notices, testnet-first, and Docker Hub distribution. |
 
@@ -44,12 +45,35 @@ Every new version is added to this list with a short note on what changed. Newes
 Open source under GPLv3.
 
 ::: tip Development happens on GitLab
-The **GitLab repository is canonical**: active development, issues, merge requests,
+The **GitLab repository is canonical**: active development, merge requests,
 and releases happen there.
 
-The **GitHub repository is a read-only mirror** for visibility and easier discovery.
-Please open issues and contributions on GitLab.
+The **GitHub repository is a public mirror** for visibility, stars, and feedback.
+For code changes and releases, GitLab remains the primary home.
 :::
 
 - **GitLab (canonical):** [gitlab.com/AndreyPopov/spot-trading-bot](https://gitlab.com/AndreyPopov/spot-trading-bot)
-- **GitHub mirror:** [github.com/PopovAndrii/spot-trading-bot](https://github.com/PopovAndrii/spot-trading-bot)
+- **GitHub mirror + feedback:** [github.com/PopovAndrii/spot-trading-bot](https://github.com/PopovAndrii/spot-trading-bot)
+- **Documentation site (GitLab Pages):** [exchange-crypto-059f74.gitlab.io](https://exchange-crypto-059f74.gitlab.io/)
+- **Documentation site (GitHub Pages):** [popovandrii.github.io/spot-trading-bot](https://popovandrii.github.io/spot-trading-bot/)
+- **Docker Hub:** [hub.docker.com/r/5879/spot-trading-bot](https://hub.docker.com/r/5879/spot-trading-bot)
+
+::: tip Support the project
+If this project helps you, consider starring it on [GitHub](https://github.com/PopovAndrii/spot-trading-bot) or [GitLab](https://gitlab.com/AndreyPopov/spot-trading-bot), and feel free to leave feedback on either platform.
+:::
+
+## 🛠️ Need Help with Deployment?
+
+While this project is fully open-source and free to set up on your own using the provided Docker guidelines, I offer paid **DevOps & Server Setup Assistance** if you prefer a turn-key technical installation:
+
+- **VPS / Ubuntu Server Setup:** Initial server hardening, firewall setup, and Docker/Docker Compose installation.
+- **Environment Configuration:** Proper system setup and process monitoring (systemd / PM2).
+- **Consultation:** 1-on-1 call via Zoom/Discord to walk you through the architecture and running process safely.
+
+> ⚠️ **Disclaimer:** I provide purely technical infrastructure and DevOps support for open-source software setup. I do **not** provide financial advice, trading strategies, or key management services. You are fully responsible for your own exchange API keys and funds.
+
+<p align="center">
+  <a href="mailto:vps.support.bot@gmail.com">
+    <img src="https://img.shields.io/badge/Email-Deployment_Support-blue?style=for-the-badge&logo=gmail" alt="Email Support" />
+  </a>
+</p>

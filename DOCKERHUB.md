@@ -7,6 +7,11 @@ keys and never sends your credentials anywhere. Runs on testnet out of the box.
 - **Image:** `5879/spot-trading-bot`
 - **Tags:** `latest`, `X.Y.Z` (pin a version for stability)
 - **Architectures:** `linux/amd64`, `linux/arm64` (Intel & Apple Silicon)
+- **GitLab (canonical):** <https://gitlab.com/AndreyPopov/spot-trading-bot>
+- **GitHub mirror + feedback:** <https://github.com/PopovAndrii/spot-trading-bot>
+- **Documentation site (GitLab Pages):** <https://exchange-crypto-059f74.gitlab.io/>
+- **Documentation site (GitHub Pages):** <https://popovandrii.github.io/spot-trading-bot/>
+- **Docker Hub:** <https://hub.docker.com/r/5879/spot-trading-bot>
 
 ---
 
@@ -23,6 +28,7 @@ keys and never sends your credentials anywhere. Runs on testnet out of the box.
 | 7 | **Testnet-first, with a safety fallback.** Ships with no keys and defaults to Binance testnet; `real` mode without real keys silently falls back to testnet, so you can't trade real funds by accident. |
 | 8 | **Manual per-order control (Expert Mode).** Cancel and re-place individual live orders by hand when you want to intervene. |
 | 9 | **Free, open source, and yours to run 24/7.** GPLv3, self-hosted — no subscription, no third party between you and the exchange. |
+| 10 | Authorization allows you to securely deploy the application on a **VPS server for round-the-clock operation**. |
 
 ---
 

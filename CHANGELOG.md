@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.0.2
+
+### Added
+
+- Public GitLab Pages documentation link from the repository front page.
+- Dedicated developer documentation page with release command examples.
+- AI usage guidance in the docs for setup, deployment, and manual review expectations.
+
+### Fixed
+
+- Auto-create pair state for live params.
+- Suppressed `npm` update/fund noise in the Docker setup flow.
+
 ## v2.0.1
 
 ### Added
