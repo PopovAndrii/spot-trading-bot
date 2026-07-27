@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl procps git
 
 WORKDIR /var/www
 
+# Silence npm's "New version of npm available" banner and the funding footer in
+# every stage — build logs and deploy output should carry only our own messages.
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+ENV NPM_CONFIG_FUND=false
+
 # ---------- dev: код и node_modules приходят bind-mount'ом (compose.yml) ----------
 FROM base AS dev
 USER node
