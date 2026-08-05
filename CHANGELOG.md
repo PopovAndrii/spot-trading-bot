@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.3
+
+### Fixed
+
+- Distinguish exchange outage (maintenance, gateway 502/503) from an invalid key or a real bug, instead of showing both as the same raw error.
+- Request timeout on key checks, so a dead network fails fast instead of hanging indefinitely.
+- Pair page shows a friendly "temporarily unavailable, retry in a few minutes" message during an exchange outage, instead of a raw stack trace.
+
 ## v2.0.2
 
 ### Added
