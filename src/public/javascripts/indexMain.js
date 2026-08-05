@@ -116,7 +116,7 @@ document.querySelectorAll('[data-check]').forEach((button) => {
     const status = button.closest('.api-keys__group').querySelector('.api-keys__status');
 
     button.disabled = true;
-    button.classList.remove('success', 'danger');
+    button.classList.remove('success', 'danger', 'warning');
     if (status) status.textContent = 'checking…';
 
     try {
@@ -127,11 +127,13 @@ document.querySelectorAll('[data-check]').forEach((button) => {
       });
       const data = await res.json();
 
-      button.classList.add(data.success ? 'success' : 'danger');
+      button.classList.add(data.success ? 'success' : data.offline ? 'warning' : 'danger');
       if (status) {
         status.textContent = data.success
           ? `✅ valid${data.canTrade === false ? ' (canTrade: no)' : ''}`
-          : `❌ ${data.message || 'invalid'}`;
+          : data.offline
+            ? `⚠️ ${data.message}`
+            : `❌ ${data.message || 'invalid'}`;
       }
     } catch (err) {
       button.classList.add('danger');

@@ -56,6 +56,25 @@
     }
   }
 
+  &.warning {
+    background-color: $c-w-700;
+    border-color: $c-w-500;
+    color: $c-w-50;
+
+    &:hover {
+      background-color: $c-w-300;
+      color: $c-w-950;
+      border-color: $c-w-700;
+    }
+
+    &.disabled {
+      background-color: $c-w-100;
+      border-color: $c-w-50;
+      color: $c-w-300;
+      cursor: not-allowed;
+    }
+  }
+
   &.sm {
     font-size: $font-size-base - 0.1;
     padding: 0.125rem 0.25rem;

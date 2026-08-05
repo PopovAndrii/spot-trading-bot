@@ -1,7 +1,29 @@
-<h1>
-  <%= message %>
-</h1>
-<h2>
-  <%= typeof error !=='undefined' ? error.status : '' %>
-</h2>
-<pre><%= typeof error !== 'undefined' ? error.stack : '' %></pre>
+<!DOCTYPE html>
+<html data-theme="">
+<%- include('../views/head'); %>
+
+<body>
+  <div class="wrapper">
+    <header class="">
+      <%- include('../views/navbar'); %>
+    </header>
+    <main class="container-adaptive content">
+      <section class="error-page">
+        <% if (typeof retryable !=='undefined' && retryable) { %>
+          <h1>Exchange temporarily unavailable</h1>
+          <p><%= message %></p>
+        <% } else { %>
+          <h1>Something went wrong</h1>
+          <p><%= message %></p>
+        <% } %>
+        <p><a href="/">Back to main page</a></p>
+        <% if (!(typeof retryable !=='undefined' && retryable) && typeof error !=='undefined' && error.stack) { %>
+          <pre><%= error.stack %></pre>
+        <% } %>
+      </section>
+    </main>
+  </div>
+  <%- include('../views/footer'); %>
+</body>
+
+</html>
