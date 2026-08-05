@@ -44,7 +44,7 @@ async function checkKeys(env) {
   if (!key || !secret) return { success: false, message: 'Keys are not set' };
 
   try {
-    const client = new Spot(key, secret, { baseURL: cfg.baseURL });
+    const client = new Spot(key, secret, { baseURL: cfg.baseURL, timeout: 5000 });
     const res = await client.account({ omitZeroBalances: true });
     return {
       success: true,
@@ -53,7 +53,20 @@ async function checkKeys(env) {
     };
   } catch (err) {
     const data = err.response?.data;
-    const message = [data?.code, data?.msg || err.message].filter(Boolean).join(' ');
+    // A rejected key comes back from Binance as a parsed JSON body {code, msg}.
+    // Anything else — no response at all (DNS failure, refused connection, our
+    // own timeout), or a response that isn't that shape (503/502/HTML "under
+    // maintenance" page) — means the request never reached the account check,
+    // so it must not be reported as an invalid key.
+    if (!data || typeof data !== 'object' || data.code === undefined) {
+      // The body is a gateway/maintenance page (HTML, plain text), not something
+      // worth showing raw — the status code already says everything useful.
+      const reason = err.response
+        ? `HTTP ${err.response.status} ${err.response.statusText || ''}`.trim()
+        : err.code || err.message || 'unknown error';
+      return { success: false, offline: true, message: `Exchange unreachable (${reason})` };
+    }
+    const message = [data.code, data.msg || err.message].filter(Boolean).join(' ');
     return { success: false, message: message || 'Request failed' };
   }
 }

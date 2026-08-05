@@ -341,7 +341,7 @@ class InvokeApi {
       const message = this.#getCatchMsg(err);
 
       this.getConsoleMsg(message, false);
-      return { success: false, message };
+      return { success: false, message, unavailable: this.#isUnavailable(err) };
     }
   }
 
@@ -426,6 +426,16 @@ class InvokeApi {
     const data = err.response?.data;
 
     return [err.message, data?.code, data?.msg || data?.message].filter(Boolean).join(' | ');
+  }
+
+  // A rejected request comes back from Binance as a parsed JSON body {code, msg}.
+  // Anything else — no response (DNS failure, connection refused, our own
+  // timeout), or a gateway/maintenance page (502/503, HTML, plain text) —
+  // means the exchange itself is unreachable, not that the request was
+  // rejected. The two must read differently to whoever sees the message.
+  #isUnavailable(err) {
+    const data = err.response?.data;
+    return !data || typeof data !== 'object' || data.code === undefined;
   }
 }
 

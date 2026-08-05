@@ -27,6 +27,18 @@ router.get('/:currency', async function (req, res, next) {
   const exchangeInfo = await API.exchangeInfo({ symbol: currency });
 
   if (!exchangeInfo.success) {
+    // Distinguish the exchange being down (maintenance, gateway errors — retry
+    // in a few minutes and it's fine) from a real problem the user needs to
+    // act on. Otherwise both look like the identical raw stack trace, and the
+    // temporary case reads as the app being broken.
+    if (exchangeInfo.unavailable) {
+      const err = new Error(
+        'The exchange is temporarily unavailable (maintenance or network issue). Please retry in a few minutes.'
+      );
+      err.status = 503;
+      err.retryable = true;
+      return next(err);
+    }
     const err = new Error(`Binance API error: ${exchangeInfo.message}`);
     err.status = 502;
     return next(err);
