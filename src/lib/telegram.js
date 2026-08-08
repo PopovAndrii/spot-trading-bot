@@ -79,15 +79,16 @@ function flush(symbol) {
   buffers.delete(symbol);
   if (!buf || buf.length === 0) return;
 
-  const header = `----- ${symbol} ------`;
-  const footer = '----------------------------';
+  // Leading space so the batch header lines up with the single messages, which
+  // start on a status icon of about that width.
+  const header = ` ${symbol}`;
 
   // Split into chunks so a very busy tick never exceeds Telegram's limit.
   let chunk = [];
   let len = 0;
   const sendChunk = () => {
     if (chunk.length === 0) return;
-    send([header, ...chunk, footer].join('\n'));
+    send([header, ...chunk].join('\n'));
     chunk = [];
     len = 0;
   };
