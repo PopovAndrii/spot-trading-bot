@@ -1269,7 +1269,7 @@ class JsonTimerSender extends EventEmitter {
         // grid file unreadable — send without a price rather than skip the notice
       }
       telegram.send(
-        `🟢 <b>Start</b> ${this.symbol}\n` +
+        `🟩 <b>Start</b> ${this.symbol}\n` +
         `Strategy: <b>${this.strategy}</b>\n` +
         (startPrice ? `Price: <b>${startPrice}</b> ${this.quoteAsset || ''}\n` : '') +
         `Auto-restart: <b>${this.autoRestart ? 'on' : 'off'}</b>`
@@ -1330,7 +1330,7 @@ class JsonTimerSender extends EventEmitter {
     logBus.log(stopMsg);
 
     if (wasRunning) {
-      telegram.send(`🛑 <b>Stop</b> ${this.symbol}`);
+      telegram.send(`🟨 <b>Pause</b> ${this.symbol}`);
     }
 
     await this.#emitRecovery();

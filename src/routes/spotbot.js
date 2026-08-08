@@ -509,7 +509,7 @@ router.post('/series/delete', async (req, res) => {
 
   logBus.clearSymbol(symbol);
 
-  telegram.send(`🗑 <b>Series deleted</b> ${symbol}`);
+  telegram.send(`🟥 <b>Series deleted</b> ${symbol}`);
 
   res.json({ success: true, message: 'No active orders.<br>Series deleted' });
 });

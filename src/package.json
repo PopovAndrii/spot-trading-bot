@@ -1,7 +1,7 @@
 {
   "name": "spot-trading-bot",
   "description": "DCA/Grid hybrid. A self-hosted, non-custodial spot bot that averages a position down, closes the whole grid at a profit, and scalps the oscillations in between.",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "private": true,
   "license": "GPL-3.0-or-later",
   "scripts": {
