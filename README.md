@@ -64,6 +64,26 @@ docker compose logs -f                        # follow logs
 docker compose down                           # stop
 ```
 
+## Production deploy (self-hosted)
+
+If you run the bot from a **cloned repository** (not the published Docker Hub image),
+production uses `compose.prod.yml`: it builds a self-contained image from source instead
+of pulling one, and bind-mounts only `data/` — the code itself ships baked into the image,
+not mounted from the host.
+
+```sh
+GIT_COMMIT=$(git rev-parse --short HEAD) GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
+  docker compose -f compose.prod.yml build
+docker compose -f compose.prod.yml up -d
+```
+
+`GIT_COMMIT`/`GIT_BRANCH` are optional — they only stamp the commit and branch into the
+running app's footer, so you can tell at a glance which build is live. Skip them and the
+footer is just blank.
+
+See [Developer notes](docs/developer/for-developers.md) for the full release process
+(version bump, tag, Docker Hub image).
+
 ## Safety notes
 
 - Start on **Binance testnet** first.

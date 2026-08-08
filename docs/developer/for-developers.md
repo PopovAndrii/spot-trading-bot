@@ -54,7 +54,37 @@ npm run build-css
 ## Production notes
 
 Production uses `compose.prod.yml` and `pm2-runtime` through `docker-config/entrypoint.sh`.
-The production image bakes in the runtime code and mounts only persistent state.
+The production image bakes in the runtime code and mounts only persistent state — there is
+no bind-mounted source, so a code change never reaches the running bot until the image is
+rebuilt.
+
+Deploy an update to the self-hosted production server:
+
+```sh
+GIT_COMMIT=$(git rev-parse --short HEAD) GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
+  docker compose -f compose.prod.yml build
+docker compose -f compose.prod.yml up -d
+```
+
+`GIT_COMMIT`/`GIT_BRANCH` are baked into the image build args and only stamp the running
+app's footer with the commit/branch that is actually live — they don't affect behavior.
+Omit them and the footer is blank.
+
+### Docker Hub image
+
+`5879/spot-trading-bot` is a **separate** public image for `compose.public.yml` users — it
+is not the same artifact as the production deploy above, and updating your own production
+server does not update it. It uses the same `prod` build target, just tagged and pushed:
+
+```sh
+docker build --target prod -t 5879/spot-trading-bot:2.0.4 -t 5879/spot-trading-bot:latest \
+  -f docker-config/Dockerfile .
+docker push 5879/spot-trading-bot:2.0.4
+docker push 5879/spot-trading-bot:latest
+```
+
+Push the version tag **and** `:latest` — `compose.public.yml` pins `:latest` by default, so
+skipping it leaves existing installs on the old image after `docker compose pull`.
 
 ## Validation
 
@@ -87,15 +117,16 @@ Development happens on GitLab; publish the GitHub mirror only after the GitLab s
 
 ## Release commands
 
-For this project, bump the version in `src/package.json` without creating a git tag automatically:
+Bump the version in `src/package.json` without creating a git tag automatically (run
+inside the container, see [Local development](#local-development)):
 
 ```sh
-docker compose exec app sh -lc "cd /var/www/src && npm version 2.0.2 --no-git-tag-version"
+npm version 2.0.5 --no-git-tag-version
 ```
 
 Then create and push the release tag from the host:
 
 ```sh
-git tag -a v2.0.2 -m "Release v2.0.2 — test"
-git push origin v2.0.2
+git tag -a v2.0.5 -m "Release v2.0.5"
+git push origin v2.0.5
 ```
