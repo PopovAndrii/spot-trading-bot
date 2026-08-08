@@ -30,12 +30,14 @@ features:
 
 ## Releases
 
-Current version: **`2.0.2`**.
+Current version: **`2.0.4`**.
 
 Every new version is added to this list with a short note on what changed. Newest first.
 
 | Version | Date | Notes |
 |---|---|---|
+| **`2.0.4`** | 2026-08-08 | Cycle no longer ends on a rung-sized close while the position isn't flat — the classic close recomputes the leftover from real fills instead of a stale plan left by a pulled hybrid scalp. Telegram: batched messages drop the closing separator; Start/Pause/Series deleted get a color-coded icon. |
+| **`2.0.3`** | 2026-08-05 | Distinguish an exchange outage from an invalid key or a real bug, instead of showing both as the same raw error. Request timeout on key checks. Friendly "temporarily unavailable" message during an outage instead of a raw stack trace. |
 | **`2.0.2`** | 2026-07-26 | Public docs link from the repo front page, developer release command examples, AI usage guidance in docs, auto-create pair state for live params, and quieter Docker setup output. |
 | **`2.0.1`** | 2026-07-20 | Live re-place of the resting micro when Micro profit % changes (atomic `cancelReplace`). VitePress docs site, rebrand + new logo, Docker Hub image rename. Fixes: resting micro shows its real book price; re-place popup price rounded to tick. |
 | **`2.0.0`** | 2026-07-17 | First test release. DCA/Grid hybrid strategy — safety-order ladder, averaged grid close that follows real fills, and a micro-scalp that banks oscillations and pulls the exit closer. Live hybrid controls on a running cycle, Telegram trade notices, testnet-first, and Docker Hub distribution. |
