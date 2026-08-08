@@ -310,7 +310,17 @@ class Job {
             if (obj['SELL'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
             }
-            const reb = rebalancedClose(obj, i, 'long'); // null → precompute
+            // No partial fills to net out → rebalancedClose bows out and the slot
+            // plan takes over. That plan is only trustworthy while the slot still
+            // holds what the calculator wrote: the scalp overwrites price/qty with
+            // ITS OWN rung-sized numbers, and they outlive the micro. Seen live:
+            // the hybrid was switched off, the micro was pulled, and the classic
+            // close inherited 0.096 @ 606.35 while 0.363 was held — a quarter of the
+            // position covered, for three days, until that close filled and ended
+            // the cycle. So recompute from the real fills first (#fullClose does not
+            // bail out on a clean book) and keep the slot plan only for a config too
+            // old to carry fill data.
+            const reb = rebalancedClose(obj, i, 'long') || this.#fullClose(obj, i, 'long');
             const quantity = reb ? reb.quantity : obj['SELL'][i].quantity;
             const price = reb ? reb.price : obj['SELL'][i].price;
 
@@ -505,7 +515,9 @@ class Job {
             if (obj['BUY'][i].manual) {
               return { status: 'pass', method: false, side: null, id: i, data: {} };
             }
-            const reb = rebalancedClose(obj, i, 'short'); // null → precompute
+            // Mirror of long: the slot plan is the last resort, not the first —
+            // a pulled micro leaves its rung-sized numbers behind on the slot.
+            const reb = rebalancedClose(obj, i, 'short') || this.#fullClose(obj, i, 'short');
             const quantity = reb ? reb.quantity : obj['BUY'][i].quantity;
             const price = reb ? reb.price : obj['BUY'][i].price;
 
