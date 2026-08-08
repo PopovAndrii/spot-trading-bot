@@ -433,20 +433,12 @@ class Job {
         // the position is only partially closed. Don't end the cycle — pass yields
         // to the lower indices, which deliver a close for the leftover (guard above
         // + case FILLED with rebalancedClose).
-        if (deepestFilledIndex(obj['BUY']) > i) {
+        const D = deepestFilledIndex(obj['BUY']);
+        if (D > i) {
           return { status: 'pass', method: false, side: null, id: i, data: {} };
         }
 
-        return {
-          status: Status.DONE,
-          method: 'cancelOpenOrders',
-          side: null,
-          id: i,
-          data: {
-            id: i,
-            symbol: el.symbol,
-          },
-        };
+        return this.#doneIfFlat(obj, i, el, D, 'long', 'SELL');
       }
     }
   };
@@ -631,19 +623,12 @@ class Job {
       if (obj['BUY'][i].status === state.FILLED) {
         // Mirror of long: DONE is valid only if i is the deepest filled sell. A
         // filled sell remains below (k>i) → orphan, don't end the cycle.
-        if (deepestFilledIndex(obj['SELL']) > i) {
+        const D = deepestFilledIndex(obj['SELL']);
+        if (D > i) {
           return { status: 'pass', method: false, side: null, id: i, data: {} };
         }
 
-        return {
-          status: Status.DONE,
-          method: 'cancelOpenOrders',
-          side: null,
-          id: i,
-          data: {
-            symbol: el.symbol,
-          },
-        };
+        return this.#doneIfFlat(obj, i, el, D, 'short', 'BUY');
       }
     }
   };
@@ -759,6 +744,61 @@ class Job {
 
     const step = parseInt(obj.param?.['field-stepSize'], 10) || 0;
     return held.toDecimalPlaces(step, Decimal.ROUND_DOWN).lte(0);
+  }
+
+  // A filled close ends the cycle ONLY if the books are square. Index reasoning
+  // ("i is the deepest filled entry, so this close was THE close") is not enough:
+  // a close sized for ONE RUNG fills at the deepest index too. That is what a
+  // hybrid micro is — and once its 'role' marker is gone (it is deleted, never
+  // re-derived) the classic machine cannot tell the two apart. Seen live: a micro
+  // sold its one rung, the cycle went DONE on that fill, cancelOpenOrders pulled
+  // the tail with it, and the rest of the position was left on the balance with
+  // nothing on the book.
+  //
+  // So ask the books. While anything is still held, re-place the close for the
+  // leftover: rebalancedClose nets out what the filled closes already sold, so it
+  // is both sized and priced off what actually remains (the bank included). The
+  // slot's fills survive the re-use — bankSlotFills carries them into
+  // filledQty/filledQuote, which is what rebalancedClose reads next time.
+  //
+  // Falls back to the old behaviour where it cannot do better: a leftover under
+  // the exchange minimum is dust (DONE + leftover, the user is notified), and a
+  // config too old to carry fill data ends as it always did.
+  #doneIfFlat(obj, i, el, D, strategy, closeSide) {
+    const symbol = el.symbol;
+    const done = (leftover) => ({
+      status: Status.DONE,
+      method: 'cancelOpenOrders',
+      side: null,
+      id: i,
+      ...(leftover ? { leftover } : {}),
+      data: { id: i, symbol },
+    });
+
+    if (this.#positionFlat(obj, D, strategy)) return done();
+
+    const reb = rebalancedClose(obj, i, strategy);
+    if (!reb) return done(); // no fill data (old config) → classic ending
+
+    if (this.#belowMin(reb.quantity, reb.price)) {
+      return done({ quantity: reb.quantity, price: reb.price, symbol });
+    }
+
+    return {
+      status: null,
+      method: 'newOrder',
+      side: closeSide,
+      id: i,
+      data: {
+        id: i,
+        symbol,
+        side: closeSide,
+        type: 'LIMIT',
+        timeInForce: 'GTC',
+        quantity: reb.quantity,
+        price: reb.price,
+      },
+    };
   }
 
   // The split line inside the pause gap: interpolate between the deepest rung's
