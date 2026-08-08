@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.4
+
+### Fixed
+
+- Cycle no longer ends when a close fills at the deepest held rung but the position isn't flat: the classic close now recomputes the leftover from the real fills instead of trusting a stale rung-sized order left on the slot by a pulled hybrid scalp.
+
+### Changed
+
+- Telegram: batched trade messages drop the closing separator line; Start/Pause/Series deleted messages get a color-coded square icon.
+
 ## v2.0.3
 
 ### Fixed
