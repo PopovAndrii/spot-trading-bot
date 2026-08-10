@@ -109,6 +109,7 @@ export class SpotWS {
               this.isRunning = false;
               this.#btnRule(false);
             }
+            window.dispatchEvent(new CustomEvent('spot-status-change'));
             break;
           case 'tableData':
             this.loadDataFromFileCalculator.applyState(message.data);
@@ -123,6 +124,7 @@ export class SpotWS {
               this.#btnRule(false);
               this.loadDataFromFileCalculator.getStateCalculator();
             }
+            window.dispatchEvent(new CustomEvent('spot-status-change'));
             break;
           case 'restartSync':
             this.#updateRestartSwitch(message.data);

@@ -125,6 +125,11 @@
     window.fetchActiveSymbols = fetchActiveSymbols;
     fetchActiveSymbols();
 
+    // Re-sync the pair list label once this page's WS has told the server
+    // the real running state — the initial fetch above can race ahead of
+    // that subscribe/spotStatus round trip and cache a stale "pause".
+    window.addEventListener('spot-status-change', fetchActiveSymbols);
+
     document.querySelector('.nav-logout')?.addEventListener('ui-button-change', () => {
       window.location.href = '/login/logout';
     });
