@@ -101,28 +101,30 @@ export class SpotWS {
         switch (message.event) {
           case 'spotStatus':
             if (message.data === true) {
+              this.isRunning = true;
               this.#btnRule(true);
               this.notifications.showNotification('Table data loaded. Bot in progress.', 'success');
-              this.isRunning = true;
               this.loadDataFromFileCalculator.getStateCalculator();
             } else {
-              this.#btnRule(false);
               this.isRunning = false;
+              this.#btnRule(false);
             }
+            window.dispatchEvent(new CustomEvent('spot-status-change'));
             break;
           case 'tableData':
             this.loadDataFromFileCalculator.applyState(message.data);
             break;
           case 'updateTableData':
             if (message.data === 1) {
-              this.#btnRule(true);
               this.isRunning = true;
+              this.#btnRule(true);
             }
             if (message.data === 0) {
-              this.#btnRule(false);
               this.isRunning = false;
+              this.#btnRule(false);
               this.loadDataFromFileCalculator.getStateCalculator();
             }
+            window.dispatchEvent(new CustomEvent('spot-status-change'));
             break;
           case 'restartSync':
             this.#updateRestartSwitch(message.data);
@@ -280,18 +282,20 @@ export class SpotWS {
     document.getElementById('group-spinbox')?.classList.toggle('params-locked', lock);
 
     const settingsCalculate = document.getElementById('settings-calculate');
-    settingsCalculate.disabled = Boolean(status);
+    if (settingsCalculate) settingsCalculate.disabled = Boolean(status);
 
     const settingsCalculateSave = document.getElementById('settings-calculate-save');
-    settingsCalculateSave.disabled = Boolean(status);
+    if (settingsCalculateSave) settingsCalculateSave.disabled = Boolean(status);
 
     const cancelAllOrders = document.getElementById('cancel-all-orders');
-    cancelAllOrders.disabled = Boolean(status);
+    if (cancelAllOrders) cancelAllOrders.disabled = Boolean(status);
 
     const deleteCurrentSeries = document.getElementById('delete-current-series');
     if (deleteCurrentSeries) deleteCurrentSeries.disabled = true;
 
     const startBtn = document.getElementById('startBtn');
+    if (!startBtn) return;
+
     if (status) {
       startBtn.classList.add('danger');
       startBtn.classList.remove('success');

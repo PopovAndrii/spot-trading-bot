@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.5
+
+### Fixed
+
+- Start button, parameter lock, and the header pair-status label could get stuck out of sync with the running bot after a fresh page load (new tab, post-login): a DOM race in the lock logic could silently drop the running state, and the pair-list label was never resynced once the page's status check completed.
+
 ## v2.0.4
 
 ### Fixed
