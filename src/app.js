@@ -139,7 +139,8 @@ if (HTTP_LOG !== 'off') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+// no-cache: always revalidate via ETag so a stale bundle never lingers across deploys
+app.use(express.static(path.join(__dirname, 'public'), { cacheControl: false, setHeaders: (res) => res.set('Cache-Control', 'no-cache') }));
 
 app.use('/login', loginRouter.router);
 app.use(loginRouter.ensureAuthenticated);

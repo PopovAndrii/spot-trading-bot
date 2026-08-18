@@ -30,12 +30,13 @@ features:
 
 ## Releases
 
-Current version: **`2.0.5`**.
+Current version: **`2.0.6`**.
 
 Every new version is added to this list with a short note on what changed. Newest first.
 
 | Version | Date | Notes |
 |---|---|---|
+| **`2.0.6`** | 2026-08-19 | Static assets (JS/CSS) served without cache-control could linger stale in the browser across deploys, showing mismatched footer versions and a resurrected pre-fix Start-button race until a hard refresh. Static serving now forces revalidation via `Cache-Control: no-cache`. |
 | **`2.0.5`** | 2026-08-10 | Start button, parameter lock, and the header pair-status label could get stuck out of sync with the running bot after a fresh page load — a DOM race could silently drop the running state, and the pair-list label was never resynced. |
 | **`2.0.4`** | 2026-08-08 | Cycle no longer ends on a rung-sized close while the position isn't flat — the classic close recomputes the leftover from real fills instead of a stale plan left by a pulled hybrid scalp. Telegram: batched messages drop the closing separator; Start/Pause/Series deleted get a color-coded icon. |
 | **`2.0.3`** | 2026-08-05 | Distinguish an exchange outage from an invalid key or a real bug, instead of showing both as the same raw error. Request timeout on key checks. Friendly "temporarily unavailable" message during an outage instead of a raw stack trace. |
