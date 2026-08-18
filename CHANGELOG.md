@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.6
+
+### Fixed
+
+- Static assets (JS/CSS) served without cache-control could linger stale in the browser across deploys, showing mismatched footer versions and a resurrected pre-fix Start-button race until a hard refresh. Static serving now forces revalidation via `Cache-Control: no-cache`.
+
 ## v2.0.5
 
 ### Fixed
