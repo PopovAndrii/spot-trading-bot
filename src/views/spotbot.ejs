@@ -57,7 +57,7 @@
             </div>
             <%- include('../views/ui/SpinBox', { id:'field-martingail' , label:'Martingail' , min: 20 , max: 150 , step: 0, hint:'The Martingale factor affects the size of the gap in the closing order (final sale). The higher the Martingale factor, the more effectively and frequently the end of the series is triggered. However, this causes the balance to be depleted very quickly. With a low Martingale factor, the order grid is very wide and provides good overlap in percentage terms. However, the final order in the series is located slightly further away than desired. Range: minimum 25-35; optimal 35-80; excellent 80-100+.' }); %>
             <%- include('../views/ui/SpinBox', { id:'field-fibonachiStep' , label:'Progressive step' , min: 0.01 , max: 2 , step: 2, hint:'Progressive Step—allows you to control the percentage of overlap between price drops (Long) and rises (Short). The greater the overlap (>20%), the lower the risk-which is good. At the same time, orders are triggered less frequently-which is bad. You need to find the optimal balance depending on the amount of currency in your exchange account.'}); %>
-            <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0.01, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
+            <%- include('../views/ui/SpinBox', { id:'field-indent' , label:'Indent price' , min:0, max:1 , step: 2, hint:'The distance between the first order and the current price.' }); %>
           </div>
 
         </div>
