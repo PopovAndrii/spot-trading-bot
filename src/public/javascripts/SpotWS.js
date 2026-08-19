@@ -54,6 +54,21 @@ export class SpotWS {
       this.connectWebSocket();
     });
 
+    // Background tabs throttle timers (ping/pong heartbeat, reconnect backoff),
+    // so a dead socket can sit unnoticed until the tab regains focus. Force a
+    // fresh check the moment the tab becomes visible again instead of waiting
+    // on those frozen timers.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (this.#isWebSocketOpen(this.ws)) return;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      this.reconnectAttempts = 0;
+      this.connectWebSocket();
+    });
+
     this.isRunning = false;
     this.btnClickHandler = null;
     this.btnStart();
@@ -194,7 +209,8 @@ export class SpotWS {
       }
 
       const delay = Math.min(2000 * 2 ** (this.reconnectAttempts - 1), 30000);
-      setTimeout(() => {
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = null;
         this.notifications.showNotification(
           `Web Socket Reconnecting (${this.reconnectAttempts})...`,
           'warning'
