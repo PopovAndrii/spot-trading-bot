@@ -100,6 +100,8 @@ export class SetStrategy {
       document.getElementById(el.id).value = defaultData[el.id];
     });
 
+    this.#applySavedDefaults();
+
     // The accuracy of the balance depends on the strategy (long → tickSize, short → stepSize).
     // Since the strategy is known only here, we set the SpinBox balance step on the client side.
     const depositSpin = document.querySelector('#field-deposit')?.closest('.UIsp');
@@ -109,6 +111,42 @@ export class SetStrategy {
     // Recreation (destroy + new) re-scans all .UIsp and in scan() calls state() on
     // each — the +/- arrows sync themselves, no manual sync needed.
     this.onFormatChange?.();
+  }
+
+  // Overrides the server-supplied defaults with whatever the user last
+  // Saved for this pair+strategy (LoadDataCalculator.#saveDefaults). Price,
+  // balance and exchange filters (tickSize/stepSize/minQuoteAsset) are never
+  // touched — they always come fresh from the server above.
+  #applySavedDefaults() {
+    const key = `settings_${base + quote}_${this.strategyName}`;
+    let saved;
+    try {
+      saved = JSON.parse(localStorage.getItem(key));
+    } catch {
+      return;
+    }
+    if (!saved) return;
+
+    Object.entries(saved).forEach(([id, value]) => {
+      if (id === 'field-hybrid' || id === 'field-autoExit') {
+        const checkboxId = id === 'field-hybrid' ? 'hybrid' : 'autoExit';
+        const el = document.getElementById(checkboxId);
+        if (el) el.checked = value === 'on';
+        return;
+      }
+      if (id === 'strategyList') {
+        // Custom UIselect: the hidden input mirrors the last-clicked option,
+        // it does not drive the widget. Re-click the matching <li> so the
+        // visible label, hidden input, and ui-select-change all stay in sync.
+        const option = document
+          .querySelector('#strategyList')
+          ?.querySelector(`li[data-value='${value}'], li[data-value=' ${value.trim()}']`);
+        option?.click();
+        return;
+      }
+      const el = document.getElementById(id);
+      if (el) el.value = value;
+    });
   }
 
   #getStaticText() {

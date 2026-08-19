@@ -805,12 +805,44 @@ export class LoadDataCalculator {
     }
   }
 
+  // Per-pair, per-strategy defaults. Only user-tuned trade params — not the
+  // live price/balance/exchange filters (those always come fresh from the
+  // server on the next Long/Short click).
+  static DEFAULTS_FIELDS = [
+    'field-orderSize',
+    'field-profit',
+    'field-commission',
+    'strategyList',
+    'field-martingail',
+    'field-fibonachiStep',
+    'field-indent',
+    'field-gridLevel',
+    'field-microProfit',
+    'field-gridExit',
+    'field-hybrid',
+    'field-autoExit',
+    'field-activeOrders',
+    'field-requestFrequency',
+  ];
+
+  #saveDefaults() {
+    const strategy = document.getElementById('field-strategy')?.value;
+    if (!strategy) return;
+    const key = `settings_${base + quote}_${strategy}`;
+    const payload = {};
+    LoadDataCalculator.DEFAULTS_FIELDS.forEach((field) => {
+      if (field in this.defaultData) payload[field] = this.defaultData[field];
+    });
+    localStorage.setItem(key, JSON.stringify(payload));
+  }
+
   async settingsSave() {
     orders.param = this.defaultData;
     const restartInput = document
       .getElementById('settings-calculate-restart')
       ?.querySelector('input');
     orders.restart = Boolean(restartInput?.checked);
+    this.#saveDefaults();
 
     try {
       const res = await fetch('/spotbot/calculator/save', {
