@@ -34,20 +34,28 @@ loadDataCalculator.runtimeParams();
 loadDataCalculator.rowActions();
 loadDataCalculator.expertMode();
 
+// Recreate the SpinBox so that it re-reads the data-step and re-syncs the
+// +/- arrows to the current min/value (the balance accuracy depends on the
+// strategy, and the package locks the step during initialization). Shared
+// between a manual Long/Short click (SetStrategy) and landing directly on
+// /spotbot/:symbol for an already-configured pair (LoadDataFromFileCalculator
+// .applyState) — both write real field values into DOM inputs the SpinBox
+// widget needs to re-scan.
+const recreateSpinBox = () => {
+  spinBox.destroy();
+  spinBox = new UiElements.SpinBox();
+};
+
 const loadDataFromFileCalculator = new LoadDataFromFileCalculator(
   sl,
   notifications,
   loadDataCalculator,
   colors,
-  () => spinBox
+  () => spinBox,
+  recreateSpinBox
 );
 
-const setStrategy = new SetStrategy(notifications, () => {
-  // Recreate the SpinBox so that it re-reads the data-step
-  // (the balance accuracy depends on the strategy, and the package locks the step during initialization).
-  spinBox.destroy();
-  spinBox = new UiElements.SpinBox();
-});
+const setStrategy = new SetStrategy(notifications, recreateSpinBox);
 
 new SpotWS(
   notifications,

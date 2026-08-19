@@ -1,11 +1,12 @@
 export class LoadDataFromFileCalculator {
-  constructor(select, notifications, loadDataCalculator, colors, getSpinBox) {
+  constructor(select, notifications, loadDataCalculator, colors, getSpinBox, onFormatChange) {
     this.selectObjectElement = select;
     this.notifications = notifications;
     this.loadDataCalculator = loadDataCalculator;
     // Getter for the current SpinBox instance: it's recreated on a strategy change
     // (setStrategy → destroy + new), so we keep a function, not a direct reference.
     this.getSpinBox = getSpinBox;
+    this.onFormatChange = onFormatChange;
 
     this.orderType = colors;
 
@@ -84,6 +85,13 @@ export class LoadDataFromFileCalculator {
 
     this.#fillInData(data);
     this.loadDataCalculator.calculate(data);
+
+    // The direct .value writes above don't re-sync the SpinBox +/- arrows
+    // (by design — see #fillInData). Recreating it here is what does: the
+    // same step a manual Long/Short click takes, otherwise a page landed on
+    // /spotbot/:symbol for an already-configured pair shows the decrement
+    // arrow stuck disabled at its server-rendered min:0/value:0 state.
+    this.onFormatChange?.();
   }
 
   async #fillInData(obj) {
