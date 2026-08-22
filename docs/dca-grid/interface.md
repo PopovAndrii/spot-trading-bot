@@ -93,6 +93,23 @@ rises (Short).
 The distance between the **first order** and the **current price** — how far below
 (Long) / above (Short) the market the ladder starts.
 
+## Remembering your settings
+
+Pressing **Save** also remembers your Build parameters **per pair and per
+strategy** (Long/Short), in the browser's local storage — not on the server. Next
+time you click **Long** or **Short** for that same pair, your last-saved Order
+Size, Profit, Commission, Progression strategy, Martingail, Progressive step,
+Indent price, Hybrid params and Runtime parameters are restored automatically,
+instead of the server's generic defaults.
+
+- This only fires on a **Long/Short click** (or switching pairs and coming back).
+  It does **not** apply on a plain page reload — a reload shows the pair's saved
+  **config file** instead (the grid that was actually calculated/placed), so the
+  form never lies about what the bot is really running.
+- **Available balance** and **price** are never remembered this way — they always
+  come fresh from the exchange when you click Long/Short.
+- It's per-browser: local storage doesn't sync across browsers or devices.
+
 ## Runtime parameters 🟢
 
 Changeable while the bot runs; written to the live cycle on the fly.
@@ -111,6 +128,22 @@ order and price state. Lower = more responsive, more API calls.
 
 When **on**, the bot **starts a new cycle automatically** after the current series
 closes. When off, it stops after the current cycle completes.
+
+### Greed lock 🟢
+
+Orders are sized from the **live price** (Order Size × price) against a **fixed**
+Available balance. After the price rallies, each rung costs more, so the same
+balance may only fit a **shorter** ladder than the cycle that just closed — the
+leftover slice of the balance would otherwise sit idle for the whole next cycle.
+
+With Greed lock **on**, a Restart is refused if the new grid would come out with
+**fewer orders** than the previous cycle. The bot stops instead of looping into the
+shrunk ladder, and sends a Telegram notice with the old/new order count and the
+idle balance, so you can raise the deposit or order size and start again
+deliberately.
+
+With Greed lock **off** (default), Restart always rebuilds the grid from the fresh
+price, even if that means fewer orders.
 
 ## Actions
 

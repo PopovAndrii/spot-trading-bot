@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.0.7
+
+### Added
+
+- Greed lock: an optional switch that refuses an auto-Restart if the new grid would come out with fewer orders than the cycle that just closed (a price rally makes each rung more expensive against a fixed deposit). The bot stops instead of looping into a shrunk ladder, with a Telegram notice showing the old/new order count and the idle balance.
+- Save now remembers your tuned Build parameters (order size, profit, commission, martingale, fibonacci step, indent, grid/hybrid params, active orders, request frequency) per pair and per strategy in the browser's local storage. Clicking Long/Short restores your last-saved values instead of the server's generic defaults.
+
+### Fixed
+
+- Landing directly on a pair page (`/spotbot/:symbol`) for an already-configured pair left the SpinBox decrement arrows stuck disabled at their server-rendered state; only a manual Long/Short click recreated the widget correctly. Fixed by recreating the SpinBox after the saved config is applied.
+- Indent price could not reach 0 (SpinBox minimum was 0.01).
+- A background tab's WebSocket reconnect could sit stuck behind a frozen, throttled backoff timer until the tab was refocused; regaining visibility now clears the pending timer and retries the connection immediately.
+- Mobile: the order table could grow wider than the screen and drag the whole page (including the parameter form above it) into a sideways scroll. The table now scrolls horizontally on its own, the rest of the layout stays put.
+- Mobile: the danger-zone row (Cancel all / Delete current series / Hybrid grid / Expert Mode) no longer fits four items abreast; it now wraps onto two rows of two, with the switch labels moved above their sliders so both fit.
+- Mobile: Calculate, Save, Start and Cancel all orders now show their text label alongside the icon (previously icon-only on every screen size).
+- Mobile Firefox: the fixed console at the bottom could hide the buttons below the table almost entirely when open — the page only reserved space for it via a `body:has(.console--open)` selector that mobile Firefox wasn't honoring. Reserving that space now uses a plain class toggled by the console's own open/close handler instead.
+
 ## v2.0.6
 
 ### Fixed
