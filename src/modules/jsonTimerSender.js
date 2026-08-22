@@ -299,6 +299,11 @@ class JsonTimerSender extends EventEmitter {
     this.symbol = null;
     this.strategy = strategy;
     this.autoRestart = false;
+    // Greed Lock: refuse an auto-restart that would build a SHORTER ladder than the
+    // cycle that just ended. Orders are sized from the price (orderSize × currency)
+    // while the deposit is fixed, so a price rally makes each rung dearer and the
+    // last rung no longer fits — that slice of the deposit would sit idle.
+    this.greedLock = false;
     this.running = false;
     this.exchangeName = 'binance';
 
@@ -567,6 +572,7 @@ class JsonTimerSender extends EventEmitter {
       const fresh = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
       if (fresh.param) obj.param = fresh.param;
       if ('restart' in fresh) obj.restart = fresh.restart;
+      if ('greedLock' in fresh) obj.greedLock = fresh.greedLock;
 
       // Manual-pull marker: a manual single-order cancel writes
       // { status: CANCELED, manual: true } straight to the grid file. The robot
@@ -957,6 +963,7 @@ class JsonTimerSender extends EventEmitter {
           await this.#mergeLiveEdits(obj);
 
           this.autoRestart = obj.restart == true ? true : false;
+          this.greedLock = obj.greedLock == true ? true : false;
 
           // Flush any batched order lines from this pass before the standalone
           // finale, so the chat reads batch → Done → Restart, not Done mixed in.
@@ -975,9 +982,12 @@ class JsonTimerSender extends EventEmitter {
 
           const stranded = recoveryStats(obj);
 
-          if (this.autoRestart && !stranded) {
-            // await this.#sleep(500);
-            this.restartCycle(obj);
+          // 'locked' = Greed Lock refused the restart; fall through to the stop path
+          // below so the cycle ends cleanly instead of looping into a shorter ladder.
+          const outcome =
+            this.autoRestart && !stranded ? await this.restartCycle(obj) : 'skipped';
+
+          if (outcome !== 'locked' && outcome !== 'skipped') {
             await this.#sleep(100);
 
             return;
@@ -1263,6 +1273,10 @@ class JsonTimerSender extends EventEmitter {
       try {
         const obj = JSON.parse(await fs.readFile(this.#filePath(), 'utf8'));
         startPrice = obj?.param?.['field-currency'] || '';
+        // Greed Lock lives in the grid file (its own route writes it), not in the
+        // start options — the file is the one authority, and #mergeLiveEdits keeps
+        // it current if the switch is flipped mid-cycle.
+        this.greedLock = obj?.greedLock === true;
         const td = parseInt(obj?.param?.['field-tickSize'], 10);
         if (Number.isInteger(td) && td >= 0) this.tickDecimals = td;
       } catch {
@@ -1389,9 +1403,40 @@ class JsonTimerSender extends EventEmitter {
 
       const calc = Calculator.build(settings, this.strategy);
 
+      // Greed Lock: the ladder is sized from the LIVE price (orderSize × currency)
+      // against a fixed deposit, so after a rally the deepest rung no longer fits and
+      // the grid comes back one (or more) orders shorter — that unspent slice of the
+      // deposit then sits idle for the whole cycle. Refuse the restart and stop, so
+      // the deposit/order size can be raised deliberately instead of silently
+      // trading a smaller ladder.
+      const prevOrders = Array.isArray(obj.BUY) ? obj.BUY.length : 0;
+
+      if (this.greedLock && prevOrders > 0 && calc.length < prevOrders) {
+        // Unspent quote left by the new ladder — what would have gone idle.
+        const idle = calc.length ? calc[calc.length - 1].calcBalance : settings['field-deposit'];
+
+        const lockMsg =
+          `🔒 ${this.symbol}: greed lock — restart canceled, ` +
+          `${calc.length} orders instead of ${prevOrders} (idle ${idle} ${this.quoteAsset || ''})`;
+        console.log(lockMsg);
+        logBus.log(lockMsg);
+
+        telegram.send(
+          `🔒 <b>Greed Lock</b> ${this.symbol}\n` +
+          `Restart canceled: <b>${calc.length}</b> orders instead of <b>${prevOrders}</b>\n` +
+          `Idle balance: <b>${idle}</b> ${this.quoteAsset || ''}\n` +
+          `Price: <b>${price}</b> — raise deposit or order size, then Start`
+        );
+
+        return 'locked';
+      }
+
       const tmp = this.#config(calc);
       tmp.param = settings;
       tmp.restart = true;
+      // #config() builds a fresh object — carry the flag over or the restarted cycle
+      // starts with the switch cleared.
+      tmp.greedLock = obj.greedLock === true;
 
       // Save to file
       const filePath = path.join(__dirname, '../data', `${this.symbol}-binance.json`);
@@ -1405,9 +1450,15 @@ class JsonTimerSender extends EventEmitter {
       );
 
       this.emit('restarted', { symbol: this.symbol, price });
+
+      return 'restarted';
     } catch (err) {
       console.error('❌ Failed to restart cycle:', err);
       this.emit('stopped', this.symbol);
+
+      // Not 'locked': the failure path keeps its previous behaviour (emit stopped,
+      // no extra stop() call) — only Greed Lock routes into the stop path.
+      return 'failed';
     }
   }
 

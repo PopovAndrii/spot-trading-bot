@@ -1,5 +1,13 @@
 @use './var' as *;
 
+// Table can get wider than the viewport on mobile (8 columns of numbers) — scope
+// the horizontal scroll to the table itself, so it doesn't stretch the whole
+// page/card (and the spinbox rows above it) sideways.
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .t {
   width: 100%;
   margin: 1rem 0 0 0;

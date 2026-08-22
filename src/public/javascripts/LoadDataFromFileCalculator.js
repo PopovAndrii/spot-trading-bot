@@ -1,11 +1,12 @@
 export class LoadDataFromFileCalculator {
-  constructor(select, notifications, loadDataCalculator, colors, getSpinBox) {
+  constructor(select, notifications, loadDataCalculator, colors, getSpinBox, onFormatChange) {
     this.selectObjectElement = select;
     this.notifications = notifications;
     this.loadDataCalculator = loadDataCalculator;
     // Getter for the current SpinBox instance: it's recreated on a strategy change
     // (setStrategy → destroy + new), so we keep a function, not a direct reference.
     this.getSpinBox = getSpinBox;
+    this.onFormatChange = onFormatChange;
 
     this.orderType = colors;
 
@@ -65,6 +66,19 @@ export class LoadDataFromFileCalculator {
       }
     }
 
+    // Greed lock: same pattern as Restart, but it lives next to it in the config
+    // root, not in param. Missing on old configs, which reads as off.
+    const greedSw = document.getElementById('settings-calculate-greedlock');
+
+    if (greedSw) {
+      const input = greedSw.querySelector('input');
+      const on = String(data.greedLock) === 'true';
+      input.checked = on;
+      if (on) input.setAttribute('checked', '');
+      else input.removeAttribute('checked');
+      greedSw.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+
     // Hybrid-grid and Auto-exit switches: restore from the saved param (same pattern
     // as Restart). Old configs carry neither field, which reads as off.
     const restoreSwitch = (id, key) => {
@@ -84,6 +98,13 @@ export class LoadDataFromFileCalculator {
 
     this.#fillInData(data);
     this.loadDataCalculator.calculate(data);
+
+    // The direct .value writes above don't re-sync the SpinBox +/- arrows
+    // (by design — see #fillInData). Recreating it here is what does: the
+    // same step a manual Long/Short click takes, otherwise a page landed on
+    // /spotbot/:symbol for an already-configured pair shows the decrement
+    // arrow stuck disabled at its server-rendered min:0/value:0 state.
+    this.onFormatChange?.();
   }
 
   async #fillInData(obj) {
