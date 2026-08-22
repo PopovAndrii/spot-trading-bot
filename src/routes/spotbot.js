@@ -314,6 +314,32 @@ router.post('/calculator/restart', async (req, res, next) => {
   }
 });
 
+// Greed Lock switch — its own route rather than a second field on /calculator/restart,
+// which rewrites `restart` from every request body and would flip it off here.
+router.post('/calculator/greedlock', async (req, res, next) => {
+  try {
+    const rawPair = req.body.message?.pair;
+    if (!rawPair) {
+      return res.status(400).json({ message: 'Pair is required' });
+    }
+
+    const symbol = rawPair.replace(/[^a-zA-Z0-9_-]/g, '');
+    const filePath = path.join(__dirname, '../data', `${symbol}-binance.json`);
+
+    const data = await loadOrCreatePairState(filePath);
+    data.greedLock = String(req.body.message.greedLock) === 'true';
+
+    await writeFileAtomic(filePath, JSON.stringify(data, null, 2), 'utf8');
+
+    const str = data.greedLock === true ? 'on' : 'off';
+
+    res.json({ message: `Greed lock for: ${symbol} is <b>${str}</b>` });
+  } catch (err) {
+    console.error('Error saving file:', err);
+    res.status(500).json({ message: 'Error saving file' });
+  }
+});
+
 router.post('/calculator/param', async (req, res, next) => {
   try {
     const msg = req.body.message || {};

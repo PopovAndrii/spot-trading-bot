@@ -158,6 +158,16 @@ export class LoadDataCalculator {
       });
   }
 
+  // Change button greed lock. No cross-tab WS sync (unlike Restart): the switch is
+  // restored from the grid file by applyState on the next table push.
+  greedLock() {
+    document
+      .getElementById('settings-calculate-greedlock')
+      .addEventListener('ui-switch-change', (e) => {
+        this.addGreedLockStatus(e.detail.value);
+      });
+  }
+
   // Params the robot re-reads every tick, so an edit lands on the LIVE cycle. Written
   // ALWAYS, running or not: the robot picks the value up on its next tick, or off the
   // file on Start. (Guarding a write on "running" is what made "Grid from order" look
@@ -842,6 +852,12 @@ export class LoadDataCalculator {
       .getElementById('settings-calculate-restart')
       ?.querySelector('input');
     orders.restart = Boolean(restartInput?.checked);
+    // Save rewrites the whole config file, so the greed-lock flag has to travel
+    // with it or a Save would silently clear the switch.
+    const greedInput = document
+      .getElementById('settings-calculate-greedlock')
+      ?.querySelector('input');
+    orders.greedLock = Boolean(greedInput?.checked);
     this.#saveDefaults();
 
     try {
@@ -879,6 +895,27 @@ export class LoadDataCalculator {
       if (this.onRestartChange) this.onRestartChange(value);
     } catch (err) {
       console.error('❌ addRestartStatus(value):', err);
+      return null;
+    }
+  }
+
+  async addGreedLockStatus(value) {
+    const obj = {
+      pair: base + quote,
+      greedLock: value,
+    };
+
+    try {
+      const res = await fetch('/spotbot/calculator/greedlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: obj }),
+      });
+
+      const data = await res.json();
+      this.notifications.showNotification(data.message, 'success', 10000);
+    } catch (err) {
+      console.error('❌ addGreedLockStatus(value):', err);
       return null;
     }
   }

@@ -28,6 +28,7 @@ const colors = {
 const loadDataCalculator = new LoadDataCalculator(notifications, colors);
 loadDataCalculator.save();
 loadDataCalculator.restart();
+loadDataCalculator.greedLock();
 loadDataCalculator.hybrid();
 loadDataCalculator.autoExit();
 loadDataCalculator.runtimeParams();

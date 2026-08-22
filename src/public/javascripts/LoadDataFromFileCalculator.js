@@ -66,6 +66,19 @@ export class LoadDataFromFileCalculator {
       }
     }
 
+    // Greed lock: same pattern as Restart, but it lives next to it in the config
+    // root, not in param. Missing on old configs, which reads as off.
+    const greedSw = document.getElementById('settings-calculate-greedlock');
+
+    if (greedSw) {
+      const input = greedSw.querySelector('input');
+      const on = String(data.greedLock) === 'true';
+      input.checked = on;
+      if (on) input.setAttribute('checked', '');
+      else input.removeAttribute('checked');
+      greedSw.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+
     // Hybrid-grid and Auto-exit switches: restore from the saved param (same pattern
     // as Restart). Old configs carry neither field, which reads as off.
     const restoreSwitch = (id, key) => {
