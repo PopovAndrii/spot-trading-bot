@@ -156,24 +156,26 @@
              engine's own numbers (obj.hybridView). Hidden on a classic cycle. -->
       <div id="hybrid-bar" class="hybrid-bar" hidden></div>
 
-      <table id="settings-table" class="t t-border t-striped t-hover">
-        <thead>
-          <tr>
-            <th class="center">#</th>
-            <th>%</th>
-            <th>Buy<br>currency</th>
-            <th>BUY</th>
-            <th>SELL</th>
-            <th>Sell<br>currency</th>
-            <th>Spent<br>
-              <%= quote %>
-            </th>
-            <th>Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table id="settings-table" class="t t-border t-striped t-hover">
+          <thead>
+            <tr>
+              <th class="center">#</th>
+              <th>%</th>
+              <th>Buy<br>currency</th>
+              <th>BUY</th>
+              <th>SELL</th>
+              <th>Sell<br>currency</th>
+              <th>Spent<br>
+                <%= quote %>
+              </th>
+              <th>Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+      </div>
 
       <div class="row">
         <div class="spotbot-danger-zone">

@@ -22,6 +22,60 @@
     >:nth-child(3) {
       justify-self: end;
     }
+
+    // Cancel-all / Delete-series buttons and the two switches all fight for one
+    // row on a phone (see table-scroll overflow fix above — same class of bug).
+    // Wrap onto its own row of 2 instead: buttons first, switches below.
+    @media (width <= 600px) {
+      grid-template-columns: repeat(2, 1fr);
+
+      >:nth-child(3) {
+        justify-self: stretch;
+      }
+    }
+  }
+}
+
+// Hybrid grid / Expert Mode switches: on a phone the danger-zone row is only 2
+// columns wide (see .spotbot-danger-zone above) and the side-by-side label +
+// slider don't fit. Same label-top treatment ui-elements already uses for
+// Restart/Greedlock, applied here only below the breakpoint where it's needed.
+@media (width <= 600px) {
+  #settings-hybrid,
+  #settings-expert-mode {
+    margin-top: 1.5rem;
+
+    // .spotbot-danger-zone switches to 2 equal 1fr columns on mobile (see above);
+    // a grid item stretches to fill its column by default, so the .UIsw box grows
+    // full-width while the slider stays left. The on/off text is absolutely
+    // positioned against *that* box (siblings of .UIsw-slider, not children —
+    // see markup), not the slider itself, so it drifted away to the right edge.
+    // Shrink back to content width instead of stretching.
+    justify-self: start;
+
+    > .UIsw-label {
+      white-space: nowrap;
+      position: absolute;
+      bottom: calc(100% + 0.125rem);
+      left: 0;
+    }
+  }
+}
+
+// Temporary test: show the text label on Calculate/Save/Start/Delete on mobile
+// (they're normally .collapse = icon-only) to see whether the text fits.
+@media (width <= 600px) {
+  #settings-calculate,
+  #settings-calculate-save,
+  #startBtn,
+  #cancel-all-orders,
+  #delete-current-series {
+    width: auto;
+    padding: 0.125rem 0.75rem;
+
+    > .UIb__label {
+      display: inline;
+    }
   }
 }
 

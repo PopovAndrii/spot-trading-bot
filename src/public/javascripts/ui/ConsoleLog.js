@@ -39,6 +39,7 @@ export class ConsoleLog {
   #restoreOpen() {
     if (localStorage.getItem(LS_OPEN) === 'true') {
       this.consoleEl.classList.add('console--open');
+      document.body.classList.add('console-open');
     }
   }
 
@@ -47,6 +48,12 @@ export class ConsoleLog {
       // a click on the git-build info only selects text, doesn't toggle the console
       if (e.target.closest('#app-version')) return;
       const isOpen = this.consoleEl.classList.toggle('console--open');
+      // .wrapper's bottom padding (room for the fixed console) used to key off
+      // `body:has(.console--open)` — mobile Firefox failed to make room for it
+      // (buttons under the table ended up hidden behind the console, a sliver
+      // visible), even though desktop Firefox was fine. A body class avoids
+      // depending on :has() support entirely.
+      document.body.classList.toggle('console-open', isOpen);
       localStorage.setItem(LS_OPEN, isOpen);
     });
   }
