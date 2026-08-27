@@ -42,3 +42,23 @@ the bot only treats the stream as dead when the pings stop.
 - **Off** → the bot stops cleanly after the current cycle completes.
 
 It can be toggled while the bot runs; the change applies to the *next* series boundary.
+
+## Greed Lock — refusing a shrunken restart
+
+The ladder is sized from the **live price** (order size × price) against a **fixed
+deposit**. If price has moved a lot by the time a series ends — up on a Long, down on a
+Short — the same deposit no longer stretches to the same number of rungs, and an
+automatic restart can come back **one or more rungs shorter** than the series that just
+finished. That unspent slice of the deposit then sits idle for the whole next cycle.
+
+**Greed Lock** (a live switch, next to Restart) guards against this:
+
+- **On** → if the freshly recalculated ladder would have **fewer** rungs than the series
+  that just ended, the restart is **refused** — the bot stops instead of quietly trading a
+  smaller grid. A Telegram message reports the old/new rung count and the idle balance, so
+  the deposit or order size can be raised deliberately.
+- **Off** → the restart proceeds with however many rungs the balance covers, same as
+  before Greed Lock existed.
+
+It only guards **automatic restarts** at the end of a series — it has no effect on the
+first **Start** of a new cycle, and it does nothing when Restart is off.

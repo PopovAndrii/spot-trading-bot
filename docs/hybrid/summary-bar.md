@@ -26,15 +26,18 @@ They start equal and diverge a little as fills land off-plan.
 
 The bar leads with a plain-language status of what the scalp is doing right now:
 
-| State | Message means |
-|---|---|
-| **idle** | Nothing held yet — waiting for the first fill. |
-| **DCA** | An order is held, but shallower than *Grid from order* — still pure averaging, no scalp yet. |
-| **scalping #N** | The micro on order #N is **live on the book**. |
-| **blocked** | No room for the micro on this rung — it names the Grid exit % to raise (or, if none fits, to lower Micro profit %). With [Auto exit](/hybrid/parameters#auto-exit) on, it raises it for you. |
-| **waiting** | In the zone but price is above the micro — arming now would sell into the book, so it waits for price to come back under the micro. Or: price is out of the zone (past the split) and the full close rests instead. |
-| **arming** | Placing the micro on the deepest order. |
-| **closed** | The position is closed out — nothing left to scalp. |
+| State | Message | Means |
+|---|---|---|
+| **idle** | `nothing held — waiting for the first fill` | No rung has filled yet — the cycle is armed but empty. |
+| **idle** | `order #N held — DCA until #M` | An order is held, but shallower than *Grid from order* — still pure averaging, no scalp yet. |
+| **idle** | `order #N is already closed out — nothing left to scalp` | Rare: rung #N's own volume is already fully sold (a close already took it), but the rest of the position is still open — nothing left on *this* rung to scalp, distinct from the whole cycle ending. |
+| **idle** | `position closed — nothing left to scalp` | The whole-position close fired and the cycle ended; the button is back to **Start**. |
+| **live** | `scalping order #N` | The micro on order #N is **live on the book** — this and [the tail](/hybrid/overview#the-tail) resting beside it. |
+| **live** | `arming the micro on #N` | The gate just opened this tick; the micro is being placed. |
+| **blocked** 🔴 | `no room for the micro on #N — raise Grid exit % to X` | The micro doesn't fit, but a higher Grid exit % would fix it — [Auto exit](/hybrid/parameters#auto-exit) raises it for you when it's on. |
+| **blocked** 🔴 | `no room for the micro on #N — no Grid exit % fits, lower Micro profit %` | No Grid exit % is high enough for this gap — the only fix left is a smaller Micro profit %. |
+| **wait** | `price is above the micro — waiting for it to come back under X` | In the zone, but arming now would sell straight into the book — it waits for price to dip back under the micro. |
+| **wait** | `price out of the zone — full close rests` | Price is past the [split](/hybrid/parameters#grid-exit) — the scalp yields and the plain whole-position close rests instead. |
 
 Read the bar top-down: **what it's doing** (state), then the four numbers it's doing it
 with. Every rung's own forecast is shown by the [✓ / ✗ marks](/hybrid/grid-marks) in the

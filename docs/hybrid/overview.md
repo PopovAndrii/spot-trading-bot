@@ -25,6 +25,25 @@ So instead of just sitting underwater waiting for the bounce, the position earns
 the up-and-down movement in the meantime. Every banked bounce also pulls the effective
 exit closer.
 
+## The tail
+
+While the micro scalps the deepest rung's own slice, the **rest of the position**
+(everything above the carrying rung, down to rung #1) still needs a resting exit — that
+order is the **tail**. It sits right next to the micro, sized and priced like the
+whole-position close, so the two together always add up to the full position: a spike up
+can fill both at once and the cycle ends on the exchange, not on the engine's next poll.
+
+The tail is priced from the real fills (same math as the classic close), **floored to
+whichever is more favorable between that price and the live micro's price** — since the
+cycle can't finish before the micro fills anyway, there is no reason to sell the bigger
+tail volume cheaper than the price the micro has already proven safe. It keeps following
+that logic while resting too: lower [Micro profit %](/hybrid/parameters#micro-profit) and
+the tail re-prices on the next poll, the same way a resting micro follows the knob.
+
+When the tail fills but the micro hasn't yet, the cycle is **not** over — it keeps
+holding the carrying rung until the micro also fills, at which point the position is flat
+and the cycle closes.
+
 ## The pause-scalp, in one line
 
 - **Pure DCA:** lay the ladder → average down → wait → close the whole position.
