@@ -28,6 +28,12 @@ from real fills. The yellow badge surfaces the **real** resting price so the tab
 lies. Hover it: *current price (re-placed)*.
 :::
 
+::: tip Yellow on the rung right above the micro? That's the tail
+Once a micro is live, the recomputed whole-position close settles on the rung right above
+it as the yellow badge — that resting order is the [tail](/hybrid/overview#the-tail): the
+rest of the position, priced to add up with the micro to the full position.
+:::
+
 ## What a micro order is
 
 A **micro order** is a small **partial close** of the **deepest filled rung's own

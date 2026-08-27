@@ -77,9 +77,9 @@ is not the same artifact as the production deploy above, and updating your own p
 server does not update it. It uses the same `prod` build target, just tagged and pushed:
 
 ```sh
-docker build --target prod -t 5879/spot-trading-bot:2.0.7 -t 5879/spot-trading-bot:latest \
+docker build --target prod -t 5879/spot-trading-bot:2.0.8 -t 5879/spot-trading-bot:latest \
   -f docker-config/Dockerfile .
-docker push 5879/spot-trading-bot:2.0.7
+docker push 5879/spot-trading-bot:2.0.8
 docker push 5879/spot-trading-bot:latest
 ```
 
@@ -121,12 +121,12 @@ Bump the version in `src/package.json` without creating a git tag automatically 
 inside the container, see [Local development](#local-development)):
 
 ```sh
-npm version 2.0.7 --no-git-tag-version
+npm version 2.0.8 --no-git-tag-version
 ```
 
 Then create and push the release tag from the host:
 
 ```sh
-git tag -a v2.0.7 -m "Release v2.0.7"
-git push origin v2.0.7
+git tag -a v2.0.8 -m "Release v2.0.8"
+git push origin v2.0.8
 ```

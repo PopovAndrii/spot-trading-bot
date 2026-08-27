@@ -30,12 +30,13 @@ features:
 
 ## Releases
 
-Current version: **`2.0.7`**.
+Current version: **`2.0.8`**.
 
 Every new version is added to this list with a short note on what changed. Newest first.
 
 | Version | Date | Notes |
 |---|---|---|
+| **`2.0.8`** | 2026-08-27 | Hybrid tail now follows price like the micro: it takes the live micro's price at placement when that's more favorable, and cancel-replaces on drift while resting — a lowered Micro profit % reaches an already-placed tail immediately. |
 | **`2.0.7`** | 2026-08-22 | Greed lock: refuses an auto-Restart if the new grid would come out with fewer orders than the last cycle (a rally makes each rung more expensive against a fixed deposit), stopping instead of looping into a shrunk ladder, with a Telegram notice. Save now remembers your Build parameters per pair/strategy in local storage. Mobile layout fixes: the order table and the danger-zone/switch row no longer drag the whole page sideways, Calculate/Save/Start/Cancel all show their label again, and the bottom console no longer hides the buttons above it on mobile Firefox. Fixes: SpinBox decrement arrows stuck disabled on direct pair navigation; Indent price could not reach 0; a background tab's WebSocket reconnect could stay stuck behind a frozen backoff until refocus. |
 | **`2.0.6`** | 2026-08-19 | Static assets (JS/CSS) served without cache-control could linger stale in the browser across deploys, showing mismatched footer versions and a resurrected pre-fix Start-button race until a hard refresh. Static serving now forces revalidation via `Cache-Control: no-cache`. |
 | **`2.0.5`** | 2026-08-10 | Start button, parameter lock, and the header pair-status label could get stuck out of sync with the running bot after a fresh page load — a DOM race could silently drop the running state, and the pair-list label was never resynced. |
