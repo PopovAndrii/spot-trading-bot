@@ -1004,6 +1004,18 @@ class JsonTimerSender extends EventEmitter {
           }
         }
 
+        // A role-less resting close whose recompute already matches it byte
+        // for byte (the tail landed on the same price the old classic close
+        // held) — no order-book action needed, just the role tag so a future
+        // FILL routes through the tail-completion path instead of classic's
+        // whole-position DONE. No API call.
+        if (currentOrder.status === 'STAMP') {
+          if (currentOrder.role) obj[currentOrder.side][currentOrder.id].role = currentOrder.role;
+          await this.#mergeLiveEdits(obj);
+          await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
+          continue;
+        }
+
         if (currentOrder.status === 'pass') {
           console.log(`${this.symbol} ${JSON.stringify(currentOrder)}`);
           // await this.#sleep(100);
