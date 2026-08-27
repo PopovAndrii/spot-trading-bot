@@ -1022,8 +1022,10 @@ class Job {
       // While the scalp holds the head, a live close anywhere but the tail's
       // slot covers the wrong remainder (left from before the ladder deepened).
       // Pull it — the tail takes its place bigger and lower, exactly the way
-      // the classic close has always moved on every new fill. A close sitting
-      // ON the tail's slot is the tail de facto and is left alone.
+      // the classic close has always moved on every new fill. Any close already
+      // resting ON the tail's own slot (role 'tail', or a role-less classic
+      // close the ladder deepened past) is handled below instead — placed,
+      // corrected on drift, or left alone if it already matches.
       if (
         microLive &&
         i !== D - 1 &&
@@ -1044,8 +1046,11 @@ class Job {
 
       if (i === D - 1 && el.status === state.FILLED) {
         const t = this.#tailClose(obj, i, D, strategy, closeSide);
+        // Resting covers role 'tail' AND a role-less leftover classic close on
+        // this slot (the ladder deepened past it without it ever yielding) —
+        // both are diffed against the recompute below and cancelReplaced on
+        // drift, which also stamps the slot with role 'tail' going forward.
         const tailResting =
-          close.role === 'tail' &&
           close.orderId != null &&
           (close.status === state.NEW || close.status === state.PARTIALLY_FILLED);
 
@@ -1310,7 +1315,10 @@ class Job {
 
     const slot = obj[closeSide]?.[i];
     if (!slot || slot.manual) return null;
-    if (slot.status !== null && slot.status !== state.CANCELED && slot.role !== 'tail') return null;
+    // Refuse over a micro (never ours to touch) or a terminal FILLED close (the
+    // caller's own FILLED branch owns that). A role-less resting close is fair
+    // game — it is exactly the leftover classic close the ladder deepened past.
+    if (slot.role === 'micro' || slot.status === state.FILLED) return null;
 
     const otherLive = (obj[closeSide] || []).some(
       (c, k) =>
