@@ -1105,20 +1105,16 @@ class Job {
           // No drift — the resting order (role 'tail' already, or a role-less
           // leftover that happens to already sit at the right price/qty) needs
           // no order-book action, but a role-less one still needs the 'tail'
-          // stamp: applyOrderResult patches role off ANY result that carries it,
-          // getOrder included. Without this, a role-less match never gets
-          // tagged (nothing ever drifts to trigger cancelReplace), and its
-          // eventual FILL falls into classic's whole-position DONE path while
-          // the carrying rung is still held.
+          // stamp. A getOrder cannot do it: the iterator only runs
+          // applyOrderResult (and its role patch) when the polled status
+          // DIFFERS from the sent one (see #jobIterator's short-circuit for
+          // NEW→NEW polls), which this resting order never will. Pure
+          // bookkeeping instead, same pattern as REARM — no API call. Without
+          // it a role-less match never gets tagged, and its eventual FILL
+          // falls into classic's whole-position DONE path while the carrying
+          // rung is still held.
           if (close.role !== 'tail') {
-            return {
-              status: close.status,
-              method: 'getOrder',
-              side: closeSide,
-              id: i,
-              role: 'tail',
-              data: { id: i, symbol, orderId: close.orderId },
-            };
+            return { status: 'STAMP', method: false, side: closeSide, id: i, role: 'tail', data: {} };
           }
         }
       }
