@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.8
+
+### Added
+
+- Hybrid tail now follows price like the micro: at placement it takes the live micro's price when that is more favorable than its own recomputed exit, and while resting it recomputes on every poll and cancel-replaces on drift — so lowering Micro profit %/commission reaches an already-placed tail immediately instead of only on the next fill that deepens the ladder.
+
 ## v2.0.7
 
 ### Added

@@ -1044,7 +1044,12 @@ class Job {
 
       if (i === D - 1 && el.status === state.FILLED) {
         const t = this.#tailClose(obj, i, D, strategy, closeSide);
-        if (t) {
+        const tailResting =
+          close.role === 'tail' &&
+          close.orderId != null &&
+          (close.status === state.NEW || close.status === state.PARTIALLY_FILLED);
+
+        if (t && !tailResting) {
           return {
             status: null,
             method: 'newOrder',
@@ -1061,6 +1066,36 @@ class Job {
               price: t.price,
             },
           };
+        }
+
+        // Live tail already resting on its slot: follow the same knobs the
+        // micro follows (Micro profit %, commission) by diffing the freshly
+        // recomputed price/qty against what is actually on the book and
+        // cancelReplacing on drift — otherwise a lowered Micro profit % only
+        // ever reaches the tail the next time the ladder deepens.
+        if (t && tailResting) {
+          const tick = parseInt(obj.param?.['field-tickSize'], 10) || 0;
+          const tickVal = tick > 0 ? Math.pow(10, -tick) : 1;
+          const drift = Math.abs(parseFloat(t.price) - parseFloat(close.price));
+          if (drift >= tickVal / 2 && parseFloat(t.quantity) > 0) {
+            return {
+              status: null,
+              method: 'cancelReplace',
+              side: closeSide,
+              id: i,
+              role: 'tail',
+              data: {
+                id: i,
+                symbol,
+                side: closeSide,
+                type: 'LIMIT',
+                timeInForce: 'GTC',
+                quantity: t.quantity,
+                price: t.price,
+                orderId: close.orderId,
+              },
+            };
+          }
         }
       }
       return classic(obj, i, el);
@@ -1254,6 +1289,15 @@ class Job {
   // the slot is busy or the user's (manual), ANOTHER live non-micro close still
   // rests (placing on top of it would oversell the position), fill data is
   // missing (old config), or the remainder is below exchange minimums.
+  //
+  // Price floor/ceiling: the cycle can't finish before the live micro fills
+  // anyway, so if the micro's price is already more favorable than the raw
+  // rebalanceClose price, the tail is placed AT the micro's price instead —
+  // free profit on the bigger 0..D-1 volume, using a price the micro already
+  // proved safe (it carries its own margin). Also callable while the tail
+  // itself already rests (role === 'tail' on this slot) to recompute what it
+  // SHOULD be right now — the caller diffs that against the live order and
+  // cancelReplaces on drift, the same way the micro follows the profit knob.
   #tailClose(obj, i, D, strategy, closeSide) {
     const entrySide = strategy === 'long' ? 'BUY' : 'SELL';
 
@@ -1266,11 +1310,12 @@ class Job {
 
     const slot = obj[closeSide]?.[i];
     if (!slot || slot.manual) return null;
-    if (slot.status !== null && slot.status !== state.CANCELED) return null;
+    if (slot.status !== null && slot.status !== state.CANCELED && slot.role !== 'tail') return null;
 
     const otherLive = (obj[closeSide] || []).some(
       (c, k) =>
         k !== D &&
+        k !== i &&
         c &&
         c.orderId != null &&
         c.role !== 'micro' &&
@@ -1304,7 +1349,14 @@ class Job {
     const quantity = new Decimal(res.quantity)
       .toDecimalPlaces(stepSize, Decimal.ROUND_DOWN)
       .toFixed(stepSize);
-    const price = new Decimal(res.price).toFixed(tickSize);
+
+    let priceVal = new Decimal(res.price);
+    const microPrice = new Decimal(md.price);
+    const microBetter =
+      strategy === 'long' ? microPrice.gt(priceVal) : microPrice.lt(priceVal);
+    if (microBetter) priceVal = microPrice;
+    const price = priceVal.toFixed(tickSize);
+
     if (parseFloat(quantity) <= 0 || this.#belowMin(quantity, price)) return null;
 
     return { quantity, price };
