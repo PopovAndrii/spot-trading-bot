@@ -1211,7 +1211,11 @@ class JsonTimerSender extends EventEmitter {
       // this.strategy = (this.strategy == null) ? strategy : this.strategy;
       this.strategy = strategy == 'short' ? 'short' : 'long';
 
-      this.autoRestart = options.autoRestart || false;
+      // The UI's Start button never sends this — the file's own `restart` flag
+      // (the same one Save persists) is the real source of truth, exactly like
+      // greedLock just below. options.autoRestart stays as an explicit override
+      // for callers that DO pass it.
+      this.autoRestart = options.autoRestart === true;
 
       this.apiFailStreak = 0;
       this.apiOutageNotified = false;
@@ -1274,12 +1278,6 @@ class JsonTimerSender extends EventEmitter {
 
       this.symbol = symbol;
 
-      this.readLoop();
-
-      const startMsg = `🟢 Start: ${this.symbol} | ${this.strategy} | restart: ${this.autoRestart}`;
-      console.log(startMsg);
-      logBus.log(startMsg);
-
       // Telegram: cycle start — price (grid base), strategy, auto-restart status.
       let startPrice = '';
       try {
@@ -1287,13 +1285,23 @@ class JsonTimerSender extends EventEmitter {
         startPrice = obj?.param?.['field-currency'] || '';
         // Greed Lock lives in the grid file (its own route writes it), not in the
         // start options — the file is the one authority, and #mergeLiveEdits keeps
-        // it current if the switch is flipped mid-cycle.
+        // it current if the switch is flipped mid-cycle. Auto-restart is the same
+        // story: the file's `restart` is what Save persisted and what the DONE
+        // path reads (see below), so Start reports that unless a caller passed
+        // an explicit override.
         this.greedLock = obj?.greedLock === true;
+        if (options.autoRestart !== true) this.autoRestart = obj?.restart === true;
         const td = parseInt(obj?.param?.['field-tickSize'], 10);
         if (Number.isInteger(td) && td >= 0) this.tickDecimals = td;
       } catch {
         // grid file unreadable — send without a price rather than skip the notice
       }
+
+      this.readLoop();
+
+      const startMsg = `🟢 Start: ${this.symbol} | ${this.strategy} | restart: ${this.autoRestart}`;
+      console.log(startMsg);
+      logBus.log(startMsg);
       telegram.send(
         `🟩 <b>Start</b> ${this.symbol}\n` +
         `Strategy: <b>${this.strategy}</b>\n` +
