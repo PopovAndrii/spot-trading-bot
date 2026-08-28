@@ -1330,10 +1330,16 @@ class Job {
 
     const slot = obj[closeSide]?.[i];
     if (!slot || slot.manual) return null;
-    // Refuse over a micro (never ours to touch) or a terminal FILLED close (the
-    // caller's own FILLED branch owns that). A role-less resting close is fair
-    // game — it is exactly the leftover classic close the ladder deepened past.
-    if (slot.role === 'micro' || slot.status === state.FILLED) return null;
+    // Refuse over a LIVE micro (never ours to touch) or a terminal FILLED close
+    // (the caller's own FILLED branch owns that). A role-less resting close is
+    // fair game — it is exactly the leftover classic close the ladder deepened
+    // past, and so is a CANCELED micro from an earlier cycle: the role tag
+    // sticks after cancel, but a dead order must not block the tail forever.
+    const slotMicroLive =
+      slot.role === 'micro' &&
+      slot.orderId != null &&
+      (slot.status === state.NEW || slot.status === state.PARTIALLY_FILLED);
+    if (slotMicroLive || slot.status === state.FILLED) return null;
 
     const otherLive = (obj[closeSide] || []).some(
       (c, k) =>
