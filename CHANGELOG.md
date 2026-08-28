@@ -6,6 +6,12 @@
 
 - Hybrid tail now follows price like the micro: at placement it takes the live micro's price when that is more favorable than its own recomputed exit, and while resting it recomputes on every poll and cancel-replaces on drift — so lowering Micro profit %/commission reaches an already-placed tail immediately instead of only on the next fill that deepens the ladder.
 
+### Fixed
+
+- A role-less classic close left resting on the hybrid tail's slot (the ladder deepened past it without it ever yielding) blocked the tail from ever being placed there — it now gets adopted, diffed against the recomputed tail price/quantity, and cancel-replaced on drift like any other tail.
+- The adopted leftover close above only got tagged with role `'tail'` when a price drift triggered a `cancelReplace`; a leftover that already matched the recomputed price stayed untagged forever, so its eventual fill fell into the classic whole-position `DONE` path while the carrying rung (with its own live micro) was still held, ending the cycle early. Untagged leftovers are now stamped with role `'tail'` as pure bookkeeping, no exchange call.
+- Telegram's Start message could report auto-restart as off even when the saved grid had it on — the Start socket call never forwarded the flag, so it read a stale `false` instead of the grid file's own `restart` value.
+
 ## v2.0.7
 
 ### Added
