@@ -851,7 +851,36 @@ class JsonTimerSender extends EventEmitter {
           cellStatus === 'PARTIALLY_FILLED'
         ) {
           if (i === parseFloat(obj['param']['field-activeOrders'])) {
-            return;
+            // Beyond the active-orders window: a resting order here is pulled so
+            // exactly N stay active, instead of sitting unmanaged (unseen by this
+            // loop at all) until the cycle's final cleanup. A not-yet-placed slot
+            // (status null) has nothing to cancel — skipped outright, since
+            // falling through to job[method] below would place it early.
+            if (
+              val.orderId != null &&
+              !val.manual &&
+              (cellStatus === 'NEW' || cellStatus === 'PARTIALLY_FILLED')
+            ) {
+              const res = await this.#runToApi({
+                method: 'cancelOrder',
+                data: { id: key, symbol: this.symbol, orderId: val.orderId },
+              });
+              if (res && res.success !== false) {
+                val.status = 'CANCELED';
+                if (res.message?.executedQty !== undefined) {
+                  val.executedQty = parseFloat(res.message.executedQty) || 0;
+                  val.cummulativeQuoteQty = parseFloat(res.message.cummulativeQuoteQty) || 0;
+                }
+                logBus.log(
+                  `🔁 ${this.symbol}: ${strategy.side} #${key + 1} @ ${val.price} pulled — ` +
+                  `beyond the ${i}-wide active-orders window`
+                );
+                obj.date_modified = new Date().toISOString();
+                await this.#mergeLiveEdits(obj);
+                await writeFileAtomic(this.#filePath(), JSON.stringify(obj, null, 2));
+              }
+            }
+            continue;
           }
           i++;
         }
